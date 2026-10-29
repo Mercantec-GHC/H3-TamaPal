@@ -47,10 +47,10 @@ git-ignored and must never be committed.
 
 ## Team
 
-| Person | Area (draft) |
+| Person | Area |
 |---|---|
-| Oleh | Arduino – the pet and visuals |
-| Andrii | Backend, database, frontend mini games |
-| Oliver | Backend, database, frontend mini games |
+| Oleh | Arduino – the pet, visuals, sensors, menu |
+| Oliver | Backend and database |
+| Andrii | Frontend in the browser – mini games, statistics |
 
-Roles and plan are a draft – everything can be discussed.
+Open questions for the team: [docs/TIL-DISKUSSION.md](docs/TIL-DISKUSSION.md).
