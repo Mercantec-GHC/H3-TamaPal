@@ -28,7 +28,7 @@ Arduino ──MQTT──► Backend + database ──SignalR──► Browser
 
 
 
-**En skitse af hele spillets loop:** (Kan rettes, tilføjes og slettes)
+**En skitse af hele spillets loop – fra Oliver:** (Kan rettes, tilføjes og slettes)
 Fase 1 – Lumi bliver født
 
 1. Arduinoen starter, og en ny Lumi bliver født med et unikt ID.
