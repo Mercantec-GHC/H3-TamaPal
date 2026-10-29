@@ -5,6 +5,11 @@
 3. **Frontend:** Blazor eller JS/canvas?
 4. **Login/JWT, Docker og deploy:** til sidst.
 5. **Hvem styrer bolden:** backend eller browseren?
+6. **Git-branches:** intet direkte i `main` – kun releases (hver fredag).
+   - `dev` er vores fælles arbejdsbranch.
+   - Hver opgave får sin egen korte branch, fx `frontend/pingpong-canvas`, `backend/signalr-hub`, `arduino/pet-needs`.
+   - Færdigt arbejde → Pull Request ind i `dev`, en anden fra gruppen kigger det igennem.
+   - Fredag før release: `dev` → `main` + tag (fx `v0.3.0`).
 
 ## Min vision for dataflowet (forslag)
 
