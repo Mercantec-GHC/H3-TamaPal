@@ -4,7 +4,7 @@ Dokumentet har fem dele:
 
 1. **Del 1 – Forslag fra Andrii (2/11):** MVP og dataflow for Pong-spillet.
 2. **Del 1b – Forslag fra Oleh (2/11):** Oplà som kæledyr + controller, 5 behov, nye MQTT-beskeder, sensorer og 16 GB SD-kort.
-3. **Del 1c – Forslag fra Oliver (2/11):** Backendens opbygning, knap og `tilt`, faste mål på spillefeltet, MQTT-broker, falske data og kommentarer til Olehs kæledyrs-beskeder.
+3. **Del 1c – Forslag fra Oliver (2/11):** Backendens opbygning, knap og `tilt`, faste mål på spillefeltet, MQTT-broker, falske data, kommentarer til Olehs kæledyrs-beskeder og hvad backenden har brug for fra Arduino og frontend.
 4. **Del 2 – Spørgsmål:** Det vi skal blive enige om.
 5. **Del 3 – Aftale:** Udfyldes sammen, når vi er enige. Det er den, vi arbejder efter.
 
@@ -365,9 +365,39 @@ Forslag til diskussionen. Del 3 udfylder vi sammen.
 
 ### Det har jeg brug for fra jer
 
-- **Oleh:** ja eller nej til punkt 2 (knappen), punkt 3 (30° = 1) og punkt 7 (`id`, `ageMinutes` og `score` i `gameover`). Og en test af, om Oplàen kan komme på skolens Wi-Fi.
-- **Andrii:** ja eller nej til målene i punkt 4, og om dine filer må vises fra backenden (spørgsmål 10).
-- **Begge:** sig til, hvis topic-navne eller felter skal ændres, før jeg bygger dem ind i koden.
+For at kunne bygge backenden har jeg brug for nogle svar og oplysninger fra jer. Skriv gerne svaret direkte i kolonnen **Svar** eller i gruppens chat.
+
+**Fra Oleh (Arduino)**
+
+| # | Hvad jeg har brug for | Hvorfor | Svar |
+|---|---|---|---|
+| O1 | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Så backenden læser `button` og `tilt` på samme måde, som Oplàen sender dem. | |
+| O2 | Ja eller nej til punkt 7: `id` og `ageMinutes` i `pet/state`, og `score` i `gameover` i stedet for `pet/reward`. | Så jeg ved, hvad databasen skal gemme. | |
+| O3 | Oplàens navn i topic (`opla-1`) og det client ID, den bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | |
+| O4 | Sender Oplàen kun `input` i controller-tilstand? | Så ved backenden, at ingen beskeder betyder "kæledyrs-tilstand" og ikke en fejl. | |
+| O5 | Alle værdier for `stage` og `cause`, og om behovene går fra 0 til 100. | Så databasen og kirkegården kan gemme og vise dem rigtigt. | |
+| O6 | Kan Oplàen komme på skolens Wi-Fi, og hvornår kan den sende rigtigt `tilt`? | Til første test hele vejen (spørgsmål 13). | |
+
+**Fra Andrii (Frontend)**
+
+| # | Hvad jeg har brug for | Hvorfor | Svar |
+|---|---|---|---|
+| A1 | Ja eller nej til målene i punkt 4 (kvadratisk felt, størrelser, midte). | Så det, du tegner, passer med det, backenden regner med. | |
+| A2 | Må backenden vise dine filer fra `Frontend/` (spørgsmål 10)? Hvis ikke: hvilken adresse og port kører siden på (fx Live Server på port 5500)? | Ellers skal jeg slå CORS til for netop den adresse. | |
+| A3 | Kan du nøjes med at se, at `score` og `lives` ændrer sig, eller skal browseren også have `hit` og `miss`? | Skal du bruge dem, skal vi aftale en ekstra besked. | |
+| A4 | Hvornår kan siden forbinde til `/gamehub` og tegne `GameState`? | Til første test hele vejen (spørgsmål 13). | |
+| A5 | Efter MVP: hvad skal highscore-listen og kirkegården vise? | Så jeg laver de rigtige tabeller i databasen. | |
+
+**Fra begge**
+
+- Hvilket navn skal stå på highscore-listen: Lumis navn fra Oplàen eller et navn, man skriver i browseren?
+- Sig til, hvis topic-navne eller felter skal ændres, før jeg bygger dem ind i koden.
+
+**Det får I fra mig**
+
+- Brokerens IP-adresse og port (1883), så snart Mosquitto kører på min bærbare.
+- En backend med falske data (`FakeInput`), som Andrii kan forbinde til (forslag: tirsdag 3/11).
+- Besked i chatten, hvis noget i kontrakten ændrer sig.
 
 ---
 
