@@ -1,8 +1,16 @@
-# Beskeder – forslag til MVP (Pong mod væggen)
+# MVP og beskeder – til diskussion
 
-Forslag fra Andrii 2/11 – til diskussion og rettelser i gruppen.
+Dokumentet har tre dele:
 
-Princip: så få beskeder som muligt og ingen ekstra felter.
+1. **Forslag** (fra Andrii 2/11) – et udgangspunkt, ikke en beslutning.
+2. **Spørgsmål** – det vi skal blive enige om.
+3. **Aftale** – udfyldes sammen, når vi har besluttet. Det er den, vi arbejder efter.
+
+Alle må rette og kommentere. Princip: så få beskeder som muligt og ingen ekstra felter.
+
+---
+
+# Del 1 – Forslag
 
 ## MVP
 
@@ -99,3 +107,58 @@ Metode `StartGame()` – knappen "Start" eller "Spil igen".
 - **Al logik ligger i backend** og opfylder DoD-punkt 6 (point, liv og regler i backend).
 - **Kun én Oplà.** Ingen problemer med to enheder eller pairing, og man kan teste alene.
 - **Alle kan starte i dag med falske data.**
+
+---
+
+# Del 2 – Spørgsmål til diskussion
+
+**Spillet**
+
+1. MVP: Pong mod væggen med én Oplà – eller to spillere fra start?
+2. Styring: vippe (IMU) – eller knapper op/ned? Hvad gør knappen?
+3. Regler: 3 liv? Skal bolden blive hurtigere? Hvornår slutter spillet?
+4. Hvad sker der efter MVP: highscore, spiller 2, lobby, kirkegård, labyrint?
+
+**Kommunikation**
+
+5. MQTT mellem Oplà og backend – eller HTTP? Hvilken broker (Mosquitto lokalt, skolens)?
+6. Er topic-navnene og JSON-felterne i Del 1 ok? Mangler der noget?
+7. Hvor ofte sender Oplàen input (20/s?), og hvor ofte sender backend `GameState` (30/s?)?
+8. Skal Oplàen reagere på `hit`/`miss`/`gameover` (LED/lyd)?
+
+**Teknik og arbejde**
+
+9. Hvem styrer bolden: backend (forslag) eller browseren?
+10. Frontend i backendens `wwwroot` eller separat (CORS)?
+11. Database fra start (Neon) – eller først efter MVP?
+12. Branch-navne `feature/...` og 1 eller 2 godkendelser på Pull Requests?
+13. Datoer: første test hele vejen igennem, brugertest, "kode-stop" før 11/11?
+
+---
+
+# Del 3 – Aftale
+
+Udfyldes sammen. Når vi er enige, skriver vi navn og dato nederst.
+
+| # | Emne | Beslutning |
+|---|---|---|
+| 1 | MVP | |
+| 2 | Styring | |
+| 3 | Regler | |
+| 5 | Protokol og broker | |
+| 6 | Topics og JSON | |
+| 7 | Frekvens | |
+| 8 | Feedback på Oplà | |
+| 9 | Hvem styrer bolden | |
+| 10 | Hvor ligger frontend | |
+| 11 | Database | |
+| 12 | Branches og reviews | |
+| 13 | Datoer | |
+
+**Godkendt af:**
+
+- [ ] Oleh – dato:
+- [ ] Oliver – dato:
+- [ ] Andrii – dato:
+
+Ændringer efter aftalen: ret både Del 1 og tabellen her, og skriv det i gruppens chat.
