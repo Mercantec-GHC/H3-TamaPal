@@ -491,3 +491,6 @@ config.h
 # Node / frontend
 node_modules/
 dist/
+
+# Personal Arduino plan document
+ARDUINO_PLAN_OLEH.md
