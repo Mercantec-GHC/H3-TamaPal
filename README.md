@@ -55,3 +55,4 @@ git-ignored and must never be committed.
 
 Open questions for the team: [docs/TIL-DISKUSSION.md](docs/TIL-DISKUSSION.md).
 Workflow and requirements from the 2/11 meeting: [docs/MOEDE-2026-11-02.md](docs/MOEDE-2026-11-02.md).
+Message format proposal (MQTT/SignalR): [docs/MESSAGES.md](docs/MESSAGES.md).
