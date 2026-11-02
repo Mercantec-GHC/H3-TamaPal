@@ -365,39 +365,16 @@ Forslag til diskussionen. Del 3 udfylder vi sammen.
 
 ### Det har jeg brug for fra jer
 
-For at kunne bygge backenden har jeg brug for nogle svar og oplysninger fra jer. Skriv gerne svaret direkte i kolonnen **Svar** eller i gruppens chat.
+Kun det, jeg skal bruge for at bygge MVP'en. Skriv svaret i kolonnen **Svar** eller i gruppens chat.
 
-**Fra Oleh (Arduino)**
+| # | Fra | Hvad jeg har brug for | Hvorfor | Svar |
+|---|---|---|---|---|
+| 1 | Oleh | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Backenden skal læse `button` og `tilt` på samme måde, som Oplàen sender dem. | |
+| 2 | Oleh | Det client ID, Oplàen bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | |
+| 3 | Andrii | Ja eller nej til målene i punkt 4. | Det, du tegner, skal passe med det, backenden regner med. | |
+| 4 | Andrii | Må backenden vise siden fra `Frontend/`? Hvis ikke: hvilken adresse og port kører den på? | Ellers skal jeg slå CORS til for den adresse. | |
 
-| # | Hvad jeg har brug for | Hvorfor | Svar |
-|---|---|---|---|
-| O1 | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Så backenden læser `button` og `tilt` på samme måde, som Oplàen sender dem. | |
-| O2 | Ja eller nej til punkt 7: `id` og `ageMinutes` i `pet/state`, og `score` i `gameover` i stedet for `pet/reward`. | Så jeg ved, hvad databasen skal gemme. | |
-| O3 | Oplàens navn i topic (`opla-1`) og det client ID, den bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | |
-| O4 | Sender Oplàen kun `input` i controller-tilstand? | Så ved backenden, at ingen beskeder betyder "kæledyrs-tilstand" og ikke en fejl. | |
-| O5 | Alle værdier for `stage` og `cause`, og om behovene går fra 0 til 100. | Så databasen og kirkegården kan gemme og vise dem rigtigt. | |
-| O6 | Kan Oplàen komme på skolens Wi-Fi, og hvornår kan den sende rigtigt `tilt`? | Til første test hele vejen (spørgsmål 13). | |
-
-**Fra Andrii (Frontend)**
-
-| # | Hvad jeg har brug for | Hvorfor | Svar |
-|---|---|---|---|
-| A1 | Ja eller nej til målene i punkt 4 (kvadratisk felt, størrelser, midte). | Så det, du tegner, passer med det, backenden regner med. | |
-| A2 | Må backenden vise dine filer fra `Frontend/` (spørgsmål 10)? Hvis ikke: hvilken adresse og port kører siden på (fx Live Server på port 5500)? | Ellers skal jeg slå CORS til for netop den adresse. | |
-| A3 | Kan du nøjes med at se, at `score` og `lives` ændrer sig, eller skal browseren også have `hit` og `miss`? | Skal du bruge dem, skal vi aftale en ekstra besked. | |
-| A4 | Hvornår kan siden forbinde til `/gamehub` og tegne `GameState`? | Til første test hele vejen (spørgsmål 13). | |
-| A5 | Efter MVP: hvad skal highscore-listen og kirkegården vise? | Så jeg laver de rigtige tabeller i databasen. | |
-
-**Fra begge**
-
-- Hvilket navn skal stå på highscore-listen: Lumis navn fra Oplàen eller et navn, man skriver i browseren?
-- Sig til, hvis topic-navne eller felter skal ændres, før jeg bygger dem ind i koden.
-
-**Det får I fra mig**
-
-- Brokerens IP-adresse og port (1883), så snart Mosquitto kører på min bærbare.
-- En backend med falske data (`FakeInput`), som Andrii kan forbinde til (forslag: tirsdag 3/11).
-- Besked i chatten, hvis noget i kontrakten ændrer sig.
+Fra mig får I brokerens IP-adresse og port (1883), så snart Mosquitto kører på min bærbare.
 
 ---
 
