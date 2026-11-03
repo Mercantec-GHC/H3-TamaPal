@@ -122,13 +122,13 @@ void NetMqttClient::update(unsigned long now) {
   }
 }
 
-bool NetMqttClient::publishInput(const char* jsonPayload, unsigned long now) {
+bool NetMqttClient::publishInput(const char* jsonPayload, unsigned long now, bool forceImmediate) {
   if (jsonPayload == nullptr || !isConnected()) {
     return false;
   }
 
-  // Rate-limit publishing to ~20 Hz (every 50 ms)
-  if (now - lastPublishTime < MQTT_PUBLISH_INTERVAL_MS) {
+  // Rate-limit publishing to ~20 Hz (every 50 ms), UNLESS a button state changed immediately!
+  if (!forceImmediate && (now - lastPublishTime < MQTT_PUBLISH_INTERVAL_MS)) {
     return false;
   }
 

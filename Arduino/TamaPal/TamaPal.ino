@@ -44,6 +44,11 @@ bool touch3HoldFired = false;
 unsigned long touch3StartTime = 0;
 unsigned long muteMessageEndTimeMs = 0;
 
+// Controller button edge-trigger tracking (for instant low-latency publishing)
+bool lastCtrlUp = false;
+bool lastCtrlDown = false;
+bool lastCtrlAction = false;
+
 void setup() {
   Serial.begin(115200);
 
@@ -252,13 +257,22 @@ void loop() {
     bool btnUp     = carrier.Buttons.getTouch(TOUCH0);
     bool btnDown   = carrier.Buttons.getTouch(TOUCH1);
     bool btnAction = carrier.Buttons.getTouch(TOUCH2);
+
+    // Detect immediate edge change (pressed or released) to eliminate 50ms tap latency
+    bool buttonEdge = (btnUp != lastCtrlUp) || (btnDown != lastCtrlDown) || (btnAction != lastCtrlAction);
+    lastCtrlUp     = btnUp;
+    lastCtrlDown   = btnDown;
+    lastCtrlAction = btnAction;
+
     tiltLogic.setButtons(btnUp, btnDown, btnAction);
 
-    // 5c. Service MQTT network and publish input at ~20 Hz
+    // 5c. Service MQTT network and publish input:
+    // - Immediately on button state change (< 1 ms latency!)
+    // - Plus 20 Hz periodic heartbeat (~50 ms) for smooth 2D tilt & keep-alive
     netMqtt.update(now);
     char jsonBuffer[96];
     tiltLogic.formatInputJson(jsonBuffer, sizeof(jsonBuffer));
-    netMqtt.publishInput(jsonBuffer, now);
+    netMqtt.publishInput(jsonBuffer, now, buttonEdge);
 
     // 5d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
     uiController.updateDisplay(tiltLogic, netMqtt.isConnected());

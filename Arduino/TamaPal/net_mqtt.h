@@ -30,8 +30,10 @@ public:
   // Maintain Wi-Fi and MQTT connection non-blockingly
   void update(unsigned long now);
 
-  // Publish tilt & button JSON packet to tamapal/opla-1/input (rate-limited to 20 Hz)
-  bool publishInput(const char* jsonPayload, unsigned long now);
+  // Publish tilt & button JSON packet to tamapal/opla-1/input
+  // Sends immediately if forceImmediate is true (instant state-change edge),
+  // otherwise maintains periodic heartbeat at 20 Hz (~50 ms)
+  bool publishInput(const char* jsonPayload, unsigned long now, bool forceImmediate = false);
 
   // Safe disconnection when exiting to main menu
   void disconnect();
