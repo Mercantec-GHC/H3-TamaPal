@@ -371,8 +371,8 @@ Kun det, jeg skal bruge for at bygge MVP'en. Skriv svaret i kolonnen **Svar** el
 |---|---|---|---|---|
 | 1 | Oleh | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Backenden skal læse `button` og `tilt` på samme måde, som Oplàen sender dem. | |
 | 2 | Oleh | Det client ID, Oplàen bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | |
-| 3 | Andrii | Ja eller nej til målene i punkt 4. | Det, du tegner, skal passe med det, backenden regner med. | |
-| 4 | Andrii | Må backenden vise siden fra `Frontend/`? Hvis ikke: hvilken adresse og port kører den på? | Ellers skal jeg slå CORS til for den adresse. | |
+| 3 | Andrii | Ja eller nej til målene i punkt 4. | Det, du tegner, skal passe med det, backenden regner med. | **Ja.** Canvas er 600 × 600, og `draw.js` bruger præcis disse mål (Andrii, 3/11). |
+| 4 | Andrii | Må backenden vise siden fra `Frontend/`? Hvis ikke: hvilken adresse og port kører den på? | Ellers skal jeg slå CORS til for den adresse. | **Ja.** Indtil backenden kører, tester jeg med `python3 -m http.server 5500` i `Frontend/` (Andrii, 3/11). |
 
 Fra mig får I brokerens IP-adresse og port (1883), så snart Mosquitto kører på min bærbare.
 
