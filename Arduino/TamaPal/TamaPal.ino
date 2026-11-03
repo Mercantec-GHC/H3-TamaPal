@@ -7,6 +7,9 @@
 #include "menu_logic.h"
 #include "ui_menu.h"
 #include "sound_led.h"
+#include "tilt_logic.h"
+#include "ui_controller.h"
+#include "net_mqtt.h"
 
 // Hardware carrier instance
 MKRIoTCarrier carrier;
@@ -15,6 +18,14 @@ MKRIoTCarrier carrier;
 MenuLogic menuLogic;
 UiMenuRenderer uiMenu;
 SoundLedController soundLed;
+TiltLogic tiltLogic;
+UiControllerRenderer uiController;
+NetMqttClient netMqtt;
+
+// Forward declaration of incoming game event callback (hit, miss, gameover)
+void onGameEventReceived(GameEvent event) {
+  soundLed.playEventFeedback(event);
+}
 
 // Track screen transitions to redraw viewports only when needed
 ScreenType previousScreen = (ScreenType)99;
@@ -45,6 +56,8 @@ void setup() {
   // Initialize UI and audio controllers
   soundLed.begin(&carrier);
   uiMenu.begin(&carrier);
+  uiController.begin(&carrier);
+  netMqtt.begin(onGameEventReceived);
 
   // Initial full screen draw
   uiMenu.drawInitialScreen();
@@ -105,9 +118,17 @@ void loop() {
   menuLogic.update(now);
   soundLed.update(now);
 
-  // 4. PRESENTATION LAYER: Redraw screens when switching views
   ScreenType currentScreen = menuLogic.getActiveScreen();
+
+  // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller mode)
   if (currentScreen != previousScreen) {
+    if (previousScreen == SCREEN_CONTROLLER) {
+      // Exiting controller: disconnect MQTT and redraw main menu
+      netMqtt.disconnect();
+      uiMenu.drawInitialScreen();
+      uiMenu.drawMenuBar(menuLogic, true);
+    }
+
     previousScreen = currentScreen;
 
     switch (currentScreen) {
@@ -120,7 +141,8 @@ void loop() {
         break;
 
       case SCREEN_CONTROLLER:
-        uiMenu.drawPlaceholderScreen("CONTROLLER", "T3 = Tilbage");
+        tiltLogic.reset();
+        uiController.drawInitialScreen();
         break;
 
       case SCREEN_ACTION:
@@ -139,8 +161,31 @@ void loop() {
     }
   }
 
-  // 5. Always update the sliding top menu bar
-  uiMenu.drawMenuBar(menuLogic, false);
+  // 5. SCREEN-SPECIFIC RUNTIME LOOPS
+  if (currentScreen == SCREEN_CONTROLLER) {
+    // 5a. Read accelerometer from IMU
+    if (carrier.IMU.accelerationAvailable()) {
+      float ax = 0.0f, ay = 0.0f, az = 0.0f;
+      carrier.IMU.readAcceleration(ax, ay, az);
+      tiltLogic.updateAcceleration(ax, ay, az);
+    }
+
+    // 5b. Read action button (TOUCH2)
+    bool buttonDown = carrier.Buttons.getTouch(TOUCH2);
+    tiltLogic.setButtonPressed(buttonDown);
+
+    // 5c. Service MQTT network and publish input at ~20 Hz
+    netMqtt.update(now);
+    char jsonBuffer[96];
+    tiltLogic.formatInputJson(jsonBuffer, sizeof(jsonBuffer));
+    netMqtt.publishInput(jsonBuffer, now);
+
+    // 5d. Real-time controller display update (smooth paddle & connection badge)
+    uiController.updateDisplay(tiltLogic, netMqtt.isConnected());
+  } else {
+    // Normal menu modes: update sliding top menu bar
+    uiMenu.drawMenuBar(menuLogic, false);
+  }
 
   // 6. Non-blocking FPS diagnostics (printed to Serial once per second)
   frameCount++;

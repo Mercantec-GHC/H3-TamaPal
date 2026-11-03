@@ -4,7 +4,9 @@
 
 #include <cstdio>
 #include <cmath>
+#include <cstring>
 #include "menu_logic.h"
+#include "tilt_logic.h"
 
 static int totalTestsRun = 0;
 static int totalTestsFailed = 0;
@@ -133,9 +135,99 @@ void testSmoothCursorPhysics() {
   CHECK(fabs(menu.getCursorPositionX() - targetX) < 0.001f, "Cursor is exactly at target position");
 }
 
+void testTiltCalculations() {
+  printf("\n--- Test: Tilt Calculations & Clamping ---\n");
+  TiltLogic tilt;
+
+  // 1. Level board: ax=0, ay=0, az=1.0g
+  tilt.updateAcceleration(0.0f, 0.0f, 1.0f);
+  CHECK(fabs(tilt.getRawTiltY()) < 0.001f, "Flat board gives tiltY = 0.0");
+  CHECK(fabs(tilt.getRawTiltX()) < 0.001f, "Flat board gives tiltX = 0.0");
+
+  // 2. Deadzone test: ~1 degree tilt (ay = 0.0175 * az)
+  // angle = atan2(0.0175, 1.0) = ~1 deg -> tilt = 1/30 = 0.033 (< 0.05 deadzone)
+  tilt.updateAcceleration(0.0f, 0.0175f, 1.0f);
+  CHECK(fabs(tilt.getRawTiltY()) < 0.001f, "Deadzone suppresses minor tilt < 5%");
+
+  // 3. 30 degrees tilt: tan(30 deg) = 0.57735 -> ay = 0.57735, az = 1.0
+  tilt.updateAcceleration(0.0f, 0.57735f, 1.0f);
+  CHECK(fabs(tilt.getRawTiltY() - 1.0f) < 0.02f, "30 deg tilt gives tiltY close to 1.0");
+
+  // 4. Overshoot clamping: 60 degrees tilt (tan(60) = 1.732)
+  tilt.updateAcceleration(0.0f, 1.732f, 1.0f);
+  CHECK(tilt.getRawTiltY() == 1.0f, "Tilt over 30 deg is clamped to exactly 1.0");
+
+  // 5. Negative tilt (paddle up): -30 deg
+  tilt.updateAcceleration(0.0f, -0.57735f, 1.0f);
+  CHECK(fabs(tilt.getRawTiltY() - (-1.0f)) < 0.02f, "-30 deg tilt gives tiltY close to -1.0");
+
+  // 6. Horizontal X tilt (left/right steering)
+  tilt.updateAcceleration(0.57735f, 0.0f, 1.0f);
+  CHECK(fabs(tilt.getRawTiltX() - 1.0f) < 0.02f, "Horizontal right tilt gives tiltX close to 1.0");
+}
+
+void testTiltSmoothing() {
+  printf("\n--- Test: Tilt Smoothing Filter ---\n");
+  TiltLogic tilt;
+
+  // Start at flat (0.0)
+  tilt.updateAcceleration(0.0f, 0.0f, 1.0f);
+
+  // Apply a sudden step jump to full tilt (ay = 1.732 -> raw tilt = 1.0)
+  tilt.updateAcceleration(0.0f, 1.732f, 1.0f);
+  float firstStep = tilt.getTiltY();
+  CHECK(firstStep > 0.15f && firstStep < 0.45f, "First smoothing step increases smoothly (EMA)");
+
+  // Run 20 updates: smoothed value should smoothly approach 1.0
+  for (int i = 0; i < 20; i++) {
+    tilt.updateAcceleration(0.0f, 1.732f, 1.0f);
+  }
+  CHECK(tilt.getTiltY() > 0.99f, "Smoothed value reaches 1.0 after 20 frames");
+  CHECK(tilt.getTiltY() <= 1.0f, "Smoothed value never overshoots 1.0");
+}
+
+void testTiltJsonFormatting() {
+  printf("\n--- Test: MQTT JSON Formatting (No %%f) ---\n");
+  TiltLogic tilt;
+  char buffer[96];
+
+  // 1. Flat state, button false
+  tilt.updateAcceleration(0.0f, 0.0f, 1.0f);
+  tilt.setButtonPressed(false);
+  // Warm up filter
+  for (int i = 0; i < 15; i++) tilt.updateAcceleration(0.0f, 0.0f, 1.0f);
+
+  tilt.formatInputJson(buffer, sizeof(buffer));
+  CHECK(strcmp(buffer, "{\"tilt\":0.00,\"tiltX\":0.00,\"button\":false}") == 0,
+        "Formats neutral flat input: {\"tilt\":0.00,\"tiltX\":0.00,\"button\":false}");
+
+  // 2. Positive tilt, button true
+  // tan(10.5 deg) ~ 0.185 -> tilt ~ 0.35
+  for (int i = 0; i < 25; i++) tilt.updateAcceleration(0.0f, 0.185f, 1.0f);
+  tilt.setButtonPressed(true);
+  tilt.formatInputJson(buffer, sizeof(buffer));
+  CHECK(strstr(buffer, "\"button\":true") != nullptr, "JSON contains \"button\":true");
+  CHECK(strstr(buffer, "\"tilt\":0.") != nullptr, "JSON contains positive tilt value");
+
+  // 3. Negative tilt
+  for (int i = 0; i < 25; i++) tilt.updateAcceleration(0.0f, -0.577f, 1.0f);
+  tilt.setButtonPressed(false);
+  tilt.formatInputJson(buffer, sizeof(buffer));
+  CHECK(strstr(buffer, "\"tilt\":-1.00") != nullptr, "JSON contains negative clamped tilt -1.00");
+}
+
+void testEventParsing() {
+  printf("\n--- Test: MQTT Event Parsing ---\n");
+  CHECK(TiltLogic::parseEventType("hit") == EVENT_HIT, "Parses 'hit' -> EVENT_HIT");
+  CHECK(TiltLogic::parseEventType("miss") == EVENT_MISS, "Parses 'miss' -> EVENT_MISS");
+  CHECK(TiltLogic::parseEventType("gameover") == EVENT_GAMEOVER, "Parses 'gameover' -> EVENT_GAMEOVER");
+  CHECK(TiltLogic::parseEventType("unknown") == EVENT_NONE, "Parses 'unknown' -> EVENT_NONE");
+  CHECK(TiltLogic::parseEventType(nullptr) == EVENT_NONE, "Safely handles nullptr -> EVENT_NONE");
+}
+
 int main() {
   printf("==================================================\n");
-  printf("TAMAPAL UNIT TEST RUNNER: MenuLogic\n");
+  printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic\n");
   printf("==================================================\n");
 
   testInitialState();
@@ -144,6 +236,11 @@ int main() {
   testActionScreenTimeout();
   testInputDisabledOnOtherScreens();
   testSmoothCursorPhysics();
+
+  testTiltCalculations();
+  testTiltSmoothing();
+  testTiltJsonFormatting();
+  testEventParsing();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

@@ -8,7 +8,8 @@ SoundLedController::SoundLedController()
   : carrier(nullptr),
     isBuzzerPlaying(false),
     soundMuted(START_WITH_SOUND_MUTED),
-    toneEndTimeMs(0) {
+    toneEndTimeMs(0),
+    ledResetTimeMs(0) {
 }
 
 // Store hardware carrier reference and configure initial LED brightness
@@ -59,8 +60,42 @@ void SoundLedController::playSound(SoundType sound) {
       isBuzzerPlaying = true;
       break;
 
+    case SOUND_HIT:
+      carrier->Buzzer.sound(1400);   // High ping for paddle hit
+      toneEndTimeMs = now + 65;
+      isBuzzerPlaying = true;
+      setMoodColor(0, 255, 80);      // Green flash
+      ledResetTimeMs = now + 200;
+      break;
+
+    case SOUND_MISS:
+      carrier->Buzzer.sound(220);    // Low buzz for miss
+      toneEndTimeMs = now + 150;
+      isBuzzerPlaying = true;
+      setMoodColor(255, 30, 30);     // Red flash
+      ledResetTimeMs = now + 250;
+      break;
+
+    case SOUND_GAMEOVER:
+      carrier->Buzzer.sound(330);    // Low tone for game over
+      toneEndTimeMs = now + 250;
+      isBuzzerPlaying = true;
+      setMoodColor(255, 120, 0);     // Amber flash
+      ledResetTimeMs = now + 400;
+      break;
+
     default:
       break;
+  }
+}
+
+// Trigger audio and LED reaction based on MQTT game event
+void SoundLedController::playEventFeedback(GameEvent event) {
+  switch (event) {
+    case EVENT_HIT:      playSound(SOUND_HIT); break;
+    case EVENT_MISS:     playSound(SOUND_MISS); break;
+    case EVENT_GAMEOVER: playSound(SOUND_GAMEOVER); break;
+    default: break;
   }
 }
 
@@ -68,9 +103,16 @@ void SoundLedController::playSound(SoundType sound) {
 void SoundLedController::update(unsigned long currentTimeMs) {
   if (carrier == nullptr) return;
 
+  // Buzzer non-blocking cutoff
   if (isBuzzerPlaying && currentTimeMs >= toneEndTimeMs) {
     carrier->Buzzer.noSound();
     isBuzzerPlaying = false;
+  }
+
+  // Restore calm mood LED color after event flash
+  if (ledResetTimeMs > 0 && currentTimeMs >= ledResetTimeMs) {
+    setMoodColor(0, 150, 220); // Restore calm cyan glow
+    ledResetTimeMs = 0;
   }
 }
 

@@ -45,6 +45,29 @@ const unsigned long TOUCH_COOLDOWN_MS = 180;
 const bool START_WITH_SOUND_MUTED = false;
 
 // ============================================================================
+// CONTROLLER & MQTT SETTINGS (Pong and Minigames)
+// ============================================================================
+// Maximum tilt angle in degrees for full deflection (30 degrees = 1.0 or -1.0)
+const float MAX_TILT_DEG = 30.0f;
+
+// Deadzone around center: ignore tilt angles below 5% to avoid hand jitters
+const float TILT_DEADZONE = 0.05f;
+
+// Exponential moving average factor: 30% new sensor data + 70% smoothed history
+const float TILT_SMOOTH_FACTOR = 0.30f;
+
+// MQTT publish frequency: 50 ms = 20 messages per second (20 Hz)
+const unsigned long MQTT_PUBLISH_INTERVAL_MS = 50;
+
+// Reconnect interval if Wi-Fi or MQTT broker drops (5 seconds)
+const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
+
+// MQTT Client ID and Topics (as defined in docs/MESSAGES.md contract)
+#define MQTT_CLIENT_ID "tamapal-opla-1"
+#define MQTT_TOPIC_INPUT "tamapal/opla-1/input"
+#define MQTT_TOPIC_EVENT "tamapal/opla-1/event"
+
+// ============================================================================
 // ENUMS (Application states and menu items)
 // ============================================================================
 
@@ -80,7 +103,18 @@ enum SoundType {
   SOUND_NONE = 0,
   SOUND_CLICK,             // Soft click when browsing icons (20 ms)
   SOUND_CONFIRM,           // Cheerful 2-tone chirp on OK selection
-  SOUND_BACK               // Low tone when returning back
+  SOUND_BACK,              // Low tone when returning back
+  SOUND_HIT,               // High ping when hitting ball in Pong (1200 Hz, 80 ms)
+  SOUND_MISS,              // Low buzz when missing ball (220 Hz, 150 ms)
+  SOUND_GAMEOVER           // 3-note descending game over jingle
+};
+
+// Events received from backend over MQTT (tamapal/opla-1/event)
+enum GameEvent {
+  EVENT_NONE = 0,
+  EVENT_HIT,               // Paddle hit the ball (+1 point)
+  EVENT_MISS,              // Missed ball (-1 life)
+  EVENT_GAMEOVER           // Game finished (0 lives)
 };
 
 #endif // SETTINGS_H

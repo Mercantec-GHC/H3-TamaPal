@@ -18,6 +18,9 @@ public:
   // Trigger non-blocking sound effect
   void playSound(SoundType sound);
 
+  // Play audio/LED feedback for MQTT game event (hit, miss, gameover)
+  void playEventFeedback(GameEvent event);
+
   // Periodic non-blocking update (checks if tone duration expired)
   void update(unsigned long currentTimeMs);
 
@@ -34,6 +37,7 @@ private:
   bool isBuzzerPlaying;
   bool soundMuted;
   unsigned long toneEndTimeMs;
+  unsigned long ledResetTimeMs;
 };
 
 #endif // SOUND_LED_H
