@@ -163,10 +163,10 @@ void loop() {
 
   // 5. SCREEN-SPECIFIC RUNTIME LOOPS
   if (currentScreen == SCREEN_CONTROLLER) {
-    // 5a. Read accelerometer from IMU
-    if (carrier.IMU.accelerationAvailable()) {
+    // 5a. Read accelerometer from IMU (IMUmodule in Carrier v2.x)
+    if (carrier.IMUmodule.accelerationAvailable()) {
       float ax = 0.0f, ay = 0.0f, az = 0.0f;
-      carrier.IMU.readAcceleration(ax, ay, az);
+      carrier.IMUmodule.readAcceleration(ax, ay, az);
       tiltLogic.updateAcceleration(ax, ay, az);
     }
 

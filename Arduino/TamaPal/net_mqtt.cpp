@@ -55,12 +55,16 @@ void NetMqttClient::attemptConnection(unsigned long now) {
   connectingState = true;
 
   // 1. Check / establish Wi-Fi
-  if (WiFi.status() != WL_CONNECTED) {
-    #if defined(SECRET_WIFI_SSID) && defined(SECRET_WIFI_PASS)
-    if (strlen(SECRET_WIFI_SSID) > 0) {
-      WiFi.begin(SECRET_WIFI_SSID, SECRET_WIFI_PASS);
+  uint8_t wifiStatus = WiFi.status();
+  if (wifiStatus != WL_CONNECTED) {
+    // Only trigger begin() if not already attempting handshake
+    if (wifiStatus != WL_IDLE_STATUS) {
+      #if defined(SECRET_WIFI_SSID) && defined(SECRET_WIFI_PASS)
+      if (strlen(SECRET_WIFI_SSID) > 0) {
+        WiFi.begin(SECRET_WIFI_SSID, SECRET_WIFI_PASS);
+      }
+      #endif
     }
-    #endif
     return; // Wait for next tick to verify Wi-Fi connection
   }
 

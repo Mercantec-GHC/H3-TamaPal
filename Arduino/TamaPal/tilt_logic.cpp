@@ -37,6 +37,7 @@ float TiltLogic::calculateNormalizedTilt(float axisAccel, float gravityAccel) {
   float tilt = angleDeg / MAX_TILT_DEG;
 
   // Clamp strictly between -1.0 and 1.0
+  if (std::isnan(tilt)) tilt = 0.0f;
   if (tilt > 1.0f) tilt = 1.0f;
   if (tilt < -1.0f) tilt = -1.0f;
 

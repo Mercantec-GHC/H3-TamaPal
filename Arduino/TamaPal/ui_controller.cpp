@@ -92,9 +92,15 @@ void UiControllerRenderer::updateDisplay(const TiltLogic& tilt, bool isMqttConne
       if (restoreH > 0) {
         carrier->display.fillRect(116, restoreY, 8, restoreH, railColor);
       }
-      // Re-draw center tick if old paddle covered it
+      // Re-draw guide ticks if old paddle covered them
+      if (lastPaddleY <= 80 && lastPaddleY + 18 >= 80) {
+        carrier->display.drawFastHLine(112, 80, 16, color565(25, 45, 75));
+      }
       if (lastPaddleY <= 120 && lastPaddleY + 18 >= 120) {
         carrier->display.drawFastHLine(110, 120, 20, color565(40, 70, 120));
+      }
+      if (lastPaddleY <= 160 && lastPaddleY + 18 >= 160) {
+        carrier->display.drawFastHLine(112, 160, 16, color565(25, 45, 75));
       }
     }
 
