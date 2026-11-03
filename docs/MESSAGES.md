@@ -1,11 +1,12 @@
 # MVP og beskeder – til diskussion
 
-Dokumentet har fire dele:
+Dokumentet har fem dele:
 
 1. **Del 1 – Forslag fra Andrii (2/11):** MVP og dataflow for Pong-spillet.
 2. **Del 1b – Forslag fra Oleh (2/11):** Oplà som kæledyr + controller, 5 behov, nye MQTT-beskeder, sensorer og 16 GB SD-kort.
-3. **Del 2 – Spørgsmål:** Det vi skal blive enige om.
-4. **Del 3 – Aftale:** Udfyldes sammen, når vi er enige. Det er den, vi arbejder efter.
+3. **Del 1c – Forslag fra Oliver (2/11):** Backendens opbygning, knap og `tilt`, faste mål på spillefeltet, MQTT-broker, falske data, kommentarer til Olehs kæledyrs-beskeder og hvad backenden har brug for fra Arduino og frontend.
+4. **Del 2 – Spørgsmål:** Det vi skal blive enige om.
+5. **Del 3 – Aftale:** Udfyldes sammen, når vi er enige. Det er den, vi arbejder efter.
 
 Alle må rette og kommentere. Princip: så få beskeder som muligt og ingen ekstra felter.
 
@@ -108,6 +109,16 @@ Metode `StartGame()` – knappen "Start" eller "Spil igen".
 - **Al logik ligger i backend** og opfylder DoD-punkt 6 (point, liv og regler i backend).
 - **Kun én Oplà.** Ingen problemer med to enheder eller pairing, og man kan teste alene.
 - **Alle kan starte i dag med falske data.**
+
+## Mine svar på Del 2 (frontend)
+
+Forslag til diskussionen. Del 3 udfylder vi sammen.
+
+| # | Mit forslag |
+|---|---|
+| 4 | Efter MVP: highscore først. Kirkegården i frontend kommer først, når Pong virker hele vejen (Oplà → backend → browser). |
+| 9 | Backenden styrer bolden – enig med Oliver. Browseren tegner kun. |
+| 10 | Enig: backenden viser siden fra `Frontend/`. |
 
 ---
 
@@ -223,6 +234,157 @@ Formålet er, at Arduino, backend og frontend passer 100% sammen fra start. Alt 
   Lærerne kan se vores opgaver direkte på GitHub Projects boardet, og vi opfylder deres faste krav.
 * **Eksempel:**  
   Når jeg laver menuen på Oplà, opretter jeg en branch med navnet `feature/arduino-menu`.
+
+---
+
+# Del 1c – Forslag og observationer fra Oliver (Backend)
+
+Her er mine kommentarer som backend-ansvarlig efter at have læst Del 1, Olehs forslag (Del 1b), noterne fra mødet 2/11 og vores GDD.
+Formålet er, at backenden passer præcis til Oplàen og browseren, så ingen skal gætte. Jeg bruger samme opbygning som Oleh: **hvad er problemet**, **mit forslag**, **konsekvens** og et **eksempel**.
+
+---
+
+### 1. Sådan bygger jeg backenden (mindste version)
+* **Hvad mangler?**  
+  `Backend/` er tom endnu, og Del 1 siger ikke, hvordan backenden er bygget. DoD punkt 5 siger, at backenden skal styre spillets tilstand og reglerne (point og liv). Derfor er jeg enig i Del 1: backenden styrer bolden (spørgsmål 9).
+* **Mit forslag:**  
+  Ét ASP.NET Core-projekt i `Backend/` med fire dele:
+  1. `MqttWorker`: lytter på `tamapal/+/input` og sender `event` til Oplàen (med biblioteket MQTTnet).
+  2. `GameLoop`: kører 30 gange i sekundet, flytter bolden, tjekker vægge og ketsjer og tæller point og liv.
+  3. `GameHub` på `/gamehub`: sender `GameState` til browseren og modtager `StartGame()`.
+  4. `FakeInput`: en falsk Oplà til test (se punkt 6).
+
+  Bolden flyttes efter den tid, der faktisk er gået siden sidste opdatering. Timeren i Windows er ikke helt præcis, så en opdatering kan komme lidt for sent, men bolden har stadig samme fart.
+* **Konsekvens:**  
+  Al logik ligger ét sted. Oplàen sender kun input, og browseren tegner kun det, den får. Hvis noget er galt med point eller liv, ligger fejlen i backenden.
+* **Eksempel:**  
+  Bolden rammer ketsjeren → `GameLoop` giver +1 point og lidt mere fart → `MqttWorker` sender `hit` til Oplàen → næste `GameState` viser den nye score i browseren.
+
+---
+
+### 2. Knappen: hvornår starter et spil?
+* **Hvad er problemet?**  
+  Oplàen sender `button` 20 gange i sekundet. Et normalt tryk varer ca. 0,2 sekunder, så backenden ser `true` 4 gange i træk. Et meget kort tryk kan omvendt falde mellem to beskeder og blive væk.
+* **Mit forslag:**  
+  - `button: true` betyder **"der er trykket siden sidste besked"**. Oplàen husker trykket og sender `true` i præcis én besked.
+  - Backenden starter kun et spil, når `status` er `waiting` eller `gameover`. Det gælder både knappen og `StartGame()` fra browseren. Under et spil bliver de ignoreret.
+* **Konsekvens:**  
+  Ét tryk = én handling. Spillet kan ikke starte to gange, og et tryk bliver aldrig væk.
+* **Eksempel:**  
+  Spilleren trykker på Oplàen og på Start i browseren næsten samtidig. Backenden starter spillet på det første og ignorerer det andet, fordi `status` allerede er `playing`.
+
+---
+
+### 3. `tilt`: hvad betyder tallet præcist?
+* **Hvad er problemet?**  
+  Del 1 siger, at `tilt` går fra -1 (op) til 1 (ned), men ikke hvor meget man skal vippe, eller om `tilt` er ketsjerens plads eller fart.
+* **Mit forslag:**  
+  - **Oleh:** vippet 30° op = `-1`, vandret = `0`, vippet 30° ned = `1`. Mere end 30° tæller som -1 eller 1.
+  - **Backend:** `tilt` er ketsjerens **plads**, ikke fart: `paddle.y = (tilt + 1) / 2`. Jeg udglatter tallet en smule, så ketsjeren ikke ryster, og holder den inde på banen.
+  - De 30° kan vi justere efter brugertesten.
+* **Konsekvens:**  
+  Ketsjeren følger hånden direkte, og det er nemt at forstå for en ny spiller. Oplàen sender kun en vinkel, og kun backenden laver den om til en plads på banen.
+* **Eksempel:**  
+  Oplàen vippes 15° op → `tilt: -0.5` → `paddle.y = 0.25` (en fjerdedel nede fra toppen).
+
+---
+
+### 4. Faste mål på spillefeltet (til Andrii)
+* **Hvad er problemet?**  
+  `GameState` siger, hvor bolden og ketsjeren er, men ikke hvor store de er, hvor (0, 0) er, eller om `paddle.y` er toppen eller midten af ketsjeren. Hvis Andrii og jeg gætter forskelligt, ser det ud, som om bolden går igennem ketsjeren.
+* **Mit forslag:**  
+  Ingen nye felter. Vi skriver faste mål her i dokumentet, og begge bruger dem:
+  - **Spillefelt:** kvadratisk (fx 600 × 600 px). x og y går fra 0 til 1.
+  - **(0, 0)** er øverst til venstre, ligesom på canvas.
+  - **Bold:** radius 0.02. `ball.x` og `ball.y` er boldens midte.
+  - **Ketsjer:** 0.02 bred og 0.2 høj, med midten ved x = 0.03. `paddle.y` er ketsjerens midte.
+* **Konsekvens:**  
+  Det, browseren tegner, passer præcis med det, backenden regner med. Med et kvadratisk felt er bolden rund og lige hurtig i alle retninger, uden at nogen skal regne om.
+* **Eksempel:**  
+  `paddle.y = 0.5` på et canvas på 600 px → Andrii tegner ketsjeren fra y = 240 px til y = 360 px.
+
+---
+
+### 5. MQTT-broker og netværk (spørgsmål 5)
+* **Hvad er problemet?**  
+  Vi har ikke valgt broker endnu, og netværket er den største risiko i hele projektet:
+  1. Mosquitto (version 2) tager som standard kun imod forbindelser fra den samme computer, så Oplàen bliver afvist.
+  2. Windows Firewall blokerer port 1883.
+  3. Skolens Wi-Fi blokerer måske trafik mellem to enheder, og Oplàen kan kun bruge 2,4 GHz Wi-Fi.
+* **Mit forslag:**  
+  - MQTT, ikke HTTP: det er lavet til mange små beskeder, og vi kan følge alt i MQTT Explorer.
+  - Mosquitto på min bærbare, port 1883, med `listener 1883` og `allow_anonymous true` i `mosquitto.conf`. Den kører kun på lokalnettet, så ingen kodeord i første version.
+  - Enhedens navn står i topic, ikke i JSON. Backenden lytter på `tamapal/+/input` og kan derfor tage imod spiller 2 (`opla-2`) senere uden at ændre noget.
+  - QoS 0 for `input` (det gør ikke noget, hvis én ud af 20 beskeder forsvinder). QoS 1 for `event` og Olehs kæledyrs-beskeder (de skal frem).
+  - Vi tester Oplà → Mosquitto → backend på skolens Wi-Fi så hurtigt som muligt. Plan B til fremlæggelsen: et mobil-hotspot.
+* **Konsekvens:**  
+  Hvis vi først opdager netværksproblemer på dagen, virker intet. Hvis vi tester tidligt, har vi tid til plan B.
+* **Eksempel:**  
+  Oplàen kan ikke forbinde på skolens Wi-Fi. Vi tænder et hotspot på en telefon, sætter bærbar og Oplà på det, og Oleh skifter IP-adressen i `arduino_secrets.h`.
+
+---
+
+### 6. Falske data: alle kan teste uden de andre
+* **Hvad er problemet?**  
+  Andrii kan først tegne rigtige data, når Oplàen virker, og Oleh kan først se ketsjeren bevæge sig, når browseren virker.
+* **Mit forslag:**  
+  - Backenden får en test-indstilling `FakeInput`. Når den er slået til, styrer computeren selv ketsjeren. Den følger bolden, men ikke perfekt, så den også misser og mister liv.
+  - Oleh kan teste uden browser: backenden logger hvert `tilt`, og `event`-beskederne kan ses i MQTT Explorer.
+  - Jeg kan selv sende `tilt` fra MQTT Explorer uden en Oplà.
+* **Konsekvens:**  
+  Ingen venter på hinanden, og det passer med trin 1 i "Rækkefølge for arbejdet".
+* **Eksempel:**  
+  Andrii åbner browseren, trykker Start og ser et helt spil med bold, ketsjer, point, liv og game over, selvom Oplàen ligger i tasken.
+
+---
+
+### 7. Kommentarer til Olehs kæledyrs-beskeder (Del 1b, punkt 3)
+* **Hvad er problemet?**  
+  Det er gode beskeder, og jeg kan gemme dem. Men:
+  1. `pet/state` har intet ID. Når Lumi dør, og en ny Lumi bliver født på den samme Oplà, kan databasen ikke se forskel, og kirkegården kan ikke vise to gravsten.
+  2. Kirkegården skal vise levetid (fase 7 i mit game loop i `TIL-DISKUSSION.md`), men beskeden har ingen alder.
+  3. Med `pet/reward` skal backenden bestemme, hvor glad Lumi bliver. Men kæledyret bor på Oplàen.
+* **Mit forslag:**  
+  - Tilføj `"id"` (en kort tilfældig kode, der laves ved fødslen og gemmes på SD-kortet) og `"ageMinutes"` til `pet/state`.
+  - Drop `pet/reward`. Send i stedet scoren med i `gameover`: `{ "type": "gameover", "score": 7 }`. Oplàen bestemmer selv, hvor meget glæde det giver.
+  - Backenden gemmer hver Lumi under sit `id`. Kommer `"alive": false` to gange for samme `id`, bliver der stadig kun lavet én gravsten.
+  - Alt det her kommer efter MVP.
+* **Konsekvens:**  
+  Én besked mindre, og alle regler for kæledyret ligger ét sted (på Oplàen). Kirkegården virker også, når en Oplà har haft flere Lumi'er.
+* **Eksempel:**  
+  ```json
+  { "id": "a3f9", "name": "Lumi", "stage": "teen", "ageMinutes": 12, "hunger": 80, "warmth": 5, "energy": 70, "happy": 85, "discipline": 60, "alive": false, "cause": "cold" }
+  ```
+  Backenden gemmer en gravsten: "Lumi, teenager, levede 12 minutter, frøs ihjel".
+
+---
+
+### Mine svar på Del 2 (backend)
+
+Forslag til diskussionen. Del 3 udfylder vi sammen.
+
+| # | Mit forslag |
+|---|---|
+| 5 | MQTT med Mosquitto på min bærbare (punkt 5). |
+| 7 | Input 20/s og `GameState` 30/s er fint. En `GameState` er ca. 100 bytes, altså ca. 3 KB i sekundet. Backenden bruger altid det nyeste `tilt` og gemmer ikke gamle. |
+| 9 | Backenden styrer bolden (punkt 1). |
+| 10 | Andriis filer bliver i `Frontend/`, og backenden viser dem på sin egen adresse (fx `http://localhost:5000`). Så ligger siden og `/gamehub` samme sted, vi slipper for CORS, og der er kun ét program at starte. |
+| 11 | Database efter MVP. Først highscore (scoren gemmes ved `gameover`), så kirkegården. Neon PostgreSQL. Forbindelsen med kodeord ligger i `dotnet user-secrets`, aldrig i `appsettings.json`. |
+| 12 | `feature/...` og 1 godkendelse. Vi er kun tre, så med 2 godkendelser skal alle læse alle Pull Requests. |
+| 13 | Backend med falske data: tirsdag 3/11. Første test hele vejen: torsdag 5/11. Brugertest: fredag 6/11 (eller til åbent hus 7/11). Kode-stop: mandag 9/11, derefter kun fejlrettelser. Datoerne skal tjekkes i Notion. |
+
+### Det har jeg brug for fra jer
+
+Kun det, jeg skal bruge for at bygge MVP'en. Skriv svaret i kolonnen **Svar** eller i gruppens chat.
+
+| # | Fra | Hvad jeg har brug for | Hvorfor | Svar |
+|---|---|---|---|---|
+| 1 | Oleh | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Backenden skal læse `button` og `tilt` på samme måde, som Oplàen sender dem. | |
+| 2 | Oleh | Det client ID, Oplàen bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | |
+| 3 | Andrii | Ja eller nej til målene i punkt 4. | Det, du tegner, skal passe med det, backenden regner med. | **Ja.** Canvas er 600 × 600, og `draw.js` bruger præcis disse mål (Andrii, 3/11). |
+| 4 | Andrii | Må backenden vise siden fra `Frontend/`? Hvis ikke: hvilken adresse og port kører den på? | Ellers skal jeg slå CORS til for den adresse. | **Ja.** Indtil backenden kører, tester jeg med `python3 -m http.server 5500` i `Frontend/` (Andrii, 3/11). |
+
+Fra mig får I brokerens IP-adresse og port (1883), så snart Mosquitto kører på min bærbare.
 
 ---
 
