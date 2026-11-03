@@ -16,6 +16,8 @@ TiltLogic::TiltLogic()
     rawTiltX(0.0f),
     smoothedTiltY(0.0f),
     smoothedTiltX(0.0f),
+    upState(false),
+    downState(false),
     buttonState(false) {
 }
 
@@ -24,6 +26,8 @@ void TiltLogic::reset() {
   rawTiltX = 0.0f;
   smoothedTiltY = 0.0f;
   smoothedTiltX = 0.0f;
+  upState = false;
+  downState = false;
   buttonState = false;
 }
 
@@ -68,6 +72,12 @@ void TiltLogic::updateAcceleration(float ax, float ay, float az) {
   if (fabsf(smoothedTiltX) < 0.005f) smoothedTiltX = 0.0f;
 }
 
+void TiltLogic::setButtons(bool up, bool down, bool action) {
+  upState = up;
+  downState = down;
+  buttonState = action;
+}
+
 void TiltLogic::setButtonPressed(bool pressed) {
   buttonState = pressed;
 }
@@ -88,11 +98,19 @@ float TiltLogic::getRawTiltX() const {
   return rawTiltX;
 }
 
+bool TiltLogic::isUpPressed() const {
+  return upState;
+}
+
+bool TiltLogic::isDownPressed() const {
+  return downState;
+}
+
 bool TiltLogic::isButtonPressed() const {
   return buttonState;
 }
 
-// Format the JSON payload safely without '%f' (avoiding SAMD21 float printf bug)
+// Format universal JSON payload safely without '%f' (avoiding SAMD21 float printf bug)
 size_t TiltLogic::formatInputJson(char* buffer, size_t maxLen) const {
   if (buffer == nullptr || maxLen == 0) return 0;
 
@@ -107,12 +125,15 @@ size_t TiltLogic::formatInputJson(char* buffer, size_t maxLen) const {
   if (vx < 0) vx = -vx;
   if (vx > 100) vx = 100;
 
-  // "tilt" (Pong compatibility) + "tiltX" (Maze / 2D steering) + "button"
+  // Universal payload for Pong (up, down, button) and Labyrinth (tiltX, tiltY):
   int written = snprintf(buffer, maxLen,
-                         "{\"tilt\":%s%d.%02d,\"tiltX\":%s%d.%02d,\"button\":%s}",
-                         signY, vy / 100, vy % 100,
+                         "{\"up\":%s,\"down\":%s,\"button\":%s,\"tiltX\":%s%d.%02d,\"tiltY\":%s%d.%02d,\"tilt\":%s%d.%02d}",
+                         upState ? "true" : "false",
+                         downState ? "true" : "false",
+                         buttonState ? "true" : "false",
                          signX, vx / 100, vx % 100,
-                         buttonState ? "true" : "false");
+                         signY, vy / 100, vy % 100,
+                         signY, vy / 100, vy % 100);
 
   if (written < 0 || (size_t)written >= maxLen) {
     buffer[maxLen - 1] = '\0';

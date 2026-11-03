@@ -38,10 +38,11 @@ uint32_t frameCount = 0;
 unsigned long lastTouchTimeMs = 0;
 
 // Non-blocking Mute toggle state (prevents multi-trigger and screen blinking)
-bool muteComboHandled = false;
-unsigned long comboStartTime = 0;
+bool combo04Fired = false;
+unsigned long combo04StartTime = 0;
+bool touch3HoldFired = false;
+unsigned long touch3StartTime = 0;
 unsigned long muteMessageEndTimeMs = 0;
-unsigned long touch3HoldStartTime = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -83,77 +84,102 @@ void loop() {
   bool touch3 = carrier.Buttons.getTouch(TOUCH3);
   bool touch4 = carrier.Buttons.getTouch(TOUCH4);
 
-  // METHOD 1: Hold TOUCH0 + TOUCH4 together for 350 ms (Clean combo without flickering)
+  ScreenType currentScreen = menuLogic.getActiveScreen();
+
+  // -------------------------------------------------------------
+  // GESTURE 1: TOUCH0 + TOUCH4 combo (Hold both for 300 ms)
+  // -------------------------------------------------------------
   if (touch0 && touch4) {
-    if (comboStartTime == 0) {
-      comboStartTime = now;
-    } else if (!muteComboHandled && (now - comboStartTime >= 350)) {
+    if (combo04StartTime == 0) {
+      combo04StartTime = now;
+    } else if (!combo04Fired && (now - combo04StartTime >= 300)) {
       soundLed.toggleMute();
-      muteComboHandled = true;
+      combo04Fired = true;
       muteMessageEndTimeMs = now + 1400; // Toast visible for 1.4 seconds
 
       if (soundLed.isMuted()) {
-        uiMenu.drawPlaceholderScreen("LYD: FRA", "Hold T0+T4 = Lyd til");
+        uiMenu.drawPlaceholderScreen("LYD: SLUKKET", "Lyd er slaaet fra");
       } else {
-        uiMenu.drawPlaceholderScreen("LYD: TIL", "Hold T0+T4 = Lyd fra");
+        uiMenu.drawPlaceholderScreen("LYD: TAENDT", "Lyd er slaaet til");
         soundLed.playSound(SOUND_CONFIRM);
       }
     }
   } else if (!touch0 && !touch4) {
-    // Both released: reset flag so combo can be triggered again next time
-    muteComboHandled = false;
-    comboStartTime = 0;
+    // Reset ONLY when BOTH fingers are lifted off
+    combo04Fired = false;
+    combo04StartTime = 0;
   }
 
-  // METHOD 2: Hold TOUCH3 for 1.4 seconds on HOME screen (Ergonomic single-finger shortcut!)
-  if (menuLogic.getActiveScreen() == SCREEN_HOME && touch3) {
-    if (touch3HoldStartTime == 0) {
-      touch3HoldStartTime = now;
-    } else if (!muteComboHandled && (now - touch3HoldStartTime >= 1400)) {
+  // -------------------------------------------------------------
+  // GESTURE 2: Hold TOUCH3 alone for 1.2 seconds on HOME screen
+  // -------------------------------------------------------------
+  if (currentScreen == SCREEN_HOME && touch3 && !touch0 && !touch4) {
+    if (touch3StartTime == 0) {
+      touch3StartTime = now;
+    } else if (!touch3HoldFired && (now - touch3StartTime >= 1200)) {
       soundLed.toggleMute();
-      muteComboHandled = true;
+      touch3HoldFired = true;
       muteMessageEndTimeMs = now + 1400;
 
       if (soundLed.isMuted()) {
-        uiMenu.drawPlaceholderScreen("LYD: FRA", "Hold T3 = Lyd til");
+        uiMenu.drawPlaceholderScreen("LYD: SLUKKET", "Lyd er slaaet fra");
       } else {
-        uiMenu.drawPlaceholderScreen("LYD: TIL", "Hold T3 = Lyd fra");
+        uiMenu.drawPlaceholderScreen("LYD: TAENDT", "Lyd er slaaet til");
         soundLed.playSound(SOUND_CONFIRM);
       }
     }
   } else if (!touch3) {
-    touch3HoldStartTime = 0;
+    // Reset ONLY when finger is lifted off TOUCH3
+    touch3HoldFired = false;
+    touch3StartTime = 0;
   }
 
-  // Restore main screen banner automatically after mute feedback expires
+  // -------------------------------------------------------------
+  // Restore screen automatically when mute banner notification expires
+  // -------------------------------------------------------------
   if (muteMessageEndTimeMs > 0 && now >= muteMessageEndTimeMs) {
     muteMessageEndTimeMs = 0;
-    if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+    if (currentScreen == SCREEN_HOME) {
       uiMenu.drawPlaceholderScreen("LUMI HOME", "Tryk T2 for at vaelge");
     }
   }
 
-  // Normal button clicks (only processed when NOT holding a combo)
-  if (!muteComboHandled && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
-    if (!touch4 && carrier.Buttons.onTouchDown(TOUCH0)) {
-      menuLogic.onButtonPrev(); // Previous icon (<)
+  // -------------------------------------------------------------
+  // Button Navigation
+  // -------------------------------------------------------------
+  if (currentScreen == SCREEN_CONTROLLER) {
+    // In controller mode:
+    // TOUCH0, TOUCH1, TOUCH2 are gameplay inputs (read continuously below).
+    // TOUCH3 exits back to HOME screen immediately.
+    if (carrier.Buttons.onTouchDown(TOUCH3)) {
+      menuLogic.onButtonBack();
       lastTouchTimeMs = now;
     }
-    else if (carrier.Buttons.onTouchDown(TOUCH1)) {
-      menuLogic.onButtonNext(); // Next icon (>)
-      lastTouchTimeMs = now;
-    }
-    else if (carrier.Buttons.onTouchDown(TOUCH2)) {
-      menuLogic.onButtonOk(now); // OK / Select
-      lastTouchTimeMs = now;
-    }
-    else if (carrier.Buttons.onTouchDown(TOUCH3)) {
-      menuLogic.onButtonBack(); // Back to Home
-      lastTouchTimeMs = now;
-    }
-    else if (!touch0 && carrier.Buttons.onTouchDown(TOUCH4)) {
-      menuLogic.onButtonStatsShortcut(); // Quick toggle Stats
-      lastTouchTimeMs = now;
+  } else {
+    // Normal menu screens (HOME, STATS, ACTION):
+    bool inAnyCombo = (touch0 && touch4) || combo04Fired || touch3HoldFired;
+
+    if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
+      if (!touch4 && carrier.Buttons.onTouchDown(TOUCH0)) {
+        menuLogic.onButtonPrev(); // Previous icon (<)
+        lastTouchTimeMs = now;
+      }
+      else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+        menuLogic.onButtonNext(); // Next icon (>)
+        lastTouchTimeMs = now;
+      }
+      else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+        menuLogic.onButtonOk(now); // OK / Select
+        lastTouchTimeMs = now;
+      }
+      else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack(); // Back to Home
+        lastTouchTimeMs = now;
+      }
+      else if (!touch0 && carrier.Buttons.onTouchDown(TOUCH4)) {
+        menuLogic.onButtonStatsShortcut(); // Quick toggle Stats
+        lastTouchTimeMs = now;
+      }
     }
   }
 
@@ -167,7 +193,7 @@ void loop() {
   menuLogic.update(now);
   soundLed.update(now);
 
-  ScreenType currentScreen = menuLogic.getActiveScreen();
+  currentScreen = menuLogic.getActiveScreen();
 
   // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller mode)
   if (currentScreen != previousScreen) {
@@ -219,9 +245,14 @@ void loop() {
       tiltLogic.updateAcceleration(ax, ay, az);
     }
 
-    // 5b. Read action button (TOUCH2)
-    bool buttonDown = carrier.Buttons.getTouch(TOUCH2);
-    tiltLogic.setButtonPressed(buttonDown);
+    // 5b. Read touch buttons for gameplay
+    // TOUCH0 = Up (Pong)
+    // TOUCH1 = Down (Pong)
+    // TOUCH2 = Action / Serve (Pong & Labyrinth)
+    bool btnUp     = carrier.Buttons.getTouch(TOUCH0);
+    bool btnDown   = carrier.Buttons.getTouch(TOUCH1);
+    bool btnAction = carrier.Buttons.getTouch(TOUCH2);
+    tiltLogic.setButtons(btnUp, btnDown, btnAction);
 
     // 5c. Service MQTT network and publish input at ~20 Hz
     netMqtt.update(now);
@@ -229,7 +260,7 @@ void loop() {
     tiltLogic.formatInputJson(jsonBuffer, sizeof(jsonBuffer));
     netMqtt.publishInput(jsonBuffer, now);
 
-    // 5d. Real-time controller display update (smooth paddle & connection badge)
+    // 5d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
     uiController.updateDisplay(tiltLogic, netMqtt.isConnected());
   } else {
     // Normal menu modes: update sliding top menu bar

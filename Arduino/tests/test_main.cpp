@@ -189,31 +189,38 @@ void testTiltSmoothing() {
 void testTiltJsonFormatting() {
   printf("\n--- Test: MQTT JSON Formatting (No %%f) ---\n");
   TiltLogic tilt;
-  char buffer[96];
+  char buffer[128];
 
-  // 1. Flat state, button false
+  // 1. Flat state, button false, up/down false
   tilt.updateAcceleration(0.0f, 0.0f, 1.0f);
-  tilt.setButtonPressed(false);
+  tilt.setButtons(false, false, false);
   // Warm up filter
   for (int i = 0; i < 15; i++) tilt.updateAcceleration(0.0f, 0.0f, 1.0f);
 
   tilt.formatInputJson(buffer, sizeof(buffer));
-  CHECK(strcmp(buffer, "{\"tilt\":0.00,\"tiltX\":0.00,\"button\":false}") == 0,
-        "Formats neutral flat input: {\"tilt\":0.00,\"tiltX\":0.00,\"button\":false}");
+  CHECK(strcmp(buffer, "{\"up\":false,\"down\":false,\"button\":false,\"tiltX\":0.00,\"tiltY\":0.00,\"tilt\":0.00}") == 0,
+        "Formats neutral flat universal input JSON with up/down/button/tiltX/tiltY/tilt");
 
-  // 2. Positive tilt, button true
+  // 2. Pong buttons test (Up=true, Down=false, Action=true)
+  tilt.setButtons(true, false, true);
+  tilt.formatInputJson(buffer, sizeof(buffer));
+  CHECK(strstr(buffer, "\"up\":true") != nullptr, "JSON contains \"up\":true");
+  CHECK(strstr(buffer, "\"down\":false") != nullptr, "JSON contains \"down\":false");
+  CHECK(strstr(buffer, "\"button\":true") != nullptr, "JSON contains \"button\":true");
+
+  // 3. Positive tilt (Labyrinth & Pong tilt compatibility)
   // tan(10.5 deg) ~ 0.185 -> tilt ~ 0.35
   for (int i = 0; i < 25; i++) tilt.updateAcceleration(0.0f, 0.185f, 1.0f);
-  tilt.setButtonPressed(true);
   tilt.formatInputJson(buffer, sizeof(buffer));
-  CHECK(strstr(buffer, "\"button\":true") != nullptr, "JSON contains \"button\":true");
   CHECK(strstr(buffer, "\"tilt\":0.") != nullptr, "JSON contains positive tilt value");
+  CHECK(strstr(buffer, "\"tiltY\":0.") != nullptr, "JSON contains positive tiltY value");
 
-  // 3. Negative tilt
+  // 4. Negative tilt clamped
   for (int i = 0; i < 25; i++) tilt.updateAcceleration(0.0f, -0.577f, 1.0f);
-  tilt.setButtonPressed(false);
+  tilt.setButtons(false, false, false);
   tilt.formatInputJson(buffer, sizeof(buffer));
   CHECK(strstr(buffer, "\"tilt\":-1.00") != nullptr, "JSON contains negative clamped tilt -1.00");
+  CHECK(strstr(buffer, "\"tiltY\":-1.00") != nullptr, "JSON contains negative clamped tiltY -1.00");
 }
 
 void testEventParsing() {

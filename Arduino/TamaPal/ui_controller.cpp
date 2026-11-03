@@ -1,15 +1,40 @@
-// WHAT: Implementation of the Pong / minigame controller screen on ST7789 display
-// WHY:  Real-time non-flickering visual feedback for paddle slider, tilt, button, and MQTT state
+// WHAT: Implementation of the universal controller screen (Pong buttons + Labyrinth 2D tilt) on ST7789 display
+// WHY:  Provides instant visual feedback for buttons, 2D tilt ball, and MQTT network state with zero flicker
 // USED BY: TamaPal.ino
 
 #include "ui_controller.h"
-#include <string.h>
+#include <stdlib.h>
+
+namespace {
+  // Arena geometry constants
+  const int ARENA_CX = 120;
+  const int ARENA_CY = 118;
+  const int ARENA_RADIUS = 34;
+  const int BALL_RADIUS = 5;
+  const int MAX_BALL_OFFSET = 26;
+
+  // Button geometry constants
+  const int BTN_UP_X = 14;
+  const int BTN_UP_Y = 106;
+  const int BTN_DN_X = 166;
+  const int BTN_DN_Y = 106;
+  const int BTN_W    = 60;
+  const int BTN_H    = 25;
+
+  const int BTN_ACT_X = 74;
+  const int BTN_ACT_Y = 166;
+  const int BTN_ACT_W = 92;
+  const int BTN_ACT_H = 24;
+}
 
 UiControllerRenderer::UiControllerRenderer()
   : carrier(nullptr),
-    lastPaddleY(-1),
+    lastBallX(-1),
+    lastBallY(-1),
     lastNetworkStatus(false),
-    lastButtonVisual(false),
+    lastBtnUp(false),
+    lastBtnDown(false),
+    lastBtnAction(false),
     isInitialized(false) {
 }
 
@@ -20,12 +45,12 @@ void UiControllerRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
 void UiControllerRenderer::drawInitialScreen() {
   if (carrier == nullptr) return;
 
-  uint16_t bgColor    = color565(8, 12, 26);
-  uint16_t ringColor  = color565(25, 45, 80);
-  uint16_t titleColor = color565(0, 230, 255);
-  uint16_t railColor  = color565(20, 35, 65);
-  uint16_t tickColor  = color565(40, 70, 120);
-  uint16_t hintColor  = color565(110, 140, 190);
+  uint16_t bgColor       = color565(8, 12, 26);
+  uint16_t ringColor     = color565(25, 45, 80);
+  uint16_t titleColor    = color565(0, 230, 255);
+  uint16_t arenaBgColor  = color565(14, 22, 44);
+  uint16_t arenaBorder   = color565(40, 75, 130);
+  uint16_t hintColor     = color565(100, 130, 175);
 
   // 1. Dark navy background
   carrier->display.fillScreen(bgColor);
@@ -33,30 +58,133 @@ void UiControllerRenderer::drawInitialScreen() {
   // 2. Subtle outer circular guideline
   carrier->display.drawCircle(120, 120, 118, ringColor);
 
-  // 3. Header title (centered at Y=30)
+  // 3. Header title (centered at Y=24)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(titleColor, bgColor);
-  carrier->display.setCursor(72, 30);
-  carrier->display.print("PONG KONTROL");
+  carrier->display.setCursor(99, 24);
+  carrier->display.print("KONTROL");
 
-  // 4. Slider track for vertical paddle movement (Height: 104 px, Center: Y=120)
-  carrier->display.fillRoundRect(116, 68, 8, 104, 4, railColor);
-  carrier->display.drawRoundRect(115, 67, 10, 106, 5, color565(30, 55, 95));
+  // 4. Center 2D circular tilt arena for Labyrinth
+  carrier->display.fillCircle(ARENA_CX, ARENA_CY, ARENA_RADIUS, arenaBgColor);
+  carrier->display.drawCircle(ARENA_CX, ARENA_CY, ARENA_RADIUS, arenaBorder);
+  carrier->display.drawCircle(ARENA_CX, ARENA_CY, ARENA_RADIUS + 1, color565(20, 35, 65));
 
-  // Center neutral tick mark
-  carrier->display.drawFastHLine(110, 120, 20, tickColor);
-  carrier->display.drawFastHLine(112, 80, 16, color565(25, 45, 75));  // Top guide
-  carrier->display.drawFastHLine(112, 160, 16, color565(25, 45, 75)); // Bottom guide
+  // Arena crosshairs
+  carrier->display.drawFastHLine(ARENA_CX - 28, ARENA_CY, 57, color565(28, 46, 80));
+  carrier->display.drawFastVLine(ARENA_CX, ARENA_CY - 28, 57, color565(28, 46, 80));
+  carrier->display.drawCircle(ARENA_CX, ARENA_CY, 13, color565(22, 36, 65));
 
-  // 5. Bottom touch button hints (safe inside round bezel)
+  // 5. Draw button indicators in initial unpressed state
+  drawButtonUp(false);
+  drawButtonDown(false);
+  drawButtonAction(false);
+
+  // 6. Bottom touch button hint (T3 = Back)
+  carrier->display.setTextSize(1);
   carrier->display.setTextColor(hintColor, bgColor);
-  carrier->display.setCursor(76, 204);
-  carrier->display.print("T2: SERVE");
-  carrier->display.setCursor(68, 218);
-  carrier->display.print("T3: AFSLUT");
+  carrier->display.setCursor(86, 214);
+  carrier->display.print("T3: TILBAGE");
 
-  lastPaddleY = -1;
+  lastBallX = -1;
+  lastBallY = -1;
+  lastBtnUp = false;
+  lastBtnDown = false;
+  lastBtnAction = false;
+  lastNetworkStatus = false;
   isInitialized = true;
+}
+
+void UiControllerRenderer::drawButtonUp(bool pressed) {
+  if (carrier == nullptr) return;
+
+  uint16_t fillCol   = pressed ? color565(0, 180, 235)   : color565(16, 26, 48);
+  uint16_t borderCol = pressed ? color565(220, 255, 255) : color565(35, 60, 100);
+  uint16_t textCol   = pressed ? color565(0, 20, 45)     : color565(120, 160, 210);
+
+  carrier->display.fillRoundRect(BTN_UP_X, BTN_UP_Y, BTN_W, BTN_H, 4, fillCol);
+  carrier->display.drawRoundRect(BTN_UP_X, BTN_UP_Y, BTN_W, BTN_H, 4, borderCol);
+
+  // Triangle arrow pointing UP
+  carrier->display.fillTriangle(BTN_UP_X + 9,  BTN_UP_Y + 16,
+                                BTN_UP_X + 15, BTN_UP_Y + 8,
+                                BTN_UP_X + 21, BTN_UP_Y + 16, textCol);
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(textCol, fillCol);
+  carrier->display.setCursor(BTN_UP_X + 26, BTN_UP_Y + 9);
+  carrier->display.print("OP");
+}
+
+void UiControllerRenderer::drawButtonDown(bool pressed) {
+  if (carrier == nullptr) return;
+
+  uint16_t fillCol   = pressed ? color565(0, 180, 235)   : color565(16, 26, 48);
+  uint16_t borderCol = pressed ? color565(220, 255, 255) : color565(35, 60, 100);
+  uint16_t textCol   = pressed ? color565(0, 20, 45)     : color565(120, 160, 210);
+
+  carrier->display.fillRoundRect(BTN_DN_X, BTN_DN_Y, BTN_W, BTN_H, 4, fillCol);
+  carrier->display.drawRoundRect(BTN_DN_X, BTN_DN_Y, BTN_W, BTN_H, 4, borderCol);
+
+  // Triangle arrow pointing DOWN
+  carrier->display.fillTriangle(BTN_DN_X + 9,  BTN_DN_Y + 8,
+                                BTN_DN_X + 15, BTN_DN_Y + 16,
+                                BTN_DN_X + 21, BTN_DN_Y + 8, textCol);
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(textCol, fillCol);
+  carrier->display.setCursor(BTN_DN_X + 26, BTN_DN_Y + 9);
+  carrier->display.print("NED");
+}
+
+void UiControllerRenderer::drawButtonAction(bool pressed) {
+  if (carrier == nullptr) return;
+
+  uint16_t fillCol   = pressed ? color565(255, 60, 80)   : color565(16, 26, 48);
+  uint16_t borderCol = pressed ? color565(255, 200, 210) : color565(35, 60, 100);
+  uint16_t textCol   = pressed ? color565(255, 255, 255) : color565(120, 160, 210);
+
+  carrier->display.fillRoundRect(BTN_ACT_X, BTN_ACT_Y, BTN_ACT_W, BTN_ACT_H, 4, fillCol);
+  carrier->display.drawRoundRect(BTN_ACT_X, BTN_ACT_Y, BTN_ACT_W, BTN_ACT_H, 4, borderCol);
+
+  // Action bullet dot
+  carrier->display.fillCircle(BTN_ACT_X + 14, BTN_ACT_Y + 12, 3, textCol);
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(textCol, fillCol);
+  carrier->display.setCursor(BTN_ACT_X + 24, BTN_ACT_Y + 8);
+  carrier->display.print("SERV T2");
+}
+
+void UiControllerRenderer::redrawArenaCrosshair(int x, int y) {
+  if (carrier == nullptr) return;
+
+  uint16_t crossColor = color565(28, 46, 80);
+  uint16_t circleColor= color565(22, 36, 65);
+
+  // Horizontal line segment restore
+  if (abs(y - ARENA_CY) <= BALL_RADIUS + 1) {
+    int startX = x - (BALL_RADIUS + 1);
+    int endX   = x + (BALL_RADIUS + 1);
+    if (startX < ARENA_CX - 28) startX = ARENA_CX - 28;
+    if (endX > ARENA_CX + 28) endX = ARENA_CX + 28;
+    if (endX >= startX) {
+      carrier->display.drawFastHLine(startX, ARENA_CY, endX - startX + 1, crossColor);
+    }
+  }
+
+  // Vertical line segment restore
+  if (abs(x - ARENA_CX) <= BALL_RADIUS + 1) {
+    int startY = y - (BALL_RADIUS + 1);
+    int endY   = y + (BALL_RADIUS + 1);
+    if (startY < ARENA_CY - 28) startY = ARENA_CY - 28;
+    if (endY > ARENA_CY + 28) endY = ARENA_CY + 28;
+    if (endY >= startY) {
+      carrier->display.drawFastVLine(ARENA_CX, startY, endY - startY + 1, crossColor);
+    }
+  }
+
+  // Center ring segment restore if near radius 13
+  carrier->display.drawCircle(ARENA_CX, ARENA_CY, 13, circleColor);
 }
 
 void UiControllerRenderer::updateDisplay(const TiltLogic& tilt, bool isMqttConnected, bool forceFullRedraw) {
@@ -66,83 +194,80 @@ void UiControllerRenderer::updateDisplay(const TiltLogic& tilt, bool isMqttConne
     drawInitialScreen();
   }
 
-  uint16_t bgColor     = color565(8, 12, 26);
-  uint16_t railColor   = color565(20, 35, 65);
-  uint16_t paddleColor = color565(0, 230, 255);
-  uint16_t paddleGloss = color565(180, 255, 255);
-  uint16_t paddleShadow= color565(15, 80, 140);
+  uint16_t bgColor      = color565(8, 12, 26);
+  uint16_t arenaBgColor = color565(14, 22, 44);
+  uint16_t ballColor    = color565(0, 230, 255);
+  uint16_t ballRim      = color565(255, 255, 255);
 
-  // 1. Calculate paddle Y position from normalized tilt (-1.0 to 1.0)
-  // Travel range: Y=70 to Y=152 (span: 82 px, center at 111)
+  // 1. Calculate 2D ball position inside arena
+  float tiltX = tilt.getTiltX();
   float tiltY = tilt.getTiltY();
-  int paddleY = 111 + (int)(tiltY * 41.0f);
-  if (paddleY < 70) paddleY = 70;
-  if (paddleY > 152) paddleY = 152;
+  int ballX = ARENA_CX + (int)(tiltX * MAX_BALL_OFFSET);
+  int ballY = ARENA_CY + (int)(tiltY * MAX_BALL_OFFSET);
 
-  // 2. Redraw paddle ONLY if position changed (prevents flicker!)
-  if (paddleY != lastPaddleY || forceFullRedraw) {
-    if (lastPaddleY >= 0) {
-      // Erase previous paddle area with background and repair the track slot
-      carrier->display.fillRect(112, lastPaddleY, 16, 18, bgColor);
-      // Restore rail slot in the erased segment
-      int restoreY = lastPaddleY;
-      int restoreH = 18;
-      if (restoreY < 68) { restoreH -= (68 - restoreY); restoreY = 68; }
-      if (restoreY + restoreH > 172) { restoreH = 172 - restoreY; }
-      if (restoreH > 0) {
-        carrier->display.fillRect(116, restoreY, 8, restoreH, railColor);
-      }
-      // Re-draw guide ticks if old paddle covered them
-      if (lastPaddleY <= 80 && lastPaddleY + 18 >= 80) {
-        carrier->display.drawFastHLine(112, 80, 16, color565(25, 45, 75));
-      }
-      if (lastPaddleY <= 120 && lastPaddleY + 18 >= 120) {
-        carrier->display.drawFastHLine(110, 120, 20, color565(40, 70, 120));
-      }
-      if (lastPaddleY <= 160 && lastPaddleY + 18 >= 160) {
-        carrier->display.drawFastHLine(112, 160, 16, color565(25, 45, 75));
-      }
-    }
-
-    // Draw new paddle slider thumb (14 px wide x 18 px high with 2.5D shine)
-    carrier->display.fillRoundRect(113, paddleY, 14, 18, 3, paddleColor);
-    carrier->display.drawFastHLine(115, paddleY + 1, 10, paddleGloss);  // Top highlight
-    carrier->display.drawFastHLine(115, paddleY + 16, 10, paddleShadow); // Bottom shadow
-    carrier->display.drawRoundRect(113, paddleY, 14, 18, 3, color565(255, 255, 255));
-
-    lastPaddleY = paddleY;
+  // Clamp within circular radius boundary
+  int dx = ballX - ARENA_CX;
+  int dy = ballY - ARENA_CY;
+  int distSq = dx * dx + dy * dy;
+  if (distSq > MAX_BALL_OFFSET * MAX_BALL_OFFSET) {
+    // Keep ball within boundary
+    ballX = ARENA_CX + (int)((float)dx * (MAX_BALL_OFFSET / 27.0f));
+    ballY = ARENA_CY + (int)((float)dy * (MAX_BALL_OFFSET / 27.0f));
   }
 
-  // 3. Network status badge (ONLINE / FORBINDER...) at Y=46
+  // 2. Redraw 2D ball only when moved (zero-flicker localized update)
+  if (ballX != lastBallX || ballY != lastBallY || forceFullRedraw) {
+    if (lastBallX >= 0) {
+      // Erase old ball
+      carrier->display.fillCircle(lastBallX, lastBallY, BALL_RADIUS + 1, arenaBgColor);
+      redrawArenaCrosshair(lastBallX, lastBallY);
+    }
+
+    // Draw new 2D ball with shine
+    carrier->display.fillCircle(ballX, ballY, BALL_RADIUS, ballColor);
+    carrier->display.drawCircle(ballX, ballY, BALL_RADIUS, ballRim);
+    carrier->display.drawPixel(ballX - 1, ballY - 1, color565(255, 255, 255));
+
+    lastBallX = ballX;
+    lastBallY = ballY;
+  }
+
+  // 3. Network status badge at Y=38
   if (isMqttConnected != lastNetworkStatus || forceFullRedraw) {
-    carrier->display.fillRect(60, 44, 120, 12, bgColor);
+    carrier->display.fillRect(60, 36, 120, 14, bgColor);
     carrier->display.setTextSize(1);
     if (isMqttConnected) {
-      carrier->display.fillCircle(82, 49, 3, color565(50, 255, 120)); // Green dot
+      carrier->display.fillCircle(88, 42, 3, color565(50, 255, 120)); // Green dot
       carrier->display.setTextColor(color565(50, 255, 120), bgColor);
-      carrier->display.setCursor(92, 46);
+      carrier->display.setCursor(96, 39);
       carrier->display.print("ONLINE");
     } else {
-      carrier->display.fillCircle(72, 49, 3, color565(255, 180, 50)); // Amber dot
+      carrier->display.fillCircle(78, 42, 3, color565(255, 180, 50)); // Amber dot
       carrier->display.setTextColor(color565(255, 180, 50), bgColor);
-      carrier->display.setCursor(82, 46);
+      carrier->display.setCursor(86, 39);
       carrier->display.print("FORBINDER");
     }
     lastNetworkStatus = isMqttConnected;
   }
 
-  // 4. Button press flash indicator at Y=180
-  bool buttonPressed = tilt.isButtonPressed();
-  if (buttonPressed != lastButtonVisual || forceFullRedraw) {
-    carrier->display.fillRect(70, 178, 100, 14, bgColor);
-    if (buttonPressed) {
-      // Glow pill when serving ball
-      carrier->display.fillRoundRect(80, 178, 80, 14, 4, color565(255, 60, 80));
-      carrier->display.setTextColor(color565(255, 255, 255), color565(255, 60, 80));
-      carrier->display.setCursor(95, 181);
-      carrier->display.print("! SERVE !");
-    }
-    lastButtonVisual = buttonPressed;
+  // 4. Update Button Up (Pong)
+  bool curUp = tilt.isUpPressed();
+  if (curUp != lastBtnUp || forceFullRedraw) {
+    drawButtonUp(curUp);
+    lastBtnUp = curUp;
+  }
+
+  // 5. Update Button Down (Pong)
+  bool curDown = tilt.isDownPressed();
+  if (curDown != lastBtnDown || forceFullRedraw) {
+    drawButtonDown(curDown);
+    lastBtnDown = curDown;
+  }
+
+  // 6. Update Button Action (Pong & Labyrinth)
+  bool curAction = tilt.isButtonPressed();
+  if (curAction != lastBtnAction || forceFullRedraw) {
+    drawButtonAction(curAction);
+    lastBtnAction = curAction;
   }
 }
-

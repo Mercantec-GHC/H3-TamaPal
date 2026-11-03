@@ -21,8 +21,9 @@ public:
   // az: vertical / gravity reference vector
   void updateAcceleration(float ax, float ay, float az);
 
-  // Set whether the action button (TOUCH2) is pressed (true for 1 packet to serve ball)
-  void setButtonPressed(bool pressed);
+  // Set button states for Pong (Up=TOUCH0, Down=TOUCH1, Action=TOUCH2)
+  void setButtons(bool up, bool down, bool action);
+  void setButtonPressed(bool pressed); // Compatibility helper for action button
 
   // Get smoothed normalized tilt values in range [-1.0 .. 1.0]
   // -1.0 = tilted forward/up, +1.0 = tilted backward/down
@@ -35,10 +36,12 @@ public:
   float getRawTiltY() const;
   float getRawTiltX() const;
 
-  // Current button state
+  // Current button states
+  bool isUpPressed() const;
+  bool isDownPressed() const;
   bool isButtonPressed() const;
 
-  // Format MQTT input JSON packet: {"tilt":0.35,"tiltX":0.10,"button":false}
+  // Format MQTT input JSON packet: {"up":false,"down":false,"button":false,"tiltX":0.10,"tiltY":0.35,"tilt":0.35}
   // Safe on SAMD21: formatted using integer arithmetic, no '%f'
   size_t formatInputJson(char* buffer, size_t maxLen) const;
 
@@ -50,6 +53,8 @@ private:
   float rawTiltX;
   float smoothedTiltY;
   float smoothedTiltX;
+  bool upState;
+  bool downState;
   bool buttonState;
 
   // Convert raw acceleration and gravity vector to a clamped [-1.0 .. 1.0] tilt value

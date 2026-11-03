@@ -1,5 +1,5 @@
-// WHAT: Renders the Pong / minigame controller screen on the round ST7789 display
-// WHY:  Provides instant visual feedback for paddle position, tilt, button, and network status
+// WHAT: Renders the universal controller screen (Pong buttons + Labyrinth 2D tilt) on ST7789 display
+// WHY:  Provides instant visual feedback for buttons, 2D tilt ball, and MQTT network state with zero flicker
 // USED BY: TamaPal.ino
 
 #ifndef UI_CONTROLLER_H
@@ -15,18 +15,26 @@ public:
 
   void begin(MKRIoTCarrier* hardwareCarrier);
 
-  // Draw the initial static controller UI (borders, header, paddle slider track, button hints)
+  // Draw the initial static controller UI (arena, button boxes, header, hints)
   void drawInitialScreen();
 
-  // Update real-time paddle position and network status badge without screen flickering
+  // Update real-time 2D tilt ball, button highlights, and network badge without screen flickering
   void updateDisplay(const TiltLogic& tilt, bool isMqttConnected, bool forceFullRedraw = false);
 
 private:
   MKRIoTCarrier* carrier;
-  int lastPaddleY;
+  int lastBallX;
+  int lastBallY;
   bool lastNetworkStatus;
-  bool lastButtonVisual;
+  bool lastBtnUp;
+  bool lastBtnDown;
+  bool lastBtnAction;
   bool isInitialized;
+
+  void drawButtonUp(bool pressed);
+  void drawButtonDown(bool pressed);
+  void drawButtonAction(bool pressed);
+  void redrawArenaCrosshair(int x, int y);
 
   // Helper to convert 24-bit RGB to 16-bit 565 format
   static uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
@@ -35,4 +43,3 @@ private:
 };
 
 #endif // UI_CONTROLLER_H
-
