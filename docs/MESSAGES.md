@@ -110,6 +110,16 @@ Metode `StartGame()` – knappen "Start" eller "Spil igen".
 - **Kun én Oplà.** Ingen problemer med to enheder eller pairing, og man kan teste alene.
 - **Alle kan starte i dag med falske data.**
 
+## Mine svar på Del 2 (frontend)
+
+Forslag til diskussionen. Del 3 udfylder vi sammen.
+
+| # | Mit forslag |
+|---|---|
+| 4 | Efter MVP: highscore først. Kirkegården i frontend kommer først, når Pong virker hele vejen (Oplà → backend → browser). |
+| 9 | Backenden styrer bolden – enig med Oliver. Browseren tegner kun. |
+| 10 | Enig: backenden viser siden fra `Frontend/`. |
+
 ---
 
 # Del 1b – Forslag og observationer fra Oleh (Arduino)
