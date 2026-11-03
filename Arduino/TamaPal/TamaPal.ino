@@ -37,6 +37,12 @@ uint32_t frameCount = 0;
 // Debounce / cooldown timer to prevent hypersensitive multi-triggers
 unsigned long lastTouchTimeMs = 0;
 
+// Non-blocking Mute toggle state (prevents multi-trigger and screen blinking)
+bool muteComboHandled = false;
+unsigned long comboStartTime = 0;
+unsigned long muteMessageEndTimeMs = 0;
+unsigned long touch3HoldStartTime = 0;
+
 void setup() {
   Serial.begin(115200);
 
@@ -73,20 +79,63 @@ void loop() {
   // 1. INPUT LAYER: Poll capacitive touch pads on the carrier
   carrier.Buttons.update();
 
-  if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
-    // Check simultaneous combo: TOUCH0 + TOUCH4 toggles sound mute ON/OFF
-    if (carrier.Buttons.getTouch(TOUCH0) && carrier.Buttons.getTouch(TOUCH4)) {
+  bool touch0 = carrier.Buttons.getTouch(TOUCH0);
+  bool touch3 = carrier.Buttons.getTouch(TOUCH3);
+  bool touch4 = carrier.Buttons.getTouch(TOUCH4);
+
+  // METHOD 1: Hold TOUCH0 + TOUCH4 together for 350 ms (Clean combo without flickering)
+  if (touch0 && touch4) {
+    if (comboStartTime == 0) {
+      comboStartTime = now;
+    } else if (!muteComboHandled && (now - comboStartTime >= 350)) {
       soundLed.toggleMute();
-      lastTouchTimeMs = now + 300; // Extra pause after combo
+      muteComboHandled = true;
+      muteMessageEndTimeMs = now + 1400; // Toast visible for 1.4 seconds
 
       if (soundLed.isMuted()) {
-        uiMenu.drawPlaceholderScreen("LYD: FRA", "T0+T4 = Taeld lyd igen");
+        uiMenu.drawPlaceholderScreen("LYD: FRA", "Hold T0+T4 = Lyd til");
       } else {
-        uiMenu.drawPlaceholderScreen("LYD: TIL", "T0+T4 = Sluk lyd");
+        uiMenu.drawPlaceholderScreen("LYD: TIL", "Hold T0+T4 = Lyd fra");
         soundLed.playSound(SOUND_CONFIRM);
       }
     }
-    else if (carrier.Buttons.onTouchDown(TOUCH0)) {
+  } else if (!touch0 && !touch4) {
+    // Both released: reset flag so combo can be triggered again next time
+    muteComboHandled = false;
+    comboStartTime = 0;
+  }
+
+  // METHOD 2: Hold TOUCH3 for 1.4 seconds on HOME screen (Ergonomic single-finger shortcut!)
+  if (menuLogic.getActiveScreen() == SCREEN_HOME && touch3) {
+    if (touch3HoldStartTime == 0) {
+      touch3HoldStartTime = now;
+    } else if (!muteComboHandled && (now - touch3HoldStartTime >= 1400)) {
+      soundLed.toggleMute();
+      muteComboHandled = true;
+      muteMessageEndTimeMs = now + 1400;
+
+      if (soundLed.isMuted()) {
+        uiMenu.drawPlaceholderScreen("LYD: FRA", "Hold T3 = Lyd til");
+      } else {
+        uiMenu.drawPlaceholderScreen("LYD: TIL", "Hold T3 = Lyd fra");
+        soundLed.playSound(SOUND_CONFIRM);
+      }
+    }
+  } else if (!touch3) {
+    touch3HoldStartTime = 0;
+  }
+
+  // Restore main screen banner automatically after mute feedback expires
+  if (muteMessageEndTimeMs > 0 && now >= muteMessageEndTimeMs) {
+    muteMessageEndTimeMs = 0;
+    if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+      uiMenu.drawPlaceholderScreen("LUMI HOME", "Tryk T2 for at vaelge");
+    }
+  }
+
+  // Normal button clicks (only processed when NOT holding a combo)
+  if (!muteComboHandled && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
+    if (!touch4 && carrier.Buttons.onTouchDown(TOUCH0)) {
       menuLogic.onButtonPrev(); // Previous icon (<)
       lastTouchTimeMs = now;
     }
@@ -102,7 +151,7 @@ void loop() {
       menuLogic.onButtonBack(); // Back to Home
       lastTouchTimeMs = now;
     }
-    else if (carrier.Buttons.onTouchDown(TOUCH4)) {
+    else if (!touch0 && carrier.Buttons.onTouchDown(TOUCH4)) {
       menuLogic.onButtonStatsShortcut(); // Quick toggle Stats
       lastTouchTimeMs = now;
     }
