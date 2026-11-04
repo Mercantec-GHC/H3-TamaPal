@@ -2,6 +2,7 @@
 // WHY:  Orchestrates inputs, pure logic, sound effects, and UI rendering cleanly
 // USED BY: Arduino MKR WiFi 1010 + MKR IoT Carrier
 
+#include <Arduino.h>
 #include <Arduino_MKRIoTCarrier.h>
 #include "settings.h"
 #include "menu_logic.h"

@@ -5,6 +5,7 @@
 #ifndef UI_CONTROLLER_H
 #define UI_CONTROLLER_H
 
+#include <Arduino.h>
 #include <Arduino_MKRIoTCarrier.h>
 #include "settings.h"
 #include "tilt_logic.h"
