@@ -290,3 +290,59 @@ void UiControllerRenderer::updateDisplay(const TiltLogic& tilt, bool isMqttConne
     lastBtnAction = curAction;
   }
 }
+
+// Display player role selection screen (Spiller 1 vs Spiller 2)
+void UiControllerRenderer::drawChoosePlayerScreen() {
+  if (carrier == nullptr) return;
+
+  uint16_t bgColor = color565(8, 12, 26);
+  carrier->display.fillScreen(bgColor);
+
+  // Outer ring guide
+  carrier->display.drawCircle(120, 120, 118, color565(25, 45, 80));
+
+  // Header Title
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(color565(0, 230, 255), bgColor);
+  carrier->display.setCursor(87, 26);
+  carrier->display.print("HVEM ER DU?");
+
+  // Card 1: Spiller 1 (Left / Venstre) -> Cyan Theme
+  carrier->display.fillRoundRect(24, 48, 192, 54, 6, color565(14, 28, 52));
+  carrier->display.drawRoundRect(24, 48, 192, 54, 6, color565(0, 200, 255));
+  carrier->display.drawCircle(44, 75, 11, color565(0, 230, 255));
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(color565(0, 230, 255), color565(14, 28, 52));
+  carrier->display.setCursor(41, 72);
+  carrier->display.print("0"); // Touch 0
+
+  carrier->display.setCursor(64, 63);
+  carrier->display.setTextColor(color565(255, 255, 255), color565(14, 28, 52));
+  carrier->display.print("T0: SPILLER 1");
+  carrier->display.setCursor(64, 79);
+  carrier->display.setTextColor(color565(130, 190, 240), color565(14, 28, 52));
+  carrier->display.print("Venstre ketsjer (P1)");
+
+  // Card 2: Spiller 2 (Right / Hoejre) -> Coral Theme
+  carrier->display.fillRoundRect(24, 112, 192, 54, 6, color565(42, 22, 28));
+  carrier->display.drawRoundRect(24, 112, 192, 54, 6, color565(255, 90, 70));
+  carrier->display.drawCircle(44, 139, 11, color565(255, 90, 70));
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(color565(255, 90, 70), color565(42, 22, 28));
+  carrier->display.setCursor(41, 136);
+  carrier->display.print("1"); // Touch 1
+
+  carrier->display.setCursor(64, 127);
+  carrier->display.setTextColor(color565(255, 255, 255), color565(42, 22, 28));
+  carrier->display.print("T1: SPILLER 2");
+  carrier->display.setCursor(64, 143);
+  carrier->display.setTextColor(color565(255, 170, 150), color565(42, 22, 28));
+  carrier->display.print("Hoejre ketsjer (P2)");
+
+  // Bottom action hints
+  carrier->display.setTextColor(color565(100, 135, 180), bgColor);
+  carrier->display.setCursor(66, 188);
+  carrier->display.print("T2: Hurtig P1");
+  carrier->display.setCursor(76, 208);
+  carrier->display.print("T3: Tilbage");
+}

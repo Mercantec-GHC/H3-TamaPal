@@ -19,6 +19,9 @@ public:
   // Draw the initial static controller UI (arena, button boxes, header, hints)
   void drawInitialScreen(int playerId = 1);
 
+  // Draw player role selection screen (Spiller 1 vs Spiller 2)
+  void drawChoosePlayerScreen();
+
   // Update real-time 2D tilt ball, button highlights, and network badge without screen flickering
   void updateDisplay(const TiltLogic& tilt, bool isMqttConnected, bool forceFullRedraw = false);
 

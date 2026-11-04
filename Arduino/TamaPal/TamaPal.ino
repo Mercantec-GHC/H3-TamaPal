@@ -310,7 +310,7 @@ void loop() {
         Serial.println(F("     -> TOUCH 0: Spiller 1 (Venstre bat)"));
         Serial.println(F("     -> TOUCH 1 / TOUCH 4: Spiller 2 (Højre bat)"));
         Serial.println(F("     -> TOUCH 3: Tilbage til menu"));
-        uiMenu.drawChoosePlayerScreen();
+        uiController.drawChoosePlayerScreen();
         break;
 
       case SCREEN_CONTROLLER:
