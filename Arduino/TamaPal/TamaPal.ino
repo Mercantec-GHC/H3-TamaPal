@@ -96,7 +96,14 @@ void setup() {
   uiMenu.drawMenuBar(menuLogic, true);
   uiMenu.drawPlaceholderScreen("LUMI HOME", "Vaelg et ikon i toppen");
 
-  Serial.println("TamaPal ready! Navigation menu running.");
+  Serial.println(F("=================================================="));
+  Serial.println(F("TamaPal klar! (MKR WiFi 1010 + MKR IoT Carrier)"));
+  Serial.println(F("Naviger med TOUCH 0 (<) og TOUCH 1 (>)"));
+  Serial.println(F("For at forbinde til Pong over MQTT:"));
+  Serial.println(F(" 1. Gaa til CONNECT (antenne-ikonet helt til hoejre)"));
+  Serial.println(F(" 2. Tryk TOUCH 2 (OK)"));
+  Serial.println(F(" 3. Vaelg spiller: TOUCH 0 (Spiller 1) eller TOUCH 4 (Spiller 2)"));
+  Serial.println(F("=================================================="));
 }
 
 void loop() {
@@ -257,18 +264,27 @@ void loop() {
 
     switch (currentScreen) {
       case SCREEN_HOME:
+        Serial.println(F("[UI] Skærm: HOME (Lumi Tamagotchi)"));
         uiMenu.drawPlaceholderScreen("LUMI HOME", "Tryk T2 for at vaelge");
         break;
 
       case SCREEN_STATS:
+        Serial.println(F("[UI] Skærm: STATISTIK (5 parametre)"));
         uiMenu.drawPlaceholderScreen("STATISTIK", "T3 / T4 = Tilbage");
         break;
 
       case SCREEN_CHOOSE_PLAYER:
+        Serial.println(F("[UI] Skærm: HVEM ER DU? Vælg spillerrolle:"));
+        Serial.println(F("     -> TOUCH 0: Spiller 1 (Venstre bat)"));
+        Serial.println(F("     -> TOUCH 4: Spiller 2 (Højre bat)"));
+        Serial.println(F("     -> TOUCH 3: Tilbage til menu"));
         uiMenu.drawChoosePlayerScreen();
         break;
 
       case SCREEN_CONTROLLER:
+        Serial.print(F("[UI] Skærm: CONTROLLER aktiv for Spiller "));
+        Serial.println(menuLogic.getPlayerId());
+        Serial.println(F("[NET] Starter Wi-Fi & MQTT for controller..."));
         netMqtt.setPlayerId(menuLogic.getPlayerId());
         tiltLogic.reset();
         lastCtrlUp = false;
@@ -283,6 +299,7 @@ void loop() {
         break;
 
       case SCREEN_ACTION:
+        Serial.println(F("[UI] Skærm: HANDLING udføres"));
         // Show temporary action banner for 1.5 seconds
         if (menuLogic.getSelectedIcon() == ICON_FOOD) {
           uiMenu.drawPlaceholderScreen("MUMS: MAD!", "Giver Lumi en baer...");

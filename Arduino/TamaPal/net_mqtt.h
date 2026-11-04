@@ -59,6 +59,8 @@ private:
   unsigned long lastPublishTime;
   unsigned long lastReconnectAttempt;
   bool connectingState;
+  bool lastReportedWifiConnected;
+  bool hasPublishedFirstPacket;
 
   // Internal connection helper (non-blocking)
   void attemptConnection(unsigned long now);
