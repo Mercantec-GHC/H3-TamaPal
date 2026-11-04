@@ -19,7 +19,7 @@ Status: 4/11 (onsdag). Ret filen, når noget ændrer sig.
 | Del | Hvem | Status |
 |---|---|---|
 | Arduino | Oleh | Menu + controller i `dev`. Sender input via MQTT og reagerer på `hit`/`miss`/`gameover`. |
-| Backend | Oliver | Ikke startet i repo endnu (går i gang 4/11, database i Neon). |
+| Backend | Oliver | Tomt projekt i `dev` (`Backend/BackendTamapal`, .NET 10, 4/11). Mangler: SignalR-hub `/gamehub`, MQTT-klient, game loop, CORS, database (Neon). |
 | Frontend | Andrii | Pong på falske data i `dev` (`fakeGame.js`). Næste: SignalR-klient (#10), når `/gamehub` findes. |
 
 ## Definition of Done – sådan opfylder vi den
@@ -54,7 +54,7 @@ I DoD står den under Nice to Have. Forslag: kun highscore (navn + score) efter 
 ## Sådan kører vi det (udkast – udfyldes til testen 5/11)
 
 1. MQTT-broker: Mathias' broker **eller** Mosquitto på Olivers bærbare (port 1883). – *ikke besluttet*
-2. Backend: `dotnet run` i `Backend/` – port: *?*
+2. Backend: `dotnet run` i `Backend/BackendTamapal/` → `http://localhost:5243` (https: 7044). Hub: `http://localhost:5243/gamehub`.
 3. Frontend: Live Server på `Frontend/` (port 5500) → backenden skal tillade CORS fra `http://localhost:5500`.
    Alternativ: backenden viser `Frontend/` fra `wwwroot` (samme adresse, ingen CORS).
 4. Oplà: Wi-Fi og broker-adresse i `arduino_secrets.h` (ikke i git). Plan B: mobil-hotspot.
