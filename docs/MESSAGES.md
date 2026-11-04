@@ -55,39 +55,49 @@ Datoer, DoD og status for hele projektet: se `docs/PLAN.md`.
 4. **Spillet færdigt:** point, liv, game over, `hit`/`miss` på Oplàen.
 5. **Brugertest** med en uden for gruppen + mindst én forbedring.
 
-## Kun 4 beskeder
+## Vores 5 beskeder (MQTT & SignalR)
 
 > **Ændret 4/11:** Brokeren kræver, at alle topics starter med gruppens navn.
 > Topics er nu `StormLamaerne/Tamapal/...` – store og små bogstaver præcis sådan.
-> Client ID: Oplà `tamapal-opla-1`, backend `tamapal-backend`. Brokerens adresse står i
-> `arduino_secrets.h` (ikke i git). Ældre forslag i Del 1b og 1c bruger stadig `tamapal/...`.
+> Client ID: Oplà `tamapal-opla-1` (og `tamapal-opla-2`), backend `tamapal-backend`. Brokerens adresse står i
+> `arduino_secrets.h` (ikke i git).
 
-### 1. Arduino → backend (MQTT), 20 gange i sekundet
+### 1. Arduino → backend (MQTT), 20 gange i sekundet + ved knap-kant
 
-Topic: `StormLamaerne/Tamapal/opla-1/input`
+Topic: `StormLamaerne/Tamapal/opla-1/input` (og `opla-2/input` for Spiller 2)  
+QoS: 0  
+Frekvens: Kontinuerlig 20 Hz (~50 ms) for jævn tilt, samt **øjeblikkelig kant-afsendelse (< 1 ms)** når knapper trykkes eller slippes.
 
 ```json
-{ "tilt": 0.35, "button": false }
+{
+  "up": false,
+  "down": false,
+  "button": false,
+  "tiltX": 0.00,
+  "tiltY": 0.35,
+  "tilt": 0.35
+}
 ```
 
-`tilt` går fra -1 (op) til 1 (ned). Arduinoen læser bare IMU og sender.
-
-> **Afvigelse (4/11):** Olehs kode i `dev` sender flere felter end aftalt – både knapper og tilt:
-> `{ "up": false, "down": false, "button": false, "tiltX": 0.00, "tiltY": 0.35, "tilt": 0.35 }`
-> `tilt` og `button` er der stadig, så backenden kan bruge besked 1 som den står.
-> Vi beslutter sammen, om vi styrer med knapper (`up`/`down`) eller `tilt` (Del 2, spørgsmål 2), og retter besked 1 bagefter.
+* `tilt` og `tiltY`: går fra -1 (vippet 30° op) til 1 (vippet 30° ned). 0 er vandret. Backenden bruger dette til ketsjerens placering: `paddle.y = (tilt + 1) / 2`.
+* `tiltX`: vandret hældning (-1 venstre, +1 højre) til fremtidige minispil (f.eks. Labyrint).
+* `button`: `true` ved serv / aktion (Touch 2 på Oplà).
+* `up` / `down`: Touch 0 (Op) og Touch 1 (Ned). Hvis spilleren foretrækker knapper frem for tilt, kan backenden også læse disse direkte!
 
 ### 2. Backend → Arduino (MQTT), kun ved hændelser
 
-Topic: `StormLamaerne/Tamapal/opla-1/event`
-
-Backenden lytter på `StormLamaerne/Tamapal/+/input` (`+` = alle Oplàer).
+Topic: `StormLamaerne/Tamapal/opla-1/event` (og `opla-2/event` for Spiller 2)  
+QoS: 1  
 
 ```json
 { "type": "hit" }
 ```
 
-Typer: `hit` (ramt), `miss` (mistet et liv), `gameover`. Oplàen blinker eller bipper.
+**Understøttede typer og Oplà-feedback:**
+* `"hit"`: Ketsjer ramte bolden (+1 point). Oplà bipper med lys tone (1200 Hz, 80 ms) og blinker grønt/cyan.
+* `"miss"`: Bolden røg forbi (-1 liv). Oplà summer med dyb tone (220 Hz, 150 ms) og blinker advarselsrød.
+* `"gameover"`: 0 liv tilbage, spil slut. Oplà afspiller 3-tonet faldende melodi (440 $\to$ 330 $\to$ 220 Hz).
+* `"assign_p1"` / `"assign_p2"`: Backenden tildeler eller bekræfter spillerens rolle.
 
 ### 3. Backend → browser (SignalR), 30 gange i sekundet
 
@@ -108,6 +118,65 @@ Alle koordinater er mellem 0 og 1. `status` kan være `waiting`, `playing` eller
 ### 4. Browser → backend (SignalR)
 
 Metode `StartGame()` – knappen "Start" eller "Spil igen".
+
+---
+
+### 5. Arduino → backend (MQTT), kæledyrets 5 behov (hvert 30. sekund og ved handlinger)
+
+> **Implementeret 4/11 i `feature/arduino-needs` (Oleh):**  
+> Oplàen opretholder Wi-Fi og MQTT-forbindelse i både Kæledyrs-tilstand og Pong-tilstand. Den sender automatisk en statuspakke for Lumis 5 behov, så backenden kan gemme kæledyret i Neon PostgreSQL, og frontenden kan vise helbredet på hjemmesiden.
+
+Topic: `StormLamaerne/Tamapal/opla-1/pet/state` (eller `opla-2/pet/state` for Spiller 2)  
+QoS: 1 (sikrer at tilstandsændringer og død leveres pålideligt)  
+Frekvens: Hvert 30. sekund (heartbeat) samt **øjeblikkeligt** ved spillerhandlinger (Mad, Leg, Skæld ud, Søvn).
+
+```json
+{
+  "name": "Lumi",
+  "stage": "teen",
+  "hunger": 80,
+  "warmth": 85,
+  "energy": 90,
+  "happy": 75,
+  "discipline": 50,
+  "alive": true
+}
+```
+
+**Feltbeskrivelse for de 5 behov (alle er heltal 0–100%):**
+* `name` (string): Kæledyrets navn (standard: `"Lumi"`).
+* `stage` (string): Livsstadie (`"baby"`, `"teen"`, `"adult"`).
+* `hunger` (int 0–100): Mæthed (100 = propmat, 0 = udsultet). Falder naturligt over tid. Stiger ved fodring i menuen (+25%).
+* `warmth` (int 0–100): Kropstemperatur (100 = optimal 20–25°C stuetemperatur). Falder hvis rummet er koldt (<14°C), stiger ved berøring/kropsvarme.
+* `energy` (int 0–100): Energi / Søvn (100 = udhvilet, 0 = udmattet). Genvindes når Lumi sover (+2% pr. 10 sek).
+* `happy` (int 0–100): Glæde (100 = super glad, 0 = trist). Stiger ved leg (+25%), falder ved skæld ud (-10%).
+* `discipline` (int 0–100): Opdragelse (100 = velopdragen). Stiger når man skælder Lumi ud (+20%), hvis den piber uberettiget.
+* `alive` (bool): `true` så længe samlet helbred > 0%. Hvis Lumi dør af sult/kulde, sendes `false`.
+
+#### Vejledning til Oliver (Backend / ASP.NET Core):
+Abonner på topic: `StormLamaerne/Tamapal/+/pet/state` (`+` fanger alle Oplàer).  
+Brug denne C# DTO-klasse:
+```csharp
+public class PetStateDto
+{
+    public string Name { get; set; } = "Lumi";
+    public string Stage { get; set; } = "teen";
+    public int Hunger { get; set; }
+    public int Warmth { get; set; }
+    public int Energy { get; set; }
+    public int Happy { get; set; }
+    public int Discipline { get; set; }
+    public bool Alive { get; set; }
+}
+```
+* **Database (Neon PostgreSQL):** Gem seneste tilstand i tabellen `pets` / `pet_states`.
+* **Kirkegård:** Hvis `Alive == false`, opret en post i kirkegårdstabellen med tidspunkt og overlevet tid til Andrii.
+* **SignalR:** Udsend event `PetStateUpdated(dto)` til browserklienter.
+
+#### Vejledning til Andrii (Frontend):
+* Lyt på `PetStateUpdated` fra SignalR.
+* Tegn 5 vandrette bjælker (0–100%): Sult (Sulten $\to$ Mæt), Varme (Kold $\to$ Varm), Energi (Træt $\to$ Frisk), Glæde (Trist $\to$ Glad), Disciplin.
+* Hvis `alive === false`, vis en gravsten på kirkegården med teksten "Lumi hviler her".
 
 ## Hvem laver hvad
 
@@ -393,8 +462,8 @@ Kun det, jeg skal bruge for at bygge MVP'en. Skriv svaret i kolonnen **Svar** el
 
 | # | Fra | Hvad jeg har brug for | Hvorfor | Svar |
 |---|---|---|---|---|
-| 1 | Oleh | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Backenden skal læse `button` og `tilt` på samme måde, som Oplàen sender dem. | |
-| 2 | Oleh | Det client ID, Oplàen bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | |
+| 1 | Oleh | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Backenden skal læse `button` og `tilt` på samme måde, som Oplàen sender dem. | **Ja.** Oplà sender `tilt` (-1.0 til 1.0, hvor 30° = 1.0) og `button` (true/false ved tryk på Touch 2). Desuden sender vi `up`/`down` (Touch 0/1) og `tiltX` (hvis du vil bruge knapper eller 2D-bevægelse). Knaptryk sendes øjeblikkeligt (< 1 ms latency), og der er 20 Hz heartbeat. (Oleh, 4/11) |
+| 2 | Oleh | Det client ID, Oplàen bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | `tamapal-opla-1` (eller `tamapal-opla-2` for Spiller 2). (Oleh, 4/11) |
 | 3 | Andrii | Ja eller nej til målene i punkt 4. | Det, du tegner, skal passe med det, backenden regner med. | **Ja.** Canvas er 600 × 600, og `draw.js` bruger præcis disse mål (Andrii, 3/11). |
 | 4 | Andrii | Må backenden vise siden fra `Frontend/`? Hvis ikke: hvilken adresse og port kører den på? | Ellers skal jeg slå CORS til for den adresse. | **Ja.** Indtil backenden kører, tester jeg med `python3 -m http.server 5500` i `Frontend/` (Andrii, 3/11). |
 
@@ -457,28 +526,25 @@ Udfyldes sammen. Når vi er enige, skriver vi navn og dato nederst.
 
 Ændringer efter aftalen: ret både Del 1 og tabellen her, og skriv det i gruppens chat.
 
-Instruktion: Hardware- og Git-opsætning for TamaPal Touch-sensorer
-Kernen i problemet:
-Oplà-kortet bruger kapacitive touch-sensorer. En printplade i plastik-case kræver høj følsomhed (tærskel 60) for at registrere tryk gennem plasten. En "bar" printplade kræver lav følsomhed (tærskel 200) for at undgå fejlreaktioner ("spøgelsestryk").
+---
 
-1. Git-niveau: Individuel konfiguration (engangsopsætning)
-Fil: arduino_secrets.h (ignoreres af Git, overskrives ikke ved pull/push).
-Handling: Åbn filen på din computer og tilføj/ret følgende linje alt efter din hardware:
-cpp
+## Hardware- og opsætningsvejledning for Oplà-controlleren
 
-// Sæt til true, hvis dit kort er i plastik-case. Sæt til false, hvis kortet er bart:
-#define SECRET_USE_CASE false
+### 1. Plastik-case vs. Bar printplade (Touch-følsomhed)
+Oplà-kortet bruger kapacitive touch-sensorer.
+- **Med plastik-case:** Kræver høj følsomhed (tærskel `60`) for at opfange fingre gennem plasten.
+- **Uden case (bar printplade):** Kræver lav følsomhed (tærskel `200`) for at undgå falske "spøgelsestryk".
 
-Используйте код с осторожностью.
-2. Runtime-niveau: Skift tilstand "on-the-fly" (uden genprogrammering)
-Handling: Åbn Serial Monitor i Arduino IDE.
-Kommando: Skriv c (eller case) og tryk Enter.
-Resultat: Systemet skifter øjeblikkeligt følsomhed og bekræfter i loggen:
-[Hardware] Tilstand: MED PLASTIK-CASE (Følsomhed: 60)
-[Hardware] Tilstand: UDEN CASE / BARE BOARD (Følsomhed: 200)
+**Sådan konfigureres det:**
+1. **I `arduino_secrets.h` (permanent for din enhed):**
+   ```cpp
+   #define SECRET_USE_CASE false  // Sæt til true hvis monteret i hvid plastik-case
+   ```
+2. **On-the-fly i Serial Monitor (uden genprogrammering):**
+   Send bogstavet `c` (eller `C`) i Serial Monitor (115200 baud). Arduinoen skifter øjeblikkeligt følsomhed og bekræfter i loggen.
 
-Status på opgaven
-Kodeændringer: Gennemført i settings.h, TamaPal.ino og arduino_secrets.example.h.
-Test & kompilering: Succesfuld (57 ud af 57 enhedstest bestået via arduino-cli).
-Git: Ændringerne er gemt (committed) og pushet til branch: feature/arduino-needs.
-Hvis du har brug for det, kan jeg tilpasse teksten i Serial Monitor eller justere standardværdierne for følsomheden. Lad mig vide, hvordan du vil fortsætte!
+### 2. Mute (Lyd fra/til)
+- **Genvej 1:** Tryk på Touch 0 og Touch 4 samtidig.
+- **Genvej 2:** Hold Touch 3 nede i 1,2 sekunder.
+- **Fysisk gestus:** Vend Oplà-kortet med bunden i vejret (IMU Z-akse < -0.7g).
+

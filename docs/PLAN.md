@@ -18,7 +18,7 @@ Status: 4/11 (onsdag). Ret filen, når noget ændrer sig.
 
 | Del | Hvem | Status |
 |---|---|---|
-| Arduino | Oleh | Menu + controller i `dev`. Sender input via MQTT og reagerer på `hit`/`miss`/`gameover`. |
+| Arduino | Oleh | Menu + controller + 5 behov (Lumi Tamagotchi) i `feature/arduino-needs`. Sender input (20 Hz) og pet state (30s) via MQTT, reagerer på `hit`/`miss`/`gameover` med lyd og lys. 103/103 enhedstests bestået. |
 | Backend | Oliver | Tomt projekt i `dev` (`Backend/BackendTamapal`, .NET 10, 4/11). Mangler: SignalR-hub `/gamehub`, MQTT-klient, game loop, CORS, database (Neon). |
 | Frontend | Andrii | Pong på falske data i `dev` (`fakeGame.js`). Næste: SignalR-klient (#10), når `/gamehub` findes. |
 
@@ -54,8 +54,8 @@ I DoD står den under Nice to Have. Forslag: kun highscore (navn + score) efter 
 ## Sådan kører vi det (udkast – udfyldes til testen 5/11)
 
 1. MQTT-broker: ekstern broker, port 1883, uden login (4/11). Adressen står i `arduino_secrets.h`, ikke i git.
-   Topics: `StormLamaerne/Tamapal/opla-1/input` og `.../event` (se `MESSAGES.md`).
-   Oleh skal rette `MQTT_TOPIC_INPUT` / `MQTT_TOPIC_EVENT` i `Arduino/TamaPal/settings.h`.
+   Topics: `StormLamaerne/Tamapal/opla-1/input`, `.../event` og `.../pet/state` (se `MESSAGES.md`).
+   Rettet i `Arduino/TamaPal/settings.h` med `MQTT_TOPIC_PREFIX = "StormLamaerne/Tamapal"`.
 2. Backend: `dotnet run` i `Backend/BackendTamapal/` → `http://localhost:5243` (https: 7044). Hub: `http://localhost:5243/gamehub`.
 3. Frontend: Live Server på `Frontend/` (port 5500) → backenden skal tillade CORS fra `http://localhost:5500`.
    Alternativ: backenden viser `Frontend/` fra `wwwroot` (samme adresse, ingen CORS).
