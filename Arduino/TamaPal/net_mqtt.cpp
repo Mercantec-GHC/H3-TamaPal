@@ -34,8 +34,8 @@ void NetMqttClient::setPlayerId(int id) {
     disconnect();
   }
   playerId = newId;
-  snprintf(topicInput, sizeof(topicInput), "tamapal/opla-%d/input", playerId);
-  snprintf(topicEvent, sizeof(topicEvent), "tamapal/opla-%d/event", playerId);
+  snprintf(topicInput, sizeof(topicInput), "%s/opla-%d/input", MQTT_TOPIC_PREFIX, playerId);
+  snprintf(topicEvent, sizeof(topicEvent), "%s/opla-%d/event", MQTT_TOPIC_PREFIX, playerId);
 
   // Append hardware MAC suffix so multiple Arduinos never kick each other off broker
   byte mac[6] = {0};

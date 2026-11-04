@@ -62,10 +62,11 @@ const unsigned long MQTT_PUBLISH_INTERVAL_MS = 50;
 // Reconnect interval if Wi-Fi or MQTT broker drops (5 seconds)
 const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 
-// MQTT Client ID and Topics (as defined in docs/MESSAGES.md contract)
+// MQTT Client ID and Topics (Group prefix: StormLamaerne/Tamapal)
 #define MQTT_CLIENT_ID "tamapal-opla-1"
-#define MQTT_TOPIC_INPUT "tamapal/opla-1/input"
-#define MQTT_TOPIC_EVENT "tamapal/opla-1/event"
+#define MQTT_TOPIC_PREFIX "StormLamaerne/Tamapal"
+#define MQTT_TOPIC_INPUT "StormLamaerne/Tamapal/opla-1/input"
+#define MQTT_TOPIC_EVENT "StormLamaerne/Tamapal/opla-1/event"
 
 // ============================================================================
 // ENUMS (Application states and menu items)

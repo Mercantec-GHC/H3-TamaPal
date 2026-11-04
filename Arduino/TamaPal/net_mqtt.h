@@ -52,9 +52,9 @@ private:
   GameEventCallback onEventCallback;
 
   int playerId;
-  char topicInput[36];
-  char topicEvent[36];
-  char clientMqttId[36];
+  char topicInput[64];
+  char topicEvent[64];
+  char clientMqttId[64];
 
   unsigned long lastPublishTime;
   unsigned long lastReconnectAttempt;
