@@ -43,8 +43,10 @@ Do not fill in **Del 3 – Aftale** alone: decisions are made together by the gr
 - **Issues** are created in the `H3-TamaPal` repo (not in other groups' repos), with title, description,
   **acceptkriterier** (checklist), one assignee, and added to the TamaPal project.
 - **Branches:** `main` is protected (releases only, PR + 1 approval). `dev` is the default, shared branch.
-  Work in a short branch from `dev`: `git switch dev` → `git pull` → `git switch -c feature/<name>`.
-- **Pull Request** into `dev`, write `Closes #<issue>` and check every acceptance criterion before asking for review.
+- **Push directly to `dev`** (group decision 4/11): `git switch dev` → `git pull` → commit → `git push`.
+  Always `git pull` before you push. No Pull Request or review is needed for `dev`.
+  A short `feature/<name>` branch + PR into `dev` is optional, e.g. if you want feedback first.
+- Write `Closes #<issue>` in the commit message when a commit finishes an Issue.
 - Never push directly to `main`, never `push --force`, never delete branches without the human asking.
 - Small commits with short messages that say what changed.
 
