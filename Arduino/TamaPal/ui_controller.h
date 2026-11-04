@@ -25,6 +25,7 @@ private:
   MKRIoTCarrier* carrier;
   int lastBallX;
   int lastBallY;
+  int currentPlayerId;
   bool lastNetworkStatus;
   bool lastBtnUp;
   bool lastBtnDown;

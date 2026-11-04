@@ -31,6 +31,7 @@ UiControllerRenderer::UiControllerRenderer()
   : carrier(nullptr),
     lastBallX(-1),
     lastBallY(-1),
+    currentPlayerId(1),
     lastNetworkStatus(false),
     lastBtnUp(false),
     lastBtnDown(false),
@@ -44,6 +45,8 @@ void UiControllerRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
 
 void UiControllerRenderer::drawInitialScreen(int playerId) {
   if (carrier == nullptr) return;
+
+  currentPlayerId = playerId;
 
   uint16_t bgColor       = color565(8, 12, 26);
   uint16_t ringColor     = color565(25, 45, 80);
@@ -196,7 +199,7 @@ void UiControllerRenderer::updateDisplay(const TiltLogic& tilt, bool isMqttConne
   if (carrier == nullptr) return;
 
   if (forceFullRedraw || !isInitialized) {
-    drawInitialScreen();
+    drawInitialScreen(currentPlayerId);
   }
 
   uint16_t bgColor      = color565(8, 12, 26);

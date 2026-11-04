@@ -158,18 +158,20 @@ void loop() {
     // TOUCH1: Choose Player 2 (Hoejre)
     // TOUCH2: Quick confirm Player 1
     // TOUCH3: Cancel back to Lumi Home
-    if (carrier.Buttons.onTouchDown(TOUCH0)) {
-      menuLogic.selectPlayer(1);
-      lastTouchTimeMs = now;
-    } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
-      menuLogic.selectPlayer(2);
-      lastTouchTimeMs = now;
-    } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
-      menuLogic.selectPlayer(1);
-      lastTouchTimeMs = now;
-    } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
-      menuLogic.onButtonBack();
-      lastTouchTimeMs = now;
+    if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
+        menuLogic.selectPlayer(1);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+        menuLogic.selectPlayer(2);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+        menuLogic.selectPlayer(1);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack();
+        lastTouchTimeMs = now;
+      }
     }
   } else if (currentScreen == SCREEN_CONTROLLER) {
     // In controller mode:
@@ -221,10 +223,12 @@ void loop() {
 
   // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller mode)
   if (currentScreen != previousScreen) {
-    if (previousScreen == SCREEN_CONTROLLER) {
-      // Exiting controller: disconnect MQTT, turn off player LEDs, and redraw main menu
-      netMqtt.disconnect();
-      soundLed.setMoodColor(0, 0, 0);
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER) {
+      // Exiting controller or player selection: clean up, turn off LEDs, and redraw full home UI
+      if (previousScreen == SCREEN_CONTROLLER) {
+        netMqtt.disconnect();
+        soundLed.setMoodColor(0, 0, 0);
+      }
       uiMenu.drawInitialScreen();
       uiMenu.drawMenuBar(menuLogic, true);
     }
@@ -247,6 +251,9 @@ void loop() {
       case SCREEN_CONTROLLER:
         netMqtt.setPlayerId(menuLogic.getPlayerId());
         tiltLogic.reset();
+        lastCtrlUp = false;
+        lastCtrlDown = false;
+        lastCtrlAction = false;
         uiController.drawInitialScreen(menuLogic.getPlayerId());
         if (menuLogic.getPlayerId() == 2) {
           soundLed.setMoodColor(255, 70, 50);  // Coral/Red glow for Player 2
@@ -306,8 +313,8 @@ void loop() {
 
     // 5d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
     uiController.updateDisplay(tiltLogic, netMqtt.isConnected());
-  } else {
-    // Normal menu modes: update sliding top menu bar
+  } else if (currentScreen != SCREEN_CHOOSE_PLAYER) {
+    // Normal menu modes (HOME, STATS, ACTION): update sliding top menu bar
     uiMenu.drawMenuBar(menuLogic, false);
   }
 
