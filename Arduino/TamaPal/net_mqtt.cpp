@@ -36,7 +36,11 @@ void NetMqttClient::setPlayerId(int id) {
   playerId = newId;
   snprintf(topicInput, sizeof(topicInput), "tamapal/opla-%d/input", playerId);
   snprintf(topicEvent, sizeof(topicEvent), "tamapal/opla-%d/event", playerId);
-  snprintf(clientMqttId, sizeof(clientMqttId), "tamapal-opla-%d", playerId);
+
+  // Append hardware MAC suffix so multiple Arduinos never kick each other off broker
+  byte mac[6] = {0};
+  WiFi.macAddress(mac);
+  snprintf(clientMqttId, sizeof(clientMqttId), "tamapal-opla-%d-%02X%02X", playerId, mac[4], mac[5]);
 }
 
 int NetMqttClient::getPlayerId() const {

@@ -240,6 +240,8 @@ void testEventParsing() {
   CHECK(TiltLogic::parseEventType("hit") == EVENT_HIT, "Parses 'hit' -> EVENT_HIT");
   CHECK(TiltLogic::parseEventType("miss") == EVENT_MISS, "Parses 'miss' -> EVENT_MISS");
   CHECK(TiltLogic::parseEventType("gameover") == EVENT_GAMEOVER, "Parses 'gameover' -> EVENT_GAMEOVER");
+  CHECK(TiltLogic::parseEventType("assign_p1") == EVENT_ASSIGN_P1, "Parses 'assign_p1' -> EVENT_ASSIGN_P1");
+  CHECK(TiltLogic::parseEventType("assign_p2") == EVENT_ASSIGN_P2, "Parses 'assign_p2' -> EVENT_ASSIGN_P2");
   CHECK(TiltLogic::parseEventType("unknown") == EVENT_NONE, "Parses 'unknown' -> EVENT_NONE");
   CHECK(TiltLogic::parseEventType(nullptr) == EVENT_NONE, "Safely handles nullptr -> EVENT_NONE");
 }

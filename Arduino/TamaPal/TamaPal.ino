@@ -22,8 +22,28 @@ TiltLogic tiltLogic;
 UiControllerRenderer uiController;
 NetMqttClient netMqtt;
 
-// Forward declaration of incoming game event callback (hit, miss, gameover)
+// Forward declaration of incoming game event callback (hit, miss, gameover, slot auto-assignment)
 void onGameEventReceived(GameEvent event) {
+  if (event == EVENT_ASSIGN_P2) {
+    if (menuLogic.getPlayerId() != 2) {
+      menuLogic.selectPlayer(2);
+      netMqtt.setPlayerId(2);
+      uiController.drawInitialScreen(2);
+      soundLed.setMoodColor(255, 70, 50); // Automatically switch LEDs to Coral/Red for P2
+      soundLed.playSound(SOUND_CONFIRM);
+    }
+    return;
+  } else if (event == EVENT_ASSIGN_P1) {
+    if (menuLogic.getPlayerId() != 1) {
+      menuLogic.selectPlayer(1);
+      netMqtt.setPlayerId(1);
+      uiController.drawInitialScreen(1);
+      soundLed.setMoodColor(0, 180, 255); // Automatically switch LEDs to Cyan/Blue for P1
+      soundLed.playSound(SOUND_CONFIRM);
+    }
+    return;
+  }
+
   soundLed.playEventFeedback(event);
 }
 

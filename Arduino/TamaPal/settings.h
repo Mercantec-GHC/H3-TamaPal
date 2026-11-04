@@ -115,7 +115,9 @@ enum GameEvent {
   EVENT_NONE = 0,
   EVENT_HIT,               // Paddle hit the ball (+1 point)
   EVENT_MISS,              // Missed ball (-1 life)
-  EVENT_GAMEOVER           // Game finished (0 lives)
+  EVENT_GAMEOVER,          // Game finished (0 lives)
+  EVENT_ASSIGN_P1,         // Backend confirms / sets player slot 1
+  EVENT_ASSIGN_P2          // Backend reassigns slot collision to player 2
 };
 
 #endif // SETTINGS_H
