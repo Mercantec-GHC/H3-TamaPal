@@ -4,6 +4,7 @@
 
 #include "ui_controller.h"
 #include <stdlib.h>
+#include <math.h>
 
 namespace {
   // Arena geometry constants
@@ -65,12 +66,20 @@ void UiControllerRenderer::drawInitialScreen(int playerId) {
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(titleColor, bgColor);
   if (playerId == 2) {
-    carrier->display.setCursor(76, 24);
+    carrier->display.setCursor(66, 24);
     carrier->display.print("P2: HOEJRE KONTROL");
   } else {
-    carrier->display.setCursor(74, 24);
+    carrier->display.setCursor(63, 24);
     carrier->display.print("P1: VENSTRE KONTROL");
   }
+
+  // Draw initial network status badge (FORBINDER)
+  carrier->display.fillRect(60, 36, 120, 14, bgColor);
+  carrier->display.fillCircle(78, 42, 3, color565(255, 180, 50)); // Amber dot
+  carrier->display.setTextColor(color565(255, 180, 50), bgColor);
+  carrier->display.setCursor(86, 39);
+  carrier->display.print("FORBINDER");
+  lastNetworkStatus = false;
 
   // 4. Center 2D circular tilt arena for Labyrinth
   carrier->display.fillCircle(ARENA_CX, ARENA_CY, ARENA_RADIUS, arenaBgColor);
@@ -113,14 +122,14 @@ void UiControllerRenderer::drawButtonUp(bool pressed) {
   carrier->display.drawRoundRect(BTN_UP_X, BTN_UP_Y, BTN_W, BTN_H, 4, borderCol);
 
   // Triangle arrow pointing UP
-  carrier->display.fillTriangle(BTN_UP_X + 9,  BTN_UP_Y + 16,
-                                BTN_UP_X + 15, BTN_UP_Y + 8,
-                                BTN_UP_X + 21, BTN_UP_Y + 16, textCol);
+  carrier->display.fillTriangle(BTN_UP_X + 7,  BTN_UP_Y + 16,
+                                BTN_UP_X + 13, BTN_UP_Y + 8,
+                                BTN_UP_X + 19, BTN_UP_Y + 16, textCol);
 
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(textCol, fillCol);
-  carrier->display.setCursor(BTN_UP_X + 26, BTN_UP_Y + 9);
-  carrier->display.print("OP");
+  carrier->display.setCursor(BTN_UP_X + 22, BTN_UP_Y + 9);
+  carrier->display.print("T0 OP");
 }
 
 void UiControllerRenderer::drawButtonDown(bool pressed) {
@@ -134,14 +143,14 @@ void UiControllerRenderer::drawButtonDown(bool pressed) {
   carrier->display.drawRoundRect(BTN_DN_X, BTN_DN_Y, BTN_W, BTN_H, 4, borderCol);
 
   // Triangle arrow pointing DOWN
-  carrier->display.fillTriangle(BTN_DN_X + 9,  BTN_DN_Y + 8,
-                                BTN_DN_X + 15, BTN_DN_Y + 16,
-                                BTN_DN_X + 21, BTN_DN_Y + 8, textCol);
+  carrier->display.fillTriangle(BTN_DN_X + 7,  BTN_DN_Y + 8,
+                                BTN_DN_X + 13, BTN_DN_Y + 16,
+                                BTN_DN_X + 19, BTN_DN_Y + 8, textCol);
 
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(textCol, fillCol);
-  carrier->display.setCursor(BTN_DN_X + 26, BTN_DN_Y + 9);
-  carrier->display.print("NED");
+  carrier->display.setCursor(BTN_DN_X + 22, BTN_DN_Y + 9);
+  carrier->display.print("T1 NED");
 }
 
 void UiControllerRenderer::drawButtonAction(bool pressed) {
@@ -213,14 +222,16 @@ void UiControllerRenderer::updateDisplay(const TiltLogic& tilt, bool isMqttConne
   int ballX = ARENA_CX + (int)(tiltX * MAX_BALL_OFFSET);
   int ballY = ARENA_CY + (int)(tiltY * MAX_BALL_OFFSET);
 
-  // Clamp within circular radius boundary
+  // Clamp within circular radius boundary (true vector normalization)
   int dx = ballX - ARENA_CX;
   int dy = ballY - ARENA_CY;
   int distSq = dx * dx + dy * dy;
   if (distSq > MAX_BALL_OFFSET * MAX_BALL_OFFSET) {
-    // Keep ball within boundary
-    ballX = ARENA_CX + (int)((float)dx * (MAX_BALL_OFFSET / 27.0f));
-    ballY = ARENA_CY + (int)((float)dy * (MAX_BALL_OFFSET / 27.0f));
+    float dist = sqrtf((float)distSq);
+    if (dist > 0.001f) {
+      ballX = ARENA_CX + (int)((dx / dist) * (float)MAX_BALL_OFFSET);
+      ballY = ARENA_CY + (int)((dy / dist) * (float)MAX_BALL_OFFSET);
+    }
   }
 
   // 2. Redraw 2D ball only when moved (zero-flicker localized update)

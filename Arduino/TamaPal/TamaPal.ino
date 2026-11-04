@@ -115,7 +115,7 @@ void setup() {
   Serial.println(F("For at forbinde til Pong over MQTT:"));
   Serial.println(F(" 1. Gaa til CONNECT (antenne-ikonet helt til hoejre)"));
   Serial.println(F(" 2. Tryk TOUCH 2 (OK)"));
-  Serial.println(F(" 3. Vaelg spiller: TOUCH 0 (Spiller 1) eller TOUCH 4 (Spiller 2)"));
+  Serial.println(F(" 3. Vaelg spiller: TOUCH 0 (Spiller 1) eller TOUCH 1 / TOUCH 4 (Spiller 2)"));
   Serial.println(F("=================================================="));
 }
 
@@ -141,9 +141,9 @@ void loop() {
   ScreenType currentScreen = menuLogic.getActiveScreen();
 
   // -------------------------------------------------------------
-  // GESTURE 1: TOUCH0 + TOUCH4 combo (Hold both for 300 ms)
+  // GESTURE 1: TOUCH0 + TOUCH4 combo (Hold both for 300 ms on HOME)
   // -------------------------------------------------------------
-  if (touch0 && touch4) {
+  if (currentScreen == SCREEN_HOME && touch0 && touch4) {
     if (combo04StartTime == 0) {
       combo04StartTime = now;
     } else if (!combo04Fired && (now - combo04StartTime >= 300)) {
@@ -195,6 +195,8 @@ void loop() {
     muteMessageEndTimeMs = 0;
     if (currentScreen == SCREEN_HOME) {
       uiMenu.drawPlaceholderScreen("LUMI HOME", "Tryk T2 for at vaelge");
+    } else if (currentScreen == SCREEN_CONTROLLER) {
+      uiController.drawInitialScreen(menuLogic.getPlayerId());
     }
   }
 
@@ -204,14 +206,14 @@ void loop() {
   if (currentScreen == SCREEN_CHOOSE_PLAYER) {
     // In player role selection screen:
     // TOUCH0: Choose Player 1 (Venstre)
-    // TOUCH1: Choose Player 2 (Hoejre)
+    // TOUCH1 or TOUCH4: Choose Player 2 (Hoejre)
     // TOUCH2: Quick confirm Player 1
     // TOUCH3: Cancel back to Lumi Home
     if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
       if (carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.selectPlayer(1);
         lastTouchTimeMs = now;
-      } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+      } else if (carrier.Buttons.onTouchDown(TOUCH1) || carrier.Buttons.onTouchDown(TOUCH4)) {
         menuLogic.selectPlayer(2);
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
@@ -225,8 +227,8 @@ void loop() {
   } else if (currentScreen == SCREEN_CONTROLLER) {
     // In controller mode:
     // TOUCH0, TOUCH1, TOUCH2 are gameplay inputs (read continuously below).
-    // TOUCH3 exits back to HOME screen immediately.
-    if (carrier.Buttons.onTouchDown(TOUCH3)) {
+    // TOUCH3 exits back to HOME screen immediately (with debounce).
+    if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
       menuLogic.onButtonBack();
       lastTouchTimeMs = now;
     }
@@ -298,7 +300,7 @@ void loop() {
       case SCREEN_CHOOSE_PLAYER:
         Serial.println(F("[UI] Skærm: HVEM ER DU? Vælg spillerrolle:"));
         Serial.println(F("     -> TOUCH 0: Spiller 1 (Venstre bat)"));
-        Serial.println(F("     -> TOUCH 4: Spiller 2 (Højre bat)"));
+        Serial.println(F("     -> TOUCH 1 / TOUCH 4: Spiller 2 (Højre bat)"));
         Serial.println(F("     -> TOUCH 3: Tilbage til menu"));
         uiMenu.drawChoosePlayerScreen();
         break;
