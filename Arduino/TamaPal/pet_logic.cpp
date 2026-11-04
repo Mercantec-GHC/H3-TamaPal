@@ -72,6 +72,11 @@ void PetLogic::setSleeping(bool sleep) {
 }
 
 void PetLogic::setAmbientTemperature(float celsius) {
+  // Reject NaN or invalid sensor spikes from uninitialized hardware
+  if (celsius < -20.0f || celsius > 65.0f || celsius != celsius) {
+    return;
+  }
+
   ambientTemp = celsius;
 
   // Ideal temperature is around 22.0 deg Celsius
@@ -85,6 +90,7 @@ void PetLogic::setAmbientTemperature(float celsius) {
 }
 
 void PetLogic::setAmbientLight(int lux) {
+  if (lux < 0) lux = 0;
   ambientLux = lux;
 
   // If very dark (< 30 lux) and Lumi is getting tired, Lumi falls asleep
@@ -108,19 +114,18 @@ void PetLogic::update(unsigned long currentTimeMs) {
     unsigned long elapsedIntervals = (currentTimeMs - lastDecayTimeMs) / PET_DECAY_INTERVAL_MS;
     lastDecayTimeMs += elapsedIntervals * PET_DECAY_INTERVAL_MS;
 
-    for (unsigned long i = 0; i < elapsedIntervals; i++) {
-      if (isAsleep) {
-        // Recover energy while sleeping
-        energyVal = clamp0100(energyVal + PET_SLEEP_ENERGY_RECOVERY);
-        // Hunger decays slower while asleep (half rate)
-        hungerVal = clamp0100(hungerVal - (PET_DECAY_HUNGER * 0.5f));
-      } else {
-        // Normal daytime awake decay
-        energyVal = clamp0100(energyVal - PET_DECAY_ENERGY);
-        hungerVal = clamp0100(hungerVal - PET_DECAY_HUNGER);
-        happinessVal = clamp0100(happinessVal - PET_DECAY_HAPPINESS);
-        disciplineVal = clamp0100(disciplineVal - PET_DECAY_DISCIPLINE);
-      }
+    float intervals = (float)elapsedIntervals;
+    if (isAsleep) {
+      // Recover energy while sleeping
+      energyVal = clamp0100(energyVal + (PET_SLEEP_ENERGY_RECOVERY * intervals));
+      // Hunger decays slower while asleep (half rate)
+      hungerVal = clamp0100(hungerVal - (PET_DECAY_HUNGER * 0.5f * intervals));
+    } else {
+      // Normal daytime awake decay (O(1) calculation, zero lag even after long pauses)
+      energyVal = clamp0100(energyVal - (PET_DECAY_ENERGY * intervals));
+      hungerVal = clamp0100(hungerVal - (PET_DECAY_HUNGER * intervals));
+      happinessVal = clamp0100(happinessVal - (PET_DECAY_HAPPINESS * intervals));
+      disciplineVal = clamp0100(disciplineVal - (PET_DECAY_DISCIPLINE * intervals));
     }
   }
 }
