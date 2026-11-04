@@ -3,6 +3,7 @@
 // USED BY: TamaPal.ino, ui_stats.cpp, tests/test_main.cpp
 
 #include "pet_logic.h"
+#include <stdio.h>
 
 PetLogic::PetLogic() {
   reset();
@@ -190,3 +191,30 @@ const char* PetLogic::getMoodStatusDanish() const {
   }
   return "Kraever lidt omsorg";
 }
+
+bool PetLogic::isAlive() const {
+  return getOverallHealth() > 0;
+}
+
+const char* PetLogic::getStage() const {
+  return "teen";
+}
+
+void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char* petName, const char* petStage) const {
+  if (buffer == nullptr || bufferSize == 0) return;
+
+  const char* name = (petName != nullptr && petName[0] != '\0') ? petName : "Lumi";
+  const char* stage = (petStage != nullptr && petStage[0] != '\0') ? petStage : getStage();
+
+  snprintf(buffer, bufferSize,
+           "{\"name\":\"%s\",\"stage\":\"%s\",\"hunger\":%d,\"warmth\":%d,\"energy\":%d,\"happy\":%d,\"discipline\":%d,\"alive\":%s}",
+           name,
+           stage,
+           getHunger(),
+           getWarmth(),
+           getEnergy(),
+           getHappiness(),
+           getDiscipline(),
+           isAlive() ? "true" : "false");
+}
+

@@ -40,8 +40,13 @@ public:
   // Overall status queries
   int getOverallHealth() const;       // Weighted average (0..100)
   bool isSleeping() const;
+  bool isAlive() const;               // True if overall health > 0
+  const char* getStage() const;       // Lifecycle stage: "baby", "teen", or "adult"
   bool needsAttention() const;        // True if any vital is below PET_CRITICAL_THRESHOLD
   const char* getMoodStatusDanish() const;
+
+  // JSON serialization for MQTT syncing (docs/MESSAGES.md Del 1b Proposal 3A)
+  void formatStateJson(char* buffer, unsigned int bufferSize, const char* petName = "Lumi", const char* petStage = "teen") const;
 
   // Direct vital setter for test verification
   void setVitals(float hunger, float warmth, float energy, float happiness, float discipline);

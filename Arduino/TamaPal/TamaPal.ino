@@ -75,6 +75,23 @@ bool lastCtrlUp = false;
 bool lastCtrlDown = false;
 bool lastCtrlAction = false;
 
+// Pet state sync to backend interval (30 seconds or immediately on action)
+unsigned long lastPetStatePublishTimeMs = 0;
+
+void syncPetStateToBackend(bool forceImmediate = false) {
+  unsigned long now = millis();
+  if (!forceImmediate && (now - lastPetStatePublishTimeMs < MQTT_PET_STATE_INTERVAL_MS)) {
+    return;
+  }
+  if (!netMqtt.isConnected()) {
+    return;
+  }
+  lastPetStatePublishTimeMs = now;
+  char petJson[160];
+  petLogic.formatStateJson(petJson, sizeof(petJson), "Lumi", petLogic.getStage());
+  netMqtt.publishPetState(petJson);
+}
+
 // Environmental sensor reading interval (every 2.5 seconds, non-blocking)
 unsigned long lastSensorReadTimeMs = 0;
 const unsigned long SENSOR_READ_INTERVAL_MS = 2500;
@@ -312,10 +329,7 @@ void loop() {
     muteMessageEndTimeMs = 0; // Cancel any active mute toast when switching screens
 
     if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS) {
-      // Exiting a fullscreen view: clean up, restore mood LEDs, and redraw full home UI
-      if (previousScreen == SCREEN_CONTROLLER) {
-        netMqtt.disconnect();
-      }
+      // Exiting a fullscreen view: restore mood LEDs and redraw full home UI
       soundLed.setMoodColor(0, 150, 220);
       uiMenu.drawInitialScreen();
       uiMenu.drawMenuBar(menuLogic, true);
@@ -389,20 +403,25 @@ void loop() {
           uiMenu.drawPlaceholderScreen("SKAELD UD!", "Disciplin stiger!");
           soundLed.setMoodColor(255, 60, 40); // Red alert glow
         }
+        syncPetStateToBackend(true); // Sync updated stats to backend immediately!
         break;
     }
   }
 
-  // 5. SCREEN-SPECIFIC RUNTIME LOOPS
+  // 5. NETWORK & MQTT (Keep connection alive and sync Lumi's 5 vitals every 30s)
+  netMqtt.update(now);
+  syncPetStateToBackend(false);
+
+  // 6. SCREEN-SPECIFIC RUNTIME LOOPS
   if (currentScreen == SCREEN_CONTROLLER) {
-    // 5a. Read accelerometer from IMU (IMUmodule in Carrier v2.x)
+    // 6a. Read accelerometer from IMU (IMUmodule in Carrier v2.x)
     if (carrier.IMUmodule.accelerationAvailable()) {
       float ax = 0.0f, ay = 0.0f, az = 0.0f;
       carrier.IMUmodule.readAcceleration(ax, ay, az);
       tiltLogic.updateAcceleration(ax, ay, az);
     }
 
-    // 5b. Read touch buttons for gameplay
+    // 6b. Read touch buttons for gameplay
     // TOUCH0 = Up (Pong)
     // TOUCH1 = Down (Pong)
     // TOUCH2 = Action / Serve (Pong & Labyrinth)
@@ -418,17 +437,14 @@ void loop() {
 
     tiltLogic.setButtons(btnUp, btnDown, btnAction);
 
-    // 5c. Service MQTT network and publish input:
-    // - Immediately on button state change (< 1 ms latency!)
-    // - Plus 20 Hz periodic heartbeat (~50 ms) for smooth 2D tilt & keep-alive
-    netMqtt.update(now);
+    // 6c. Publish controller input at 20 Hz or on button edge:
     if (netMqtt.canPublish(now, buttonEdge)) {
       char jsonBuffer[96];
       tiltLogic.formatInputJson(jsonBuffer, sizeof(jsonBuffer));
       netMqtt.publishInput(jsonBuffer, now, buttonEdge);
     }
 
-    // 5d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
+    // 6d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
     uiController.updateDisplay(tiltLogic, netMqtt.isConnected());
   } else if (currentScreen == SCREEN_STATS) {
     // Real-time stats dashboard update (dirty updates only when values decay or change)
@@ -447,7 +463,7 @@ void loop() {
     }
   }
 
-  // 6. Non-blocking FPS diagnostics (printed to Serial once per second)
+  // 7. Non-blocking FPS diagnostics (printed to Serial once per second)
   frameCount++;
   if (now - lastFpsTimeMs >= 1000) {
     // Optional: Serial.print("FPS: "); Serial.println(frameCount);

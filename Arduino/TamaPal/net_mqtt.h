@@ -38,6 +38,9 @@ public:
   // otherwise maintains periodic heartbeat at 20 Hz (~50 ms)
   bool publishInput(const char* jsonPayload, unsigned long now, bool forceImmediate = false);
 
+  // Publish pet vital state JSON packet to StormLamaerne/Tamapal/opla-1/pet/state
+  bool publishPetState(const char* jsonPayload);
+
   // Safe disconnection when exiting to main menu
   void disconnect();
 
@@ -57,6 +60,7 @@ private:
   int playerId;
   char topicInput[64];
   char topicEvent[64];
+  char topicPetState[64];
   char clientMqttId[64];
 
   unsigned long lastPublishTime;

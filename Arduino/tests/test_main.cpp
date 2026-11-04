@@ -339,6 +339,37 @@ void testPetDecayAndStatus() {
   CHECK(strcmp(pet.getMoodStatusDanish(), "Sover zZz...") == 0, "Reports Danish mood: 'Sover zZz...'");
 }
 
+void testPetSerialization() {
+  printf("\n--- Test: PetLogic JSON Serialization & Life State ---\n");
+  PetLogic pet;
+  char buf[256];
+
+  CHECK(pet.isAlive(), "Default Lumi is alive");
+  CHECK(strcmp(pet.getStage(), "teen") == 0, "Default stage is teen");
+
+  // Format default state JSON
+  pet.formatStateJson(buf, sizeof(buf));
+  CHECK(strstr(buf, "\"name\":\"Lumi\"") != NULL, "JSON contains name Lumi");
+  CHECK(strstr(buf, "\"stage\":\"teen\"") != NULL, "JSON contains stage teen");
+  CHECK(strstr(buf, "\"hunger\":80") != NULL, "JSON contains hunger 80");
+  CHECK(strstr(buf, "\"warmth\":85") != NULL, "JSON contains warmth 85");
+  CHECK(strstr(buf, "\"energy\":90") != NULL, "JSON contains energy 90");
+  CHECK(strstr(buf, "\"happy\":75") != NULL, "JSON contains happy 75");
+  CHECK(strstr(buf, "\"discipline\":50") != NULL, "JSON contains discipline 50");
+  CHECK(strstr(buf, "\"alive\":true") != NULL, "JSON contains alive true");
+
+  // Format with custom name and baby stage
+  pet.formatStateJson(buf, sizeof(buf), "Sparky", "baby");
+  CHECK(strstr(buf, "\"name\":\"Sparky\"") != NULL, "JSON contains custom name Sparky");
+  CHECK(strstr(buf, "\"stage\":\"baby\"") != NULL, "JSON contains custom stage baby");
+
+  // Dead state: all vitals 0
+  pet.setVitals(0, 0, 0, 0, 0);
+  CHECK(!pet.isAlive(), "Lumi is not alive when all vitals reach 0");
+  pet.formatStateJson(buf, sizeof(buf));
+  CHECK(strstr(buf, "\"alive\":false") != NULL, "JSON contains alive false when dead");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -360,6 +391,7 @@ int main() {
   testPetActions();
   testPetSleepAndSensors();
   testPetDecayAndStatus();
+  testPetSerialization();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

@@ -68,6 +68,9 @@ const float TILT_SMOOTH_FACTOR = 0.30f;
 // MQTT publish frequency: 50 ms = 20 messages per second (20 Hz)
 const unsigned long MQTT_PUBLISH_INTERVAL_MS = 50;
 
+// Pet vital state MQTT sync frequency: 30 seconds (or immediately on action)
+const unsigned long MQTT_PET_STATE_INTERVAL_MS = 30000;
+
 // Reconnect interval if Wi-Fi or MQTT broker drops (5 seconds)
 const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 
@@ -76,6 +79,7 @@ const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 #define MQTT_TOPIC_PREFIX "StormLamaerne/Tamapal"
 #define MQTT_TOPIC_INPUT "StormLamaerne/Tamapal/opla-1/input"
 #define MQTT_TOPIC_EVENT "StormLamaerne/Tamapal/opla-1/event"
+#define MQTT_TOPIC_PET_STATE "StormLamaerne/Tamapal/opla-1/pet/state"
 
 // ============================================================================
 // ENUMS (Application states and menu items)

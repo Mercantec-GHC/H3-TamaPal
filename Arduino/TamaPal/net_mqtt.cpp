@@ -46,6 +46,7 @@ NetMqttClient::NetMqttClient()
   // Pure in-memory initialization only: NO hardware I/O (WiFi, SPI) before setup()!
   topicInput[0] = '\0';
   topicEvent[0] = '\0';
+  topicPetState[0] = '\0';
   clientMqttId[0] = '\0';
 }
 
@@ -77,6 +78,7 @@ void NetMqttClient::setPlayerId(int id) {
   playerId = newId;
   snprintf(topicInput, sizeof(topicInput), "%s/opla-%d/input", MQTT_TOPIC_PREFIX, playerId);
   snprintf(topicEvent, sizeof(topicEvent), "%s/opla-%d/event", MQTT_TOPIC_PREFIX, playerId);
+  snprintf(topicPetState, sizeof(topicPetState), "%s/opla-%d/pet/state", MQTT_TOPIC_PREFIX, playerId);
   snprintf(clientMqttId, sizeof(clientMqttId), "tamapal-opla-%d", playerId);
 }
 
@@ -316,3 +318,21 @@ bool NetMqttClient::publishInput(const char* jsonPayload, unsigned long now, boo
 
   return true;
 }
+
+bool NetMqttClient::publishPetState(const char* jsonPayload) {
+  if (jsonPayload == nullptr || !isConnected()) {
+    return false;
+  }
+
+  // Publish to pet state topic with QoS 1 for reliable delivery to backend
+  mqttClient.beginMessage(topicPetState, false, 1, false);
+  mqttClient.print(jsonPayload);
+  mqttClient.endMessage();
+
+  Serial.print(F("[MQTT TX Pet] "));
+  Serial.print(topicPetState);
+  Serial.print(F(" -> "));
+  Serial.println(jsonPayload);
+  return true;
+}
+
