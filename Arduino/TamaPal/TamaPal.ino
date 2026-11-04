@@ -14,6 +14,7 @@
 #include "pet_logic.h"
 #include "ui_stats.h"
 #include "storage_pet.h"
+#include "ui_pet.h"
 
 // Hardware carrier instance
 MKRIoTCarrier carrier;
@@ -28,6 +29,7 @@ NetMqttClient netMqtt;
 PetLogic petLogic;
 UiStatsRenderer uiStats;
 StoragePet storagePet;
+UiPetRenderer uiPet;
 
 // Forward declarations
 void onGameEventReceived(GameEvent event);
@@ -75,7 +77,6 @@ void onPetRewardReceived(const char* type, int amount) {
 
 // Track screen transitions to redraw viewports only when needed
 ScreenType previousScreen = SCREEN_HOME;
-const char* lastHomeMood = nullptr;
 
 // Performance monitor (measures frames per second without blocking)
 unsigned long lastFpsTimeMs = 0;
@@ -212,13 +213,13 @@ void setup() {
   uiMenu.begin(&carrier);
   uiController.begin(&carrier);
   uiStats.begin(&carrier);
+  uiPet.begin(&carrier);
   netMqtt.begin(onGameEventReceived, onPetRewardReceived);
 
   // Initial full screen draw
   uiMenu.drawInitialScreen();
   uiMenu.drawMenuBar(menuLogic, true);
-  lastHomeMood = petLogic.getMoodStatusDanish();
-  uiMenu.drawPlaceholderScreen("LUMI HOME", lastHomeMood);
+  uiPet.updateHomeDisplay(petLogic, millis(), true);
   previousScreen = SCREEN_HOME;
 
   Serial.println(F("=================================================="));
@@ -263,7 +264,7 @@ void loop() {
   if (muteMessageEndTimeMs > 0 && now >= muteMessageEndTimeMs) {
     muteMessageEndTimeMs = 0;
     if (currentScreen == SCREEN_HOME) {
-      uiMenu.drawPlaceholderScreen("LUMI HOME", petLogic.getMoodStatusDanish());
+      uiPet.updateHomeDisplay(petLogic, now, true);
     } else if (currentScreen == SCREEN_CONTROLLER) {
       uiController.drawInitialScreen(menuLogic.getPlayerId());
     }
@@ -374,8 +375,7 @@ void loop() {
     switch (currentScreen) {
       case SCREEN_HOME:
         Serial.println(F("[UI] Skærm: HOME (Lumi Tamagotchi)"));
-        lastHomeMood = petLogic.getMoodStatusDanish();
-        uiMenu.drawPlaceholderScreen("LUMI HOME", lastHomeMood);
+        uiPet.updateHomeDisplay(petLogic, now, true);
         break;
 
       case SCREEN_STATS:
@@ -411,27 +411,27 @@ void loop() {
       case SCREEN_ACTION:
         Serial.println(F("[UI] Skærm: HANDLING udføres"));
         if (petLogic.isSleeping()) {
-          uiMenu.drawPlaceholderScreen("SOVER ZZZ!", "Lumi sover lige nu...");
+          uiPet.drawActionScene(petLogic, EXPR_SLEEPING, "SOVER ZZZ!", "Lumi sover lige nu...", now);
           soundLed.setMoodColor(80, 140, 255); // Soft sleep blue
         } else if (menuLogic.getSelectedIcon() == ICON_FOOD) {
           if (petLogic.feed()) {
-            uiMenu.drawPlaceholderScreen("MUMS: MAD!", "Giver Lumi et baer...");
+            uiPet.drawActionScene(petLogic, EXPR_EATING, "MUMS: MAD!", "Lumi spiser et baer!", now);
             soundLed.setMoodColor(80, 255, 80); // Green glow
           } else {
-            uiMenu.drawPlaceholderScreen("IKKE SULTEN!", "Lumi er helt maet!");
+            uiPet.drawActionScene(petLogic, EXPR_CONTENT, "IKKE SULTEN!", "Lumi er helt maet!", now);
             soundLed.setMoodColor(255, 180, 50); // Orange glow
           }
         } else if (menuLogic.getSelectedIcon() == ICON_PLAY) {
           if (petLogic.play()) {
-            uiMenu.drawPlaceholderScreen("JUBII: LEG!", "Lumi leger og hopper!");
+            uiPet.drawActionScene(petLogic, EXPR_PLAYING, "JUBII: LEG!", "Lumi leger og hopper!", now);
             soundLed.setMoodColor(255, 220, 50); // Gold glow
           } else {
-            uiMenu.drawPlaceholderScreen("FOR TRAET!", "Lumi mangler energi...");
+            uiPet.drawActionScene(petLogic, EXPR_EXHAUSTED, "FOR TRAET!", "Lumi mangler energi...", now);
             soundLed.setMoodColor(120, 120, 180);
           }
         } else if (menuLogic.getSelectedIcon() == ICON_SCOLD) {
           petLogic.scold();
-          uiMenu.drawPlaceholderScreen("SKAELD UD!", "Disciplin stiger!");
+          uiPet.drawActionScene(petLogic, EXPR_SCOLDED, "SKAELD UD!", "Disciplin stiger!", now);
           soundLed.setMoodColor(255, 60, 40); // Red alert glow
         }
         syncPetStateToBackend(true); // Sync updated stats to backend immediately!
@@ -484,13 +484,9 @@ void loop() {
     // Normal menu modes (HOME, ACTION): update sliding top menu bar
     uiMenu.drawMenuBar(menuLogic, false);
 
-    // Refresh home mood text automatically if Lumi's status changes while on HOME screen
+    // Real-time 2.5D Lumi character animation on HOME screen (breathing, blinking, Navi, shivering)
     if (currentScreen == SCREEN_HOME && muteMessageEndTimeMs == 0) {
-      const char* curMood = petLogic.getMoodStatusDanish();
-      if (curMood != lastHomeMood) {
-        lastHomeMood = curMood;
-        uiMenu.drawPlaceholderScreen("LUMI HOME", curMood);
-      }
+      uiPet.updateHomeDisplay(petLogic, now, false);
     }
   }
 
