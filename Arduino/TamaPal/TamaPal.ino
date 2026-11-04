@@ -13,6 +13,7 @@
 #include "net_mqtt.h"
 #include "pet_logic.h"
 #include "ui_stats.h"
+#include "storage_pet.h"
 
 // Hardware carrier instance
 MKRIoTCarrier carrier;
@@ -26,6 +27,7 @@ UiControllerRenderer uiController;
 NetMqttClient netMqtt;
 PetLogic petLogic;
 UiStatsRenderer uiStats;
+StoragePet storagePet;
 
 // Forward declarations
 void onGameEventReceived(GameEvent event);
@@ -102,13 +104,17 @@ void syncPetStateToBackend(bool forceImmediate) {
   if (!forceImmediate && (now - lastPetStatePublishTimeMs < MQTT_PET_STATE_INTERVAL_MS)) {
     return;
   }
-  if (!netMqtt.isConnected()) {
-    return;
-  }
   lastPetStatePublishTimeMs = now;
-  char petJson[160];
-  petLogic.formatStateJson(petJson, sizeof(petJson), "Lumi", petLogic.getStage());
-  netMqtt.publishPetState(petJson);
+
+  // 1. Save to local MicroSD card (persists even if Wi-Fi / MQTT is offline!)
+  storagePet.savePet(petLogic);
+
+  // 2. Publish to MQTT broker if connected
+  if (netMqtt.isConnected()) {
+    char petJson[160];
+    petLogic.formatStateJson(petJson, sizeof(petJson), "Lumi", petLogic.getStage());
+    netMqtt.publishPetState(petJson);
+  }
 }
 
 // Environmental sensor reading interval (every 1.0 second, non-blocking)
@@ -191,6 +197,12 @@ void setup() {
   // touch_sensors_config() inside Qtouch reads the sensitivity during carrier.begin().
   setCaseMode(SECRET_USE_CASE, false);
   carrier.begin();
+
+  // Initialize MicroSD card persistence and restore Lumi if file exists
+  storagePet.begin();
+  if (storagePet.loadPet(petLogic)) {
+    Serial.println(F("[STORAGE] Lumi fortsætter fra gemt tilstand på MicroSD-kort!"));
+  }
 
   // Set LCD rotation (0 = standard orientation)
   carrier.display.setRotation(0);

@@ -8,6 +8,7 @@
 #include "menu_logic.h"
 #include "tilt_logic.h"
 #include "pet_logic.h"
+#include "storage_pet.h"
 
 static int totalTestsRun = 0;
 static int totalTestsFailed = 0;
@@ -393,6 +394,40 @@ void testPetSerialization() {
   CHECK(strstr(buf, "\"alive\":false") != NULL, "JSON contains alive false when dead");
 }
 
+void testPetStorageSerialization() {
+  printf("\n--- Test: StoragePet MicroSD Serialization & Parsing ---\n");
+  PetLogic pet;
+  pet.setVitals(77, 88, 66, 99, 44);
+  pet.setSleeping(true);
+
+  char buffer[128];
+  StoragePet::serializeState(buffer, sizeof(buffer), pet);
+
+  CHECK(strstr(buffer, "HUNGER=77\n") != NULL, "Serialized text contains HUNGER=77");
+  CHECK(strstr(buffer, "WARMTH=88\n") != NULL, "Serialized text contains WARMTH=88");
+  CHECK(strstr(buffer, "ENERGY=66\n") != NULL, "Serialized text contains ENERGY=66");
+  CHECK(strstr(buffer, "HAPPINESS=99\n") != NULL, "Serialized text contains HAPPINESS=99");
+  CHECK(strstr(buffer, "DISCIPLINE=44\n") != NULL, "Serialized text contains DISCIPLINE=44");
+  CHECK(strstr(buffer, "ASLEEP=1\n") != NULL, "Serialized text contains ASLEEP=1");
+
+  // Test deserialization into fresh variables
+  float h = 0, w = 0, e = 0, hap = 0, d = 0;
+  bool asleep = false;
+  CHECK(StoragePet::deserializeState(buffer, h, w, e, hap, d, asleep), "Deserialization succeeds on valid text");
+  CHECK((int)h == 77, "Restored hunger is 77");
+  CHECK((int)w == 88, "Restored warmth is 88");
+  CHECK((int)e == 66, "Restored energy is 66");
+  CHECK((int)hap == 99, "Restored happiness is 99");
+  CHECK((int)d == 44, "Restored discipline is 44");
+  CHECK(asleep == true, "Restored asleep state is true");
+
+  // Test corrupt or truncated inputs
+  CHECK(!StoragePet::deserializeState("HUNGER=50\n", h, w, e, hap, d, asleep), "Fails on incomplete file");
+  CHECK(!StoragePet::deserializeState("HUNGER=999\nWARMTH=50\nENERGY=50\nHAPPINESS=50\nDISCIPLINE=50\nASLEEP=0\n", h, w, e, hap, d, asleep), "Fails on out-of-range value (999)");
+  CHECK(!StoragePet::deserializeState(nullptr, h, w, e, hap, d, asleep), "Fails safely on nullptr");
+  CHECK(!StoragePet::deserializeState("", h, w, e, hap, d, asleep), "Fails safely on empty string");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -415,6 +450,7 @@ int main() {
   testPetSleepAndSensors();
   testPetDecayAndStatus();
   testPetSerialization();
+  testPetStorageSerialization();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {
