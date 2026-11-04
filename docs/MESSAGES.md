@@ -438,7 +438,7 @@ Udfyldes sammen. Når vi er enige, skriver vi navn og dato nederst.
 | 9 | Hvem styrer bolden | |
 | 10 | Hvor ligger frontend | |
 | 11 | Database | |
-| 12 | Branches og reviews | |
+| 12 | Branches og reviews | Push direkte til `dev` uden review. `main` kun via Pull Request + 1 godkendelse. `feature/...` til branches. (aftalt 4/11) |
 | 13 | Datoer | |
 | 14 | Afbrudt forbindelse | |
 

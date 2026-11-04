@@ -24,7 +24,8 @@ H3 middle project (Mercantec, autumn 2026). Full game design:
   saves pet state and match results in the database.
 - **Frontend** – meeting place for two TamaPals, ping-pong and maze race.
 
-Protocol (MQTT or HTTP) and message format are still to be decided.
+Proposal: MQTT between Oplà and backend, SignalR between backend and browser.
+The first mini game is Pong. Message format: [docs/MESSAGES.md](docs/MESSAGES.md).
 
 ---
 
@@ -33,10 +34,16 @@ Protocol (MQTT or HTTP) and message format are still to be decided.
 ```
 H3-TamaPal/
 ├── Arduino/
-│   └── TamagotchiMaxDemo/    # Graphics demo: what the Oplà can draw with code only
-├── Backend/                  # .NET Web API + database (coming)
-├── Frontend/                 # Browser mini games (coming)
+│   ├── TamaPal/              # Oplà: menu, controller mode, MQTT input, LED/sound
+│   ├── TamagotchiMaxDemo/    # Graphics demo: what the Oplà can draw with code only
+│   └── tests/
+├── Backend/                  # .NET Web API + SignalR + database (coming)
+├── Frontend/                 # Pong on canvas (plain JS, fake data until the backend is ready)
 └── docs/
+    ├── MESSAGES.md           # contract: the messages between the parts + group agreement
+    ├── PLAN.md               # dates, Definition of Done, status, open questions
+    ├── MOEDE-2026-11-02.md   # teachers' workflow and requirements
+    ├── TIL-DISKUSSION.md     # archive: first questions + Oliver's game loop
     └── TamaPal-game-design-doc.docx
 ```
 
@@ -53,6 +60,7 @@ git-ignored and must never be committed.
 | Oliver | Backend and database |
 | Andrii | Frontend in the browser – mini games, statistics |
 
-Open questions for the team: [docs/TIL-DISKUSSION.md](docs/TIL-DISKUSSION.md).
-Workflow and requirements from the 2/11 meeting: [docs/MOEDE-2026-11-02.md](docs/MOEDE-2026-11-02.md).
-Message format proposal (MQTT/SignalR): [docs/MESSAGES.md](docs/MESSAGES.md).
+Start here:
+1. [docs/MESSAGES.md](docs/MESSAGES.md) – the messages between the parts (MQTT/SignalR) and our agreement.
+2. [docs/PLAN.md](docs/PLAN.md) – dates, requirements, status and open questions.
+3. [docs/MOEDE-2026-11-02.md](docs/MOEDE-2026-11-02.md) – workflow: push to `dev`, `main` only via Pull Request.

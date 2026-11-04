@@ -9,7 +9,8 @@ TamaPal – H3 middle project at Mercantec (deadline: presentation 11/11-2026).
 A game where an **Arduino Oplà** (MKR WiFi 1010 + MKR IoT Carrier) is the controller,
 a **.NET backend** runs the game logic, and a **browser frontend** draws the game on a canvas.
 
-Current MVP proposal: Pong against the wall with one Oplà (tilt = paddle, button = start).
+Current MVP proposal: Pong against the wall with one Oplà (tilt or buttons = paddle, button = start).
+Status, dates and open questions: `docs/PLAN.md`.
 
 | Person (GitHub) | Area | Folder |
 |---|---|---|
@@ -27,9 +28,9 @@ Stay in your human's folder. Do not change another person's area without asking 
 4. `docs/TIL-DISKUSSION.md` – earlier questions and Oliver's full game loop vision.
 5. `docs/TamaPal-game-design-doc.docx` – original game design (Oleh).
 
-## Your first task: give input on the plan
+## Before you change anything
 
-Before writing code, help your human answer the questions in **Del 2** of `docs/MESSAGES.md` for their part:
+Check `docs/PLAN.md` for status and open questions. If your human's part still has open points, help them answer the questions in **Del 2** of `docs/MESSAGES.md` for their part:
 
 - Is the message format enough for your part? What is missing or unclear?
 - What do you need from the other two (names, endpoints, topics, timing)?
