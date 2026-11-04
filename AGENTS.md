@@ -22,9 +22,10 @@ Stay in your human's folder. Do not change another person's area without asking 
 ## Read before you start
 
 1. `docs/MESSAGES.md` – **the contract between the parts**: MVP, project flow, the 4 messages (MQTT + SignalR JSON). Most important file.
-2. `docs/MOEDE-2026-11-02.md` – teachers' workflow and Definition of Done.
-3. `docs/TIL-DISKUSSION.md` – earlier questions and Oliver's full game loop vision.
-4. `docs/TamaPal-game-design-doc.docx` – original game design (Oleh).
+2. `docs/PLAN.md` – dates, Definition of Done mapped to our plan, status per part, open questions.
+3. `docs/MOEDE-2026-11-02.md` – teachers' workflow and Definition of Done.
+4. `docs/TIL-DISKUSSION.md` – earlier questions and Oliver's full game loop vision.
+5. `docs/TamaPal-game-design-doc.docx` – original game design (Oleh).
 
 ## Your first task: give input on the plan
 
@@ -58,7 +59,7 @@ Do not fill in **Del 3 – Aftale** alone: decisions are made together by the gr
   `{ "status": "playing", "ball": {"x":0.5,"y":0.3}, "paddle": {"y":0.4}, "score": 7, "lives": 2 }`
 - SignalR method `StartGame()` (browser → backend)
 
-Coordinates are 0–1. If you need to change the contract, change `docs/MESSAGES.md` in a PR and tell the group – never change it silently in code.
+Coordinates are 0–1. If you need to change the contract, change `docs/MESSAGES.md` and tell the group – never change it silently in code.
 
 ## Rules
 

@@ -10,6 +10,8 @@ Dokumentet har fem dele:
 
 Alle må rette og kommentere. Princip: så få beskeder som muligt og ingen ekstra felter.
 
+Datoer, DoD og status for hele projektet: se `docs/PLAN.md`.
+
 ---
 
 # Del 1 – Forslag
@@ -64,6 +66,11 @@ Topic: `tamapal/opla-1/input`
 ```
 
 `tilt` går fra -1 (op) til 1 (ned). Arduinoen læser bare IMU og sender.
+
+> **Afvigelse (4/11):** Olehs kode i `dev` sender flere felter end aftalt – både knapper og tilt:
+> `{ "up": false, "down": false, "button": false, "tiltX": 0.00, "tiltY": 0.35, "tilt": 0.35 }`
+> `tilt` og `button` er der stadig, så backenden kan bruge besked 1 som den står.
+> Vi beslutter sammen, om vi styrer med knapper (`up`/`down`) eller `tilt` (Del 2, spørgsmål 2), og retter besked 1 bagefter.
 
 ### 2. Backend → Arduino (MQTT), kun ved hændelser
 
@@ -411,6 +418,7 @@ Fra mig får I brokerens IP-adresse og port (1883), så snart Mosquitto kører p
 11. Database fra start (Neon) – eller først efter MVP?
 12. Branch-navne `feature/...` og 1 eller 2 godkendelser på Pull Requests?
 13. Datoer: første test hele vejen igennem, brugertest, "kode-stop" før 11/11?
+14. Hvad sker der, hvis forbindelsen afbrydes (Oplà eller browser)? Pause, besked på skærmen – eller game over?
 
 ---
 
@@ -432,6 +440,7 @@ Udfyldes sammen. Når vi er enige, skriver vi navn og dato nederst.
 | 11 | Database | |
 | 12 | Branches og reviews | |
 | 13 | Datoer | |
+| 14 | Afbrudt forbindelse | |
 
 **Godkendt af:**
 
