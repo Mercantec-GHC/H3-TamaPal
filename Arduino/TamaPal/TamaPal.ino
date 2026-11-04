@@ -92,6 +92,53 @@ void setCaseMode(bool enableCase, bool reinitHardware = false) {
   }
 }
 
+// Non-blocking Mute toggle gesture processing
+void processMuteGestures(unsigned long now, bool touch0, bool touch3, bool touch4, ScreenType currentScreen) {
+  // GESTURE 1: TOUCH0 + TOUCH4 combo (Hold both for 300 ms on HOME)
+  if (currentScreen == SCREEN_HOME && touch0 && touch4) {
+    if (combo04StartTime == 0) {
+      combo04StartTime = now;
+    } else if (!combo04Fired && (now - combo04StartTime >= 300)) {
+      soundLed.toggleMute();
+      combo04Fired = true;
+      muteMessageEndTimeMs = now + 1400; // Toast visible for 1.4 seconds
+
+      if (soundLed.isMuted()) {
+        uiMenu.drawPlaceholderScreen("LYD: SLUKKET", "Lyd er slaaet fra");
+      } else {
+        uiMenu.drawPlaceholderScreen("LYD: TAENDT", "Lyd er slaaet til");
+        soundLed.playSound(SOUND_CONFIRM);
+      }
+    }
+  } else if (!touch0 && !touch4) {
+    // Reset ONLY when BOTH fingers are lifted off
+    combo04Fired = false;
+    combo04StartTime = 0;
+  }
+
+  // GESTURE 2: Hold TOUCH3 alone for 1.2 seconds on HOME screen
+  if (currentScreen == SCREEN_HOME && touch3 && !touch0 && !touch4) {
+    if (touch3StartTime == 0) {
+      touch3StartTime = now;
+    } else if (!touch3HoldFired && (now - touch3StartTime >= 1200)) {
+      soundLed.toggleMute();
+      touch3HoldFired = true;
+      muteMessageEndTimeMs = now + 1400;
+
+      if (soundLed.isMuted()) {
+        uiMenu.drawPlaceholderScreen("LYD: SLUKKET", "Lyd er slaaet fra");
+      } else {
+        uiMenu.drawPlaceholderScreen("LYD: TAENDT", "Lyd er slaaet til");
+        soundLed.playSound(SOUND_CONFIRM);
+      }
+    }
+  } else if (!touch3) {
+    // Reset ONLY when finger is lifted off TOUCH3
+    touch3HoldFired = false;
+    touch3StartTime = 0;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -148,53 +195,8 @@ void loop() {
 
   ScreenType currentScreen = menuLogic.getActiveScreen();
 
-  // -------------------------------------------------------------
-  // GESTURE 1: TOUCH0 + TOUCH4 combo (Hold both for 300 ms on HOME)
-  // -------------------------------------------------------------
-  if (currentScreen == SCREEN_HOME && touch0 && touch4) {
-    if (combo04StartTime == 0) {
-      combo04StartTime = now;
-    } else if (!combo04Fired && (now - combo04StartTime >= 300)) {
-      soundLed.toggleMute();
-      combo04Fired = true;
-      muteMessageEndTimeMs = now + 1400; // Toast visible for 1.4 seconds
-
-      if (soundLed.isMuted()) {
-        uiMenu.drawPlaceholderScreen("LYD: SLUKKET", "Lyd er slaaet fra");
-      } else {
-        uiMenu.drawPlaceholderScreen("LYD: TAENDT", "Lyd er slaaet til");
-        soundLed.playSound(SOUND_CONFIRM);
-      }
-    }
-  } else if (!touch0 && !touch4) {
-    // Reset ONLY when BOTH fingers are lifted off
-    combo04Fired = false;
-    combo04StartTime = 0;
-  }
-
-  // -------------------------------------------------------------
-  // GESTURE 2: Hold TOUCH3 alone for 1.2 seconds on HOME screen
-  // -------------------------------------------------------------
-  if (currentScreen == SCREEN_HOME && touch3 && !touch0 && !touch4) {
-    if (touch3StartTime == 0) {
-      touch3StartTime = now;
-    } else if (!touch3HoldFired && (now - touch3StartTime >= 1200)) {
-      soundLed.toggleMute();
-      touch3HoldFired = true;
-      muteMessageEndTimeMs = now + 1400;
-
-      if (soundLed.isMuted()) {
-        uiMenu.drawPlaceholderScreen("LYD: SLUKKET", "Lyd er slaaet fra");
-      } else {
-        uiMenu.drawPlaceholderScreen("LYD: TAENDT", "Lyd er slaaet til");
-        soundLed.playSound(SOUND_CONFIRM);
-      }
-    }
-  } else if (!touch3) {
-    // Reset ONLY when finger is lifted off TOUCH3
-    touch3HoldFired = false;
-    touch3StartTime = 0;
-  }
+  // Process Mute gestures (TOUCH0+TOUCH4 combo or hold TOUCH3)
+  processMuteGestures(now, touch0, touch3, touch4, currentScreen);
 
   // -------------------------------------------------------------
   // Restore screen automatically when mute banner notification expires
