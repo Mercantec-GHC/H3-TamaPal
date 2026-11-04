@@ -152,7 +152,26 @@ void loop() {
   // -------------------------------------------------------------
   // Button Navigation
   // -------------------------------------------------------------
-  if (currentScreen == SCREEN_CONTROLLER) {
+  if (currentScreen == SCREEN_CHOOSE_PLAYER) {
+    // In player role selection screen:
+    // TOUCH0: Choose Player 1 (Venstre)
+    // TOUCH1: Choose Player 2 (Hoejre)
+    // TOUCH2: Quick confirm Player 1
+    // TOUCH3: Cancel back to Lumi Home
+    if (carrier.Buttons.onTouchDown(TOUCH0)) {
+      menuLogic.selectPlayer(1);
+      lastTouchTimeMs = now;
+    } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+      menuLogic.selectPlayer(2);
+      lastTouchTimeMs = now;
+    } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+      menuLogic.selectPlayer(1);
+      lastTouchTimeMs = now;
+    } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+      menuLogic.onButtonBack();
+      lastTouchTimeMs = now;
+    }
+  } else if (currentScreen == SCREEN_CONTROLLER) {
     // In controller mode:
     // TOUCH0, TOUCH1, TOUCH2 are gameplay inputs (read continuously below).
     // TOUCH3 exits back to HOME screen immediately.
@@ -203,8 +222,9 @@ void loop() {
   // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller mode)
   if (currentScreen != previousScreen) {
     if (previousScreen == SCREEN_CONTROLLER) {
-      // Exiting controller: disconnect MQTT and redraw main menu
+      // Exiting controller: disconnect MQTT, turn off player LEDs, and redraw main menu
       netMqtt.disconnect();
+      soundLed.setMoodColor(0, 0, 0);
       uiMenu.drawInitialScreen();
       uiMenu.drawMenuBar(menuLogic, true);
     }
@@ -220,9 +240,19 @@ void loop() {
         uiMenu.drawPlaceholderScreen("STATISTIK", "T3 / T4 = Tilbage");
         break;
 
+      case SCREEN_CHOOSE_PLAYER:
+        uiMenu.drawChoosePlayerScreen();
+        break;
+
       case SCREEN_CONTROLLER:
+        netMqtt.setPlayerId(menuLogic.getPlayerId());
         tiltLogic.reset();
-        uiController.drawInitialScreen();
+        uiController.drawInitialScreen(menuLogic.getPlayerId());
+        if (menuLogic.getPlayerId() == 2) {
+          soundLed.setMoodColor(255, 70, 50);  // Coral/Red glow for Player 2
+        } else {
+          soundLed.setMoodColor(0, 180, 255);  // Cyan/Blue glow for Player 1
+        }
         break;
 
       case SCREEN_ACTION:

@@ -8,6 +8,7 @@
 MenuLogic::MenuLogic()
   : activeScreen(SCREEN_HOME),
     selectedIcon(ICON_FOOD),
+    playerId(1),
     cursorPositionX(0.0f),
     targetPositionX(0.0f),
     actionStartTimeMs(0),
@@ -73,13 +74,24 @@ void MenuLogic::onButtonOk(unsigned long currentTimeMs) {
     if (selectedIcon == ICON_STATS) {
       activeScreen = SCREEN_STATS;
     } else if (selectedIcon == ICON_CONNECT) {
-      activeScreen = SCREEN_CONTROLLER;
+      activeScreen = SCREEN_CHOOSE_PLAYER;
     } else {
       // Food, Play, or Scold opens temporary action overlay
       activeScreen = SCREEN_ACTION;
       actionStartTimeMs = currentTimeMs;
     }
   }
+}
+
+// Select player role (1 or 2) and advance to controller view
+void MenuLogic::selectPlayer(int id) {
+  playerId = (id == 2) ? 2 : 1;
+  activeScreen = SCREEN_CONTROLLER;
+  pendingSound = SOUND_CONFIRM;
+}
+
+int MenuLogic::getPlayerId() const {
+  return playerId;
 }
 
 // TOUCH3: Back button - return to HOME screen from any other view

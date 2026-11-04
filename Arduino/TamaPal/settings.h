@@ -75,6 +75,7 @@ const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 enum ScreenType {
   SCREEN_HOME = 0,         // Main screen: Lumi character + top menu bar
   SCREEN_STATS,            // Fullscreen statistics dashboard (5 vital bars)
+  SCREEN_CHOOSE_PLAYER,    // Select Player 1 (Venstre) vs Player 2 (Hoejre)
   SCREEN_CONTROLLER,       // Pong controller mode (sends tilt & button to backend)
   SCREEN_ACTION            // Temporary action banner (e.g., feeding food animation)
 };

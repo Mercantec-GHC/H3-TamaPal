@@ -16,7 +16,7 @@ public:
   void begin(MKRIoTCarrier* hardwareCarrier);
 
   // Draw the initial static controller UI (arena, button boxes, header, hints)
-  void drawInitialScreen();
+  void drawInitialScreen(int playerId = 1);
 
   // Update real-time 2D tilt ball, button highlights, and network badge without screen flickering
   void updateDisplay(const TiltLogic& tilt, bool isMqttConnected, bool forceFullRedraw = false);

@@ -7,16 +7,18 @@
 NetMqttClient::NetMqttClient()
   : mqttClient(wifiClient),
     onEventCallback(nullptr),
+    playerId(1),
     lastPublishTime(0),
     lastReconnectAttempt(0),
     connectingState(false) {
+  setPlayerId(1);
 }
 
 void NetMqttClient::begin(GameEventCallback callback) {
   onEventCallback = callback;
 
   // Set MQTT client credentials and keep-alive
-  mqttClient.setId(MQTT_CLIENT_ID);
+  mqttClient.setId(clientMqttId);
   mqttClient.setKeepAliveInterval(15 * 1000); // 15 seconds keep-alive
 
   #if defined(SECRET_MQTT_USER) && defined(SECRET_MQTT_PASS)
@@ -24,6 +26,21 @@ void NetMqttClient::begin(GameEventCallback callback) {
     mqttClient.setUsernamePassword(SECRET_MQTT_USER, SECRET_MQTT_PASS);
   }
   #endif
+}
+
+void NetMqttClient::setPlayerId(int id) {
+  int newId = (id == 2) ? 2 : 1;
+  if (playerId != newId && mqttClient.connected()) {
+    disconnect();
+  }
+  playerId = newId;
+  snprintf(topicInput, sizeof(topicInput), "tamapal/opla-%d/input", playerId);
+  snprintf(topicEvent, sizeof(topicEvent), "tamapal/opla-%d/event", playerId);
+  snprintf(clientMqttId, sizeof(clientMqttId), "tamapal-opla-%d", playerId);
+}
+
+int NetMqttClient::getPlayerId() const {
+  return playerId;
 }
 
 bool NetMqttClient::isConnected() {
@@ -71,9 +88,10 @@ void NetMqttClient::attemptConnection(unsigned long now) {
   // 2. Connect to MQTT broker
   if (!mqttClient.connected()) {
     #if defined(SECRET_MQTT_HOST) && defined(SECRET_MQTT_PORT)
+    mqttClient.setId(clientMqttId);
     if (mqttClient.connect(SECRET_MQTT_HOST, SECRET_MQTT_PORT)) {
-      // Subscribe to backend event topic (tamapal/opla-1/event) with QoS 1
-      mqttClient.subscribe(MQTT_TOPIC_EVENT, 1);
+      // Subscribe to backend event topic (tamapal/opla-1/event or opla-2/event) with QoS 1
+      mqttClient.subscribe(topicEvent, 1);
       connectingState = false;
     }
     #endif
@@ -134,8 +152,8 @@ bool NetMqttClient::publishInput(const char* jsonPayload, unsigned long now, boo
 
   lastPublishTime = now;
 
-  // Publish to tamapal/opla-1/input with QoS 0 (standard fast sensor stream)
-  mqttClient.beginMessage(MQTT_TOPIC_INPUT, false, 0, false);
+  // Publish to dynamic input topic (tamapal/opla-1/input or opla-2/input) with QoS 0
+  mqttClient.beginMessage(topicInput, false, 0, false);
   mqttClient.print(jsonPayload);
   mqttClient.endMessage();
 

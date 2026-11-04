@@ -20,6 +20,10 @@ public:
   void onButtonBack();
   void onButtonStatsShortcut();
 
+  // Select player role (1 or 2) and advance to SCREEN_CONTROLLER
+  void selectPlayer(int playerId);
+  int getPlayerId() const;
+
   // Periodic update for animation interpolation and auto-close timers
   void update(unsigned long currentTimeMs);
 
@@ -42,6 +46,7 @@ public:
 private:
   ScreenType activeScreen;
   MenuIcon selectedIcon;
+  int playerId;
 
   float cursorPositionX;
   float targetPositionX;

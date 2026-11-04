@@ -42,14 +42,14 @@ void UiControllerRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
 }
 
-void UiControllerRenderer::drawInitialScreen() {
+void UiControllerRenderer::drawInitialScreen(int playerId) {
   if (carrier == nullptr) return;
 
   uint16_t bgColor       = color565(8, 12, 26);
   uint16_t ringColor     = color565(25, 45, 80);
-  uint16_t titleColor    = color565(0, 230, 255);
+  uint16_t titleColor    = (playerId == 2) ? color565(255, 110, 80) : color565(0, 230, 255);
   uint16_t arenaBgColor  = color565(14, 22, 44);
-  uint16_t arenaBorder   = color565(40, 75, 130);
+  uint16_t arenaBorder   = (playerId == 2) ? color565(140, 55, 50)  : color565(40, 75, 130);
   uint16_t hintColor     = color565(100, 130, 175);
 
   // 1. Dark navy background
@@ -61,8 +61,13 @@ void UiControllerRenderer::drawInitialScreen() {
   // 3. Header title (centered at Y=24)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(titleColor, bgColor);
-  carrier->display.setCursor(99, 24);
-  carrier->display.print("KONTROL");
+  if (playerId == 2) {
+    carrier->display.setCursor(76, 24);
+    carrier->display.print("P2: HOEJRE KONTROL");
+  } else {
+    carrier->display.setCursor(74, 24);
+    carrier->display.print("P1: VENSTRE KONTROL");
+  }
 
   // 4. Center 2D circular tilt arena for Labyrinth
   carrier->display.fillCircle(ARENA_CX, ARENA_CY, ARENA_RADIUS, arenaBgColor);
