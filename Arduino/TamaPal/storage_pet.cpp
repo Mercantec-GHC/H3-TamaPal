@@ -173,3 +173,4 @@ bool StoragePet::loadPet(PetLogic& pet) {
   return false;
 #endif
 }
+
