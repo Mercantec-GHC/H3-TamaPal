@@ -54,8 +54,9 @@ Do not fill in **Del 3 – Aftale** alone: decisions are made together by the gr
 
 ## Message contract (summary – full version in docs/MESSAGES.md)
 
-- MQTT `tamapal/opla-1/input` (Oplà → backend, ~20/s): `{ "tilt": 0.35, "button": false }`
-- MQTT `tamapal/opla-1/event` (backend → Oplà, on events): `{ "type": "hit" | "miss" | "gameover" }`
+- MQTT `StormLamaerne/Tamapal/opla-1/input` (Oplà → backend, ~20/s): `{ "tilt": 0.35, "button": false }`
+- MQTT `StormLamaerne/Tamapal/opla-1/event` (backend → Oplà, on events): `{ "type": "hit" | "miss" | "gameover" }`
+- Topics are case-sensitive and must start with the group name `StormLamaerne/` (broker rule).
 - SignalR hub `/gamehub`, event `GameState` (backend → browser, ~30/s):
   `{ "status": "playing", "ball": {"x":0.5,"y":0.3}, "paddle": {"y":0.4}, "score": 7, "lives": 2 }`
 - SignalR method `StartGame()` (browser → backend)

@@ -57,9 +57,14 @@ Datoer, DoD og status for hele projektet: se `docs/PLAN.md`.
 
 ## Kun 4 beskeder
 
+> **Ændret 4/11:** Brokeren kræver, at alle topics starter med gruppens navn.
+> Topics er nu `StormLamaerne/Tamapal/...` – store og små bogstaver præcis sådan.
+> Client ID: Oplà `tamapal-opla-1`, backend `tamapal-backend`. Brokerens adresse står i
+> `arduino_secrets.h` (ikke i git). Ældre forslag i Del 1b og 1c bruger stadig `tamapal/...`.
+
 ### 1. Arduino → backend (MQTT), 20 gange i sekundet
 
-Topic: `tamapal/opla-1/input`
+Topic: `StormLamaerne/Tamapal/opla-1/input`
 
 ```json
 { "tilt": 0.35, "button": false }
@@ -74,7 +79,9 @@ Topic: `tamapal/opla-1/input`
 
 ### 2. Backend → Arduino (MQTT), kun ved hændelser
 
-Topic: `tamapal/opla-1/event`
+Topic: `StormLamaerne/Tamapal/opla-1/event`
+
+Backenden lytter på `StormLamaerne/Tamapal/+/input` (`+` = alle Oplàer).
 
 ```json
 { "type": "hit" }
