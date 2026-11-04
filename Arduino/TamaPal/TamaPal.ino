@@ -213,7 +213,7 @@ void loop() {
   if (muteMessageEndTimeMs > 0 && now >= muteMessageEndTimeMs) {
     muteMessageEndTimeMs = 0;
     if (currentScreen == SCREEN_HOME) {
-      uiMenu.drawPlaceholderScreen("LUMI HOME", "Tryk T2 for at vaelge");
+      uiMenu.drawPlaceholderScreen("LUMI HOME", petLogic.getMoodStatusDanish());
     } else if (currentScreen == SCREEN_CONTROLLER) {
       uiController.drawInitialScreen(menuLogic.getPlayerId());
     }
@@ -305,13 +305,15 @@ void loop() {
 
   currentScreen = menuLogic.getActiveScreen();
 
-  // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller or stats mode)
+  // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller, stats, or action mode)
   if (currentScreen != previousScreen) {
-    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS) {
-      // Exiting controller, stats, or player selection: clean up, turn off LEDs, and redraw full home UI
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_ACTION) {
+      // Exiting controller, stats, action, or player selection: clean up, restore mood LEDs, and redraw full home UI
       if (previousScreen == SCREEN_CONTROLLER) {
         netMqtt.disconnect();
         soundLed.setMoodColor(0, 0, 0);
+      } else {
+        soundLed.setMoodColor(0, 150, 220); // Restore calm cyan glow after action
       }
       uiMenu.drawInitialScreen();
       uiMenu.drawMenuBar(menuLogic, true);
@@ -322,12 +324,11 @@ void loop() {
     switch (currentScreen) {
       case SCREEN_HOME:
         Serial.println(F("[UI] Skærm: HOME (Lumi Tamagotchi)"));
-        uiMenu.drawPlaceholderScreen("LUMI HOME", "Tryk T2 for at vaelge");
+        uiMenu.drawPlaceholderScreen("LUMI HOME", petLogic.getMoodStatusDanish());
         break;
 
       case SCREEN_STATS:
         Serial.println(F("[UI] Skærm: STATISTIK (5 parametre)"));
-        uiStats.drawInitialScreen();
         uiStats.updateDisplay(petLogic, true);
         break;
 

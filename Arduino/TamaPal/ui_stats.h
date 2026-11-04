@@ -31,7 +31,7 @@ private:
   int lastEnergy;
   int lastHappiness;
   int lastDiscipline;
-  const char* lastMood;
+  char lastMood[32];
   bool isInitialized;
 
   void drawSingleBar(int y, const char* label, int val, int& lastVal, uint16_t barColor, bool force);
@@ -42,3 +42,4 @@ private:
 };
 
 #endif // UI_STATS_H
+
