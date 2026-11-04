@@ -28,15 +28,24 @@ const float MENU_SLIDE_SPEED = 0.25f;
 const unsigned long ACTION_MESSAGE_DURATION_MS = 1500;
 
 // ============================================================================
-// TOUCH SENSORS & AUDIO SETTINGS
+// TOUCH SENSORS & HARDWARE CASE SETTINGS
 // ============================================================================
-// Set to false when using bare board (carrier.noCase()), true if inside plastic box
-const bool USE_PLASTIC_CASE = false;
+#if __has_include("arduino_secrets.h")
+  #include "arduino_secrets.h"
+#else
+  #include "arduino_secrets.example.h"
+#endif
 
-// Capacitive touch threshold (8-bit: 1..254).
-// Higher value = LESS sensitive (requires firm finger press, ignores hovering finger).
-// IMPORTANT: Must be set BEFORE carrier.begin()!
-const int TOUCH_SENSITIVITY_THRESHOLD = 250;
+// Fallback if SECRET_USE_CASE is not specified in personal arduino_secrets.h:
+#ifndef SECRET_USE_CASE
+  #define SECRET_USE_CASE false
+#endif
+
+// Capacitive touch sensitivity thresholds:
+// Lower value = MORE sensitive (for plastic case, penetrates plastic dielectric)
+// Higher value = LESS sensitive (for bare PCB, prevents hovering finger ghost taps)
+const int TOUCH_SENSITIVITY_BARE_BOARD = 200; // Bare PCB without case
+const int TOUCH_SENSITIVITY_WITH_CASE  = 60;  // Board mounted in plastic enclosure
 
 // Minimum pause between button triggers in milliseconds (prevents accidental double-taps)
 const unsigned long TOUCH_COOLDOWN_MS = 180;

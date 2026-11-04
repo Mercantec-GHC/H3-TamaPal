@@ -69,18 +69,28 @@ bool lastCtrlUp = false;
 bool lastCtrlDown = false;
 bool lastCtrlAction = false;
 
+// Hardware case mode (true = with plastic enclosure, false = bare board)
+bool currentCaseMode = SECRET_USE_CASE;
+
+void setCaseMode(bool enableCase) {
+  currentCaseMode = enableCase;
+  if (currentCaseMode) {
+    carrier.withCase();
+    carrier.Buttons.updateConfig(TOUCH_SENSITIVITY_WITH_CASE);
+    Serial.println(F("[Hardware] Tilstand: MED PLASTIK-CASE (Følsomhed: 60)"));
+  } else {
+    carrier.noCase();
+    carrier.Buttons.updateConfig(TOUCH_SENSITIVITY_BARE_BOARD);
+    Serial.println(F("[Hardware] Tilstand: UDEN CASE / BARE BOARD (Følsomhed: 200)"));
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
-  // IMPORTANT: Set custom touch threshold BEFORE carrier.begin()!
-  // Inside MKRIoTCarrier library, touch_sensors_config() runs ONLY during begin(),
-  // and carrier.withCase() ensures begin() does not overwrite our custom threshold with 200.
   carrier.withCase();
-  carrier.Buttons.updateConfig(TOUCH_SENSITIVITY_THRESHOLD);
   carrier.begin();
-  if (!USE_PLASTIC_CASE) {
-    carrier.noCase();
-  }
+  setCaseMode(SECRET_USE_CASE);
 
   // Set LCD rotation (0 = standard orientation)
   carrier.display.setRotation(0);
@@ -98,6 +108,9 @@ void setup() {
 
   Serial.println(F("=================================================="));
   Serial.println(F("TamaPal klar! (MKR WiFi 1010 + MKR IoT Carrier)"));
+  Serial.print(F("Touch-tilstand: "));
+  Serial.println(currentCaseMode ? F("PLASTIK-CASE (Følsomhed 60)") : F("BARE BOARD (Følsomhed 200)"));
+  Serial.println(F("Tip: Skriv 'c' i Serial Monitor for at skifte mellem case/bare board on-the-fly!"));
   Serial.println(F("Naviger med TOUCH 0 (<) og TOUCH 1 (>)"));
   Serial.println(F("For at forbinde til Pong over MQTT:"));
   Serial.println(F(" 1. Gaa til CONNECT (antenne-ikonet helt til hoejre)"));
@@ -108,6 +121,15 @@ void setup() {
 
 void loop() {
   unsigned long now = millis();
+
+  // Listen for 'c' or 'case' in Serial Monitor to toggle plastic case mode on-the-fly!
+  if (Serial.available() > 0) {
+    char c = Serial.peek();
+    if (c == 'c' || c == 'C') {
+      Serial.readStringUntil('\n');
+      setCaseMode(!currentCaseMode);
+    }
+  }
 
   // 1. INPUT LAYER: Poll capacitive touch pads on the carrier
   carrier.Buttons.update();
