@@ -30,7 +30,7 @@ Status: 4/11 (onsdag). Ret filen, når noget ændrer sig.
 | 2 | Gameplay loop | Ram bolden → +1 point og hurtigere bold; forbi → -1 liv | alle | ✅ designet |
 | 3 | Start, spil, slut | `status`: `waiting` → `playing` → `gameover`, "Spil igen" | Oliver + Andrii | ⚠️ kun på falske data |
 | 4 | Mindst 2 handlinger på Oplà | Op/ned (knapper eller tilt) + server/start | Oleh | ✅ i koden, ikke testet med backend |
-| 5 | Protokol Arduino → backend | MQTT, topics i `MESSAGES.md` | Oleh + Oliver | ⚠️ broker ikke valgt |
+| 5 | Protokol Arduino → backend | MQTT, topics i `MESSAGES.md` | Oleh + Oliver | ⚠️ Oplà → broker testet 4/11 (~20 beskeder/s). Backend lytter ikke endnu |
 | 6 | Backend med spillogik | Game loop: bold, point, liv, regler | Oliver | ❌ |
 | 7 | Frontend med feedback | Canvas, score, liv, start- og game over-skærm | Andrii | ✅ på falske data |
 | 8 | Integration + forklare dataflow | Test 5/11, diagram i `MESSAGES.md` | alle | ❌ |
@@ -53,7 +53,9 @@ I DoD står den under Nice to Have. Forslag: kun highscore (navn + score) efter 
 
 ## Sådan kører vi det (udkast – udfyldes til testen 5/11)
 
-1. MQTT-broker: Mathias' broker **eller** Mosquitto på Olivers bærbare (port 1883). – *ikke besluttet*
+1. MQTT-broker: ekstern broker, port 1883, uden login (4/11). Adressen står i `arduino_secrets.h`, ikke i git.
+   Topics: `StormLamaerne/Tamapal/opla-1/input` og `.../event` (se `MESSAGES.md`).
+   Oleh skal rette `MQTT_TOPIC_INPUT` / `MQTT_TOPIC_EVENT` i `Arduino/TamaPal/settings.h`.
 2. Backend: `dotnet run` i `Backend/BackendTamapal/` → `http://localhost:5243` (https: 7044). Hub: `http://localhost:5243/gamehub`.
 3. Frontend: Live Server på `Frontend/` (port 5500) → backenden skal tillade CORS fra `http://localhost:5500`.
    Alternativ: backenden viser `Frontend/` fra `wwwroot` (samme adresse, ingen CORS).
@@ -64,6 +66,6 @@ I DoD står den under Nice to Have. Forslag: kun highscore (navn + score) efter 
 1. Styring: knapper (som Kaspers eksempel) eller tilt? Olehs kode sender begge.
 2. Multiplayer: med i MVP eller efter? (Nice to Have)
 3. Hvad sker der ved afbrudt forbindelse? (Del 2, spørgsmål 14)
-4. Hvilken broker: Mathias' eller vores egen?
+4. ~~Hvilken broker: Mathias' eller vores egen?~~ Valgt 4/11 – se "Sådan kører vi det", punkt 1.
 5. Hvornår er `/gamehub` med falsk `GameState` klar? (Frontend venter på den)
 6. Hvem tester spillet 6/11?
