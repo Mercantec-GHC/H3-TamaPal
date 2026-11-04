@@ -11,6 +11,7 @@ clang++ -std=c++17 -Wall -Wextra -I"$PROJECT_DIR" \
     "$SCRIPT_DIR/test_main.cpp" \
     "$PROJECT_DIR/menu_logic.cpp" \
     "$PROJECT_DIR/tilt_logic.cpp" \
+    "$PROJECT_DIR/pet_logic.cpp" \
     -o "$SCRIPT_DIR/test_runner"
 
 echo "Running tests..."

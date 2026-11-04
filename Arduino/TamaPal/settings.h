@@ -130,5 +130,28 @@ enum GameEvent {
   EVENT_ASSIGN_P2          // Backend reassigns slot collision to player 2
 };
 
+// ============================================================================
+// TAMAPAL PET VITAL STATS & NEEDS (Lumi 5 Parametre)
+// ============================================================================
+// Interval between natural stat decay updates in milliseconds
+const unsigned long PET_DECAY_INTERVAL_MS = 10000; // Decay tick every 10 seconds
+
+// Decay amounts per tick
+const float PET_DECAY_HUNGER = 0.5f;     // Hunger drops 0.5% every 10 sec
+const float PET_DECAY_ENERGY = 0.3f;     // Energy drops 0.3% every 10 sec awake
+const float PET_DECAY_HAPPINESS = 0.4f;  // Happiness drops 0.4% every 10 sec
+const float PET_DECAY_DISCIPLINE = 0.2f; // Discipline drops 0.2% every 10 sec
+
+// Energy recovery per tick while sleeping
+const float PET_SLEEP_ENERGY_RECOVERY = 2.0f; // Recovers 2% every 10 sec
+
+// Action increments
+const float PET_FEED_RESTORE = 25.0f;
+const float PET_PLAY_RESTORE = 25.0f;
+const float PET_SCOLD_RESTORE = 20.0f;
+
+// Attention threshold: below 20%, Lumi needs immediate care
+const int PET_CRITICAL_THRESHOLD = 20;
+
 #endif // SETTINGS_H
 

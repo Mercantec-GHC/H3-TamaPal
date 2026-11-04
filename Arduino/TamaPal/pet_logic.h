@@ -1,0 +1,65 @@
+// WHAT: Pure business logic for Lumi's 5 Tamagotchi vitals (Sult, Varme, Energi, Glæde, Disciplin)
+// WHY:  Separated from hardware and graphics for deterministic testing on Mac / PC
+// USED BY: TamaPal.ino, ui_stats.cpp, tests/test_main.cpp
+
+#ifndef PET_LOGIC_H
+#define PET_LOGIC_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "settings.h"
+
+class PetLogic {
+public:
+  PetLogic();
+
+  // Reset or initialize vitals to healthy defaults
+  void reset();
+
+  // Player interaction actions
+  bool feed();     // Increases Hunger (sult/mæthed) and slightly Happiness
+  bool play();     // Increases Happiness, consumes Energy and Hunger
+  bool scold();    // Increases Discipline, slightly reduces Happiness
+  void toggleSleep();
+  void setSleeping(bool sleep);
+
+  // Environmental sensor updates (ambient room temperature & light from MKR Carrier)
+  void setAmbientTemperature(float celsius);
+  void setAmbientLight(int lux);
+
+  // Periodic decay and simulation step (called periodically with millis())
+  void update(unsigned long currentTimeMs);
+
+  // Getters for the 5 vital stats (0 to 100%)
+  int getHunger() const;      // Sult / Mæthed (100 = mæt, 0 = udsultet)
+  int getWarmth() const;      // Varme (100 = behagelig, 0 = for kold/varm)
+  int getEnergy() const;      // Energi / Søvn (100 = udhvilet, 0 = udmattet)
+  int getHappiness() const;   // Glæde (100 = super glad, 0 = trist)
+  int getDiscipline() const;  // Disciplin (100 = velopdragen, 0 = ulydig)
+
+  // Overall status queries
+  int getOverallHealth() const;       // Weighted average (0..100)
+  bool isSleeping() const;
+  bool needsAttention() const;        // True if any vital is below PET_CRITICAL_THRESHOLD
+  const char* getMoodStatusDanish() const;
+
+  // Direct vital setter for test verification
+  void setVitals(float hunger, float warmth, float energy, float happiness, float discipline);
+
+private:
+  float hungerVal;
+  float warmthVal;
+  float energyVal;
+  float happinessVal;
+  float disciplineVal;
+
+  bool isAsleep;
+  bool decayInitialized;
+  unsigned long lastDecayTimeMs;
+  float ambientTemp;
+  int ambientLux;
+
+  static float clamp0100(float val);
+};
+
+#endif // PET_LOGIC_H

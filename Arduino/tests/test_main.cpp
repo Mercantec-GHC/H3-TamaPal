@@ -7,6 +7,7 @@
 #include <cstring>
 #include "menu_logic.h"
 #include "tilt_logic.h"
+#include "pet_logic.h"
 
 static int totalTestsRun = 0;
 static int totalTestsFailed = 0;
@@ -246,9 +247,101 @@ void testEventParsing() {
   CHECK(TiltLogic::parseEventType(nullptr) == EVENT_NONE, "Safely handles nullptr -> EVENT_NONE");
 }
 
+void testPetInitialState() {
+  printf("\n--- Test: PetLogic Initial Vitals ---\n");
+  PetLogic pet;
+  CHECK(pet.getHunger() == 80, "Initial hunger is 80% (well-fed)");
+  CHECK(pet.getWarmth() == 85, "Initial warmth is 85% (comfortable)");
+  CHECK(pet.getEnergy() == 90, "Initial energy is 90% (well-rested)");
+  CHECK(pet.getHappiness() == 75, "Initial happiness is 75% (cheerful)");
+  CHECK(pet.getDiscipline() == 50, "Initial discipline is 50% (neutral)");
+  CHECK(!pet.isSleeping(), "Lumi is awake initially");
+  CHECK(!pet.needsAttention(), "Lumi does not need critical attention initially");
+  CHECK(pet.getOverallHealth() >= 70, "Overall health is healthy (>70%)");
+}
+
+void testPetActions() {
+  printf("\n--- Test: PetLogic Actions (Feed, Play, Scold) ---\n");
+  PetLogic pet;
+
+  // Feed action
+  CHECK(pet.feed(), "Feed action succeeds when hungry");
+  CHECK(pet.getHunger() == 100, "Hunger restored to max 100% (was 80 + 25 -> 100)");
+  CHECK(!pet.feed(), "Feed action returns false when already 100% full");
+
+  // Play action
+  pet.setVitals(80, 80, 50, 50, 50);
+  CHECK(pet.play(), "Play action succeeds when awake with energy");
+  CHECK(pet.getHappiness() == 75, "Happiness increased by 25% (50 -> 75)");
+  CHECK(pet.getEnergy() == 35, "Energy decreased by 15% (50 -> 35)");
+  CHECK(pet.getHunger() == 75, "Hunger decreased slightly by 5% (80 -> 75)");
+
+  // Scold action
+  pet.setVitals(80, 80, 50, 50, 50);
+  CHECK(pet.scold(), "Scold action succeeds");
+  CHECK(pet.getDiscipline() == 70, "Discipline increased by 20% (50 -> 70)");
+  CHECK(pet.getHappiness() == 40, "Happiness decreased by 10% (50 -> 40)");
+
+  // Actions disabled when sleeping
+  pet.setSleeping(true);
+  CHECK(!pet.feed(), "Cannot feed while asleep");
+  CHECK(!pet.play(), "Cannot play while asleep");
+  CHECK(!pet.scold(), "Cannot scold while asleep");
+}
+
+void testPetSleepAndSensors() {
+  printf("\n--- Test: PetLogic Sleep and Environmental Sensors ---\n");
+  PetLogic pet;
+
+  // Temperature response: 22 deg C keeps warmth optimal
+  pet.setVitals(80, 85, 90, 75, 50);
+  pet.setAmbientTemperature(22.0f);
+  CHECK(pet.getWarmth() >= 80, "Optimal 22C temperature maintains high warmth");
+
+  // Cold room: 10 deg C pulls warmth down
+  pet.setAmbientTemperature(10.0f);
+  pet.setAmbientTemperature(10.0f);
+  pet.setAmbientTemperature(10.0f);
+  CHECK(pet.getWarmth() < 60, "Cold room (10C) pulls warmth down");
+
+  // Light sensor: dark room puts tired Lumi to sleep
+  pet.setVitals(80, 80, 30, 80, 50);
+  CHECK(!pet.isSleeping(), "Lumi is awake before dark");
+  pet.setAmbientLight(15); // < 30 lux
+  CHECK(pet.isSleeping(), "Dark room (<30 lux) puts tired Lumi to sleep");
+
+  // Light sensor: bright room wakes well-rested Lumi
+  pet.setVitals(80, 80, 95, 80, 50);
+  pet.setAmbientLight(150); // > 100 lux
+  CHECK(!pet.isSleeping(), "Bright lights wake up well-rested Lumi");
+}
+
+void testPetDecayAndStatus() {
+  printf("\n--- Test: PetLogic Decay Over Time and Mood Status ---\n");
+  PetLogic pet;
+  pet.setVitals(80, 80, 80, 80, 80);
+
+  // Time decay: 1 interval = 10,000 ms (test after 40 seconds awake)
+  pet.update(0); // Initialize timer
+  pet.update(40000); // 4 intervals passed (40 seconds)
+  CHECK(pet.getHunger() < 80, "Hunger decays after 40 seconds awake (80 -> 78)");
+  CHECK(pet.getEnergy() < 80, "Energy decays after 40 seconds awake (80 -> 79)");
+
+  // Critical threshold trigger
+  pet.setVitals(15, 80, 80, 80, 80); // Hunger < 20%
+  CHECK(pet.needsAttention(), "needsAttention() is true when hunger < 20%");
+  CHECK(strcmp(pet.getMoodStatusDanish(), "Lumi er sulten!") == 0, "Reports Danish mood: 'Lumi er sulten!'");
+
+  pet.setVitals(80, 15, 80, 80, 80); // Warmth < 20%
+  CHECK(strcmp(pet.getMoodStatusDanish(), "Lumi fryser!") == 0, "Reports Danish mood: 'Lumi fryser!'");
+
+  pet.setSleeping(true);
+  CHECK(strcmp(pet.getMoodStatusDanish(), "Sover zZz...") == 0, "Reports Danish mood: 'Sover zZz...'");
+}
+
 int main() {
   printf("==================================================\n");
-  printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic\n");
+  printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
   printf("==================================================\n");
 
   testInitialState();
@@ -262,6 +355,11 @@ int main() {
   testTiltSmoothing();
   testTiltJsonFormatting();
   testEventParsing();
+
+  testPetInitialState();
+  testPetActions();
+  testPetSleepAndSensors();
+  testPetDecayAndStatus();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {
