@@ -62,10 +62,11 @@ const unsigned long MQTT_PUBLISH_INTERVAL_MS = 50;
 // Reconnect interval if Wi-Fi or MQTT broker drops (5 seconds)
 const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 
-// MQTT Client ID and Topics (as defined in docs/MESSAGES.md contract)
+// MQTT Client ID and Topics (Group prefix: StormLamaerne/Tamapal)
 #define MQTT_CLIENT_ID "tamapal-opla-1"
-#define MQTT_TOPIC_INPUT "tamapal/opla-1/input"
-#define MQTT_TOPIC_EVENT "tamapal/opla-1/event"
+#define MQTT_TOPIC_PREFIX "StormLamaerne/Tamapal"
+#define MQTT_TOPIC_INPUT "StormLamaerne/Tamapal/opla-1/input"
+#define MQTT_TOPIC_EVENT "StormLamaerne/Tamapal/opla-1/event"
 
 // ============================================================================
 // ENUMS (Application states and menu items)
@@ -75,6 +76,7 @@ const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 enum ScreenType {
   SCREEN_HOME = 0,         // Main screen: Lumi character + top menu bar
   SCREEN_STATS,            // Fullscreen statistics dashboard (5 vital bars)
+  SCREEN_CHOOSE_PLAYER,    // Select Player 1 (Venstre) vs Player 2 (Hoejre)
   SCREEN_CONTROLLER,       // Pong controller mode (sends tilt & button to backend)
   SCREEN_ACTION            // Temporary action banner (e.g., feeding food animation)
 };
@@ -114,7 +116,9 @@ enum GameEvent {
   EVENT_NONE = 0,
   EVENT_HIT,               // Paddle hit the ball (+1 point)
   EVENT_MISS,              // Missed ball (-1 life)
-  EVENT_GAMEOVER           // Game finished (0 lives)
+  EVENT_GAMEOVER,          // Game finished (0 lives)
+  EVENT_ASSIGN_P1,         // Backend confirms / sets player slot 1
+  EVENT_ASSIGN_P2          // Backend reassigns slot collision to player 2
 };
 
 #endif // SETTINGS_H

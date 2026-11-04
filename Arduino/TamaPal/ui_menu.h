@@ -24,6 +24,7 @@ public:
 
   // Helper screens
   void drawPlaceholderScreen(const char* title, const char* hint);
+  void drawChoosePlayerScreen();
 
 private:
   MKRIoTCarrier* carrier;

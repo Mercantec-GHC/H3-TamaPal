@@ -22,8 +22,28 @@ TiltLogic tiltLogic;
 UiControllerRenderer uiController;
 NetMqttClient netMqtt;
 
-// Forward declaration of incoming game event callback (hit, miss, gameover)
+// Forward declaration of incoming game event callback (hit, miss, gameover, slot auto-assignment)
 void onGameEventReceived(GameEvent event) {
+  if (event == EVENT_ASSIGN_P2) {
+    if (menuLogic.getPlayerId() != 2) {
+      menuLogic.selectPlayer(2);
+      netMqtt.setPlayerId(2);
+      uiController.drawInitialScreen(2);
+      soundLed.setMoodColor(255, 70, 50); // Automatically switch LEDs to Coral/Red for P2
+      soundLed.playSound(SOUND_CONFIRM);
+    }
+    return;
+  } else if (event == EVENT_ASSIGN_P1) {
+    if (menuLogic.getPlayerId() != 1) {
+      menuLogic.selectPlayer(1);
+      netMqtt.setPlayerId(1);
+      uiController.drawInitialScreen(1);
+      soundLed.setMoodColor(0, 180, 255); // Automatically switch LEDs to Cyan/Blue for P1
+      soundLed.playSound(SOUND_CONFIRM);
+    }
+    return;
+  }
+
   soundLed.playEventFeedback(event);
 }
 
@@ -152,7 +172,28 @@ void loop() {
   // -------------------------------------------------------------
   // Button Navigation
   // -------------------------------------------------------------
-  if (currentScreen == SCREEN_CONTROLLER) {
+  if (currentScreen == SCREEN_CHOOSE_PLAYER) {
+    // In player role selection screen:
+    // TOUCH0: Choose Player 1 (Venstre)
+    // TOUCH1: Choose Player 2 (Hoejre)
+    // TOUCH2: Quick confirm Player 1
+    // TOUCH3: Cancel back to Lumi Home
+    if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
+        menuLogic.selectPlayer(1);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+        menuLogic.selectPlayer(2);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+        menuLogic.selectPlayer(1);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack();
+        lastTouchTimeMs = now;
+      }
+    }
+  } else if (currentScreen == SCREEN_CONTROLLER) {
     // In controller mode:
     // TOUCH0, TOUCH1, TOUCH2 are gameplay inputs (read continuously below).
     // TOUCH3 exits back to HOME screen immediately.
@@ -202,9 +243,12 @@ void loop() {
 
   // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller mode)
   if (currentScreen != previousScreen) {
-    if (previousScreen == SCREEN_CONTROLLER) {
-      // Exiting controller: disconnect MQTT and redraw main menu
-      netMqtt.disconnect();
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER) {
+      // Exiting controller or player selection: clean up, turn off LEDs, and redraw full home UI
+      if (previousScreen == SCREEN_CONTROLLER) {
+        netMqtt.disconnect();
+        soundLed.setMoodColor(0, 0, 0);
+      }
       uiMenu.drawInitialScreen();
       uiMenu.drawMenuBar(menuLogic, true);
     }
@@ -220,9 +264,22 @@ void loop() {
         uiMenu.drawPlaceholderScreen("STATISTIK", "T3 / T4 = Tilbage");
         break;
 
+      case SCREEN_CHOOSE_PLAYER:
+        uiMenu.drawChoosePlayerScreen();
+        break;
+
       case SCREEN_CONTROLLER:
+        netMqtt.setPlayerId(menuLogic.getPlayerId());
         tiltLogic.reset();
-        uiController.drawInitialScreen();
+        lastCtrlUp = false;
+        lastCtrlDown = false;
+        lastCtrlAction = false;
+        uiController.drawInitialScreen(menuLogic.getPlayerId());
+        if (menuLogic.getPlayerId() == 2) {
+          soundLed.setMoodColor(255, 70, 50);  // Coral/Red glow for Player 2
+        } else {
+          soundLed.setMoodColor(0, 180, 255);  // Cyan/Blue glow for Player 1
+        }
         break;
 
       case SCREEN_ACTION:
@@ -276,8 +333,8 @@ void loop() {
 
     // 5d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
     uiController.updateDisplay(tiltLogic, netMqtt.isConnected());
-  } else {
-    // Normal menu modes: update sliding top menu bar
+  } else if (currentScreen != SCREEN_CHOOSE_PLAYER) {
+    // Normal menu modes (HOME, STATS, ACTION): update sliding top menu bar
     uiMenu.drawMenuBar(menuLogic, false);
   }
 

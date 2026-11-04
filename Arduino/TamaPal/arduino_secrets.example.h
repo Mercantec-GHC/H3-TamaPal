@@ -9,10 +9,10 @@
 #define SECRET_WIFI_SSID "Your_WiFi_Name"
 #define SECRET_WIFI_PASS "Your_WiFi_Password"
 
-#define SECRET_MQTT_HOST "192.168.1.100" // IP address of computer running Mosquitto
+#define SECRET_MQTT_HOST "138.199.155.78" // IP address of team MQTT broker
 #define SECRET_MQTT_PORT 1883
-#define SECRET_MQTT_USER "tamapal"
-#define SECRET_MQTT_PASS "tamapal123"
+#define SECRET_MQTT_USER ""
+#define SECRET_MQTT_PASS ""
 
 #endif // ARDUINO_SECRETS_H
 

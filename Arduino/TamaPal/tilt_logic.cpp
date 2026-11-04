@@ -149,6 +149,8 @@ GameEvent TiltLogic::parseEventType(const char* typeStr) {
   if (strcmp(typeStr, "hit") == 0) return EVENT_HIT;
   if (strcmp(typeStr, "miss") == 0) return EVENT_MISS;
   if (strcmp(typeStr, "gameover") == 0) return EVENT_GAMEOVER;
+  if (strcmp(typeStr, "assign_p1") == 0) return EVENT_ASSIGN_P1;
+  if (strcmp(typeStr, "assign_p2") == 0) return EVENT_ASSIGN_P2;
   return EVENT_NONE;
 }
 

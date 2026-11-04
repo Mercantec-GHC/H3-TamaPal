@@ -74,10 +74,22 @@ void testScreenSwitching() {
   menu.onButtonBack();
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "TOUCH3 returns from STATS to HOME");
 
-  // 4. Select CONNECT -> CONTROLLER
+  // 4. Select CONNECT -> SCREEN_CHOOSE_PLAYER -> selectPlayer(1) -> CONTROLLER
   menu.onButtonNext(); // 4 (CONNECT)
   menu.onButtonOk(1500);
-  CHECK(menu.getActiveScreen() == SCREEN_CONTROLLER, "OK on CONNECT icon opens SCREEN_CONTROLLER");
+  CHECK(menu.getActiveScreen() == SCREEN_CHOOSE_PLAYER, "OK on CONNECT icon opens SCREEN_CHOOSE_PLAYER");
+  menu.selectPlayer(1);
+  CHECK(menu.getActiveScreen() == SCREEN_CONTROLLER, "selectPlayer(1) opens SCREEN_CONTROLLER");
+  CHECK(menu.getPlayerId() == 1, "Player ID is 1");
+  menu.onButtonBack();
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "TOUCH3 returns from CONTROLLER to HOME");
+
+  // 5. While still on CONNECT icon -> choose Player 2 -> CONTROLLER
+  menu.onButtonOk(2000);
+  CHECK(menu.getActiveScreen() == SCREEN_CHOOSE_PLAYER, "OK on CONNECT opens SCREEN_CHOOSE_PLAYER");
+  menu.selectPlayer(2);
+  CHECK(menu.getActiveScreen() == SCREEN_CONTROLLER, "selectPlayer(2) opens SCREEN_CONTROLLER");
+  CHECK(menu.getPlayerId() == 2, "Player ID is 2");
   menu.onButtonBack();
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "TOUCH3 returns from CONTROLLER to HOME");
 }
@@ -228,6 +240,8 @@ void testEventParsing() {
   CHECK(TiltLogic::parseEventType("hit") == EVENT_HIT, "Parses 'hit' -> EVENT_HIT");
   CHECK(TiltLogic::parseEventType("miss") == EVENT_MISS, "Parses 'miss' -> EVENT_MISS");
   CHECK(TiltLogic::parseEventType("gameover") == EVENT_GAMEOVER, "Parses 'gameover' -> EVENT_GAMEOVER");
+  CHECK(TiltLogic::parseEventType("assign_p1") == EVENT_ASSIGN_P1, "Parses 'assign_p1' -> EVENT_ASSIGN_P1");
+  CHECK(TiltLogic::parseEventType("assign_p2") == EVENT_ASSIGN_P2, "Parses 'assign_p2' -> EVENT_ASSIGN_P2");
   CHECK(TiltLogic::parseEventType("unknown") == EVENT_NONE, "Parses 'unknown' -> EVENT_NONE");
   CHECK(TiltLogic::parseEventType(nullptr) == EVENT_NONE, "Safely handles nullptr -> EVENT_NONE");
 }

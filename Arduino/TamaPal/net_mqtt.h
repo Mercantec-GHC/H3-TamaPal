@@ -42,10 +42,19 @@ public:
   bool isConnected();
   bool isConnecting() const;
 
+  // Configure dynamic player slot (1 or 2) for MQTT topics and client ID
+  void setPlayerId(int id);
+  int getPlayerId() const;
+
 private:
   WiFiClient wifiClient;
   MqttClient mqttClient;
   GameEventCallback onEventCallback;
+
+  int playerId;
+  char topicInput[64];
+  char topicEvent[64];
+  char clientMqttId[64];
 
   unsigned long lastPublishTime;
   unsigned long lastReconnectAttempt;
