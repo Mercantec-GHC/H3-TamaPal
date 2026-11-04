@@ -665,3 +665,4 @@ void UiPetRenderer::drawActionScene(const PetLogic& pet,
   // Mark stage so returning to SCREEN_HOME cleanly refreshes the top sky strip
   stageInitialized = false;
 }
+
