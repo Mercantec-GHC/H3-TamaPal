@@ -43,11 +43,15 @@ NetMqttClient::NetMqttClient()
     connectingState(false),
     lastReportedWifiConnected(false),
     hasPublishedFirstPacket(false) {
-  setPlayerId(1);
+  // Pure in-memory initialization only: NO hardware I/O (WiFi, SPI) before setup()!
+  topicInput[0] = '\0';
+  topicEvent[0] = '\0';
+  clientMqttId[0] = '\0';
 }
 
 void NetMqttClient::begin(GameEventCallback callback) {
   onEventCallback = callback;
+  setPlayerId(1);
 
   // Set MQTT client credentials, keep-alive, and connection timeout
   mqttClient.setId(clientMqttId);
@@ -73,15 +77,7 @@ void NetMqttClient::setPlayerId(int id) {
   playerId = newId;
   snprintf(topicInput, sizeof(topicInput), "%s/opla-%d/input", MQTT_TOPIC_PREFIX, playerId);
   snprintf(topicEvent, sizeof(topicEvent), "%s/opla-%d/event", MQTT_TOPIC_PREFIX, playerId);
-
-  // Append hardware MAC suffix so multiple Arduinos never kick each other off broker
-  byte mac[6] = {0};
-  WiFi.macAddress(mac);
-  if (mac[4] != 0 || mac[5] != 0) {
-    snprintf(clientMqttId, sizeof(clientMqttId), "tamapal-opla-%d-%02X%02X", playerId, mac[4], mac[5]);
-  } else {
-    snprintf(clientMqttId, sizeof(clientMqttId), "tamapal-opla-%d", playerId);
-  }
+  snprintf(clientMqttId, sizeof(clientMqttId), "tamapal-opla-%d", playerId);
 }
 
 int NetMqttClient::getPlayerId() const {

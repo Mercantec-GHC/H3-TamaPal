@@ -73,15 +73,21 @@ bool lastCtrlAction = false;
 // Hardware case mode (true = with plastic enclosure, false = bare board)
 bool currentCaseMode = SECRET_USE_CASE;
 
-void setCaseMode(bool enableCase) {
+void setCaseMode(bool enableCase, bool reinitHardware = false) {
   currentCaseMode = enableCase;
   if (currentCaseMode) {
     carrier.withCase();
     carrier.Buttons.updateConfig(TOUCH_SENSITIVITY_WITH_CASE);
+    if (reinitHardware) {
+      carrier.Buttons.begin();
+    }
     Serial.println(F("[Hardware] Tilstand: MED PLASTIK-CASE (Følsomhed: 60)"));
   } else {
     carrier.noCase();
     carrier.Buttons.updateConfig(TOUCH_SENSITIVITY_BARE_BOARD);
+    if (reinitHardware) {
+      carrier.Buttons.begin();
+    }
     Serial.println(F("[Hardware] Tilstand: UDEN CASE / BARE BOARD (Følsomhed: 200)"));
   }
 }
@@ -89,9 +95,10 @@ void setCaseMode(bool enableCase) {
 void setup() {
   Serial.begin(115200);
 
-  carrier.withCase();
+  // IMPORTANT: Set case mode and sensitivity BEFORE carrier.begin()!
+  // touch_sensors_config() inside Qtouch reads the sensitivity during carrier.begin().
+  setCaseMode(SECRET_USE_CASE, false);
   carrier.begin();
-  setCaseMode(SECRET_USE_CASE);
 
   // Set LCD rotation (0 = standard orientation)
   carrier.display.setRotation(0);
@@ -128,7 +135,7 @@ void loop() {
     char c = Serial.peek();
     if (c == 'c' || c == 'C') {
       Serial.readStringUntil('\n');
-      setCaseMode(!currentCaseMode);
+      setCaseMode(!currentCaseMode, true);
     }
   }
 
