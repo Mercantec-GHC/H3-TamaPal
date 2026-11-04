@@ -136,6 +136,13 @@ void SoundLedController::setMoodColor(uint8_t red, uint8_t green, uint8_t blue) 
   applyLedColor(red, green, blue);
 }
 
+// Temporary flash that reverts to base color after durationMs
+void SoundLedController::flashColor(uint8_t red, uint8_t green, uint8_t blue, unsigned long durationMs) {
+  if (carrier == nullptr) return;
+  applyLedColor(red, green, blue);
+  ledResetTimeMs = millis() + durationMs;
+}
+
 // Internal hardware helper to write RGB values to the 5 LEDs
 void SoundLedController::applyLedColor(uint8_t red, uint8_t green, uint8_t blue) {
   if (carrier == nullptr) return;

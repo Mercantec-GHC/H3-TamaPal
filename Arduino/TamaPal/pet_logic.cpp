@@ -87,6 +87,8 @@ void PetLogic::toggleSleep() {
 
 void PetLogic::setSleeping(bool sleep) {
   isAsleep = sleep;
+  darkStartTimeMs = 0;
+  lightStartTimeMs = 0;
 }
 
 void PetLogic::setAmbientTemperature(float celsius) {

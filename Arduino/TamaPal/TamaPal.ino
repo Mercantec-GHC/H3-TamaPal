@@ -66,8 +66,8 @@ void onPetRewardReceived(const char* type, int amount) {
 
   if (petLogic.applyReward(type, amount)) {
     soundLed.playSound(SOUND_CONFIRM);
-    soundLed.setMoodColor(255, 230, 80); // Bright golden reward flash
-    syncPetStateToBackend(true);          // Sync immediately to update stats in DB
+    soundLed.flashColor(255, 230, 80, 400); // 400 ms golden reward flash, then restores base color
+    syncPetStateToBackend(true);            // Sync immediately to update stats in DB
   }
 }
 

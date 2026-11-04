@@ -27,6 +27,9 @@ public:
   // Set color pattern for all 5 RGB LEDs
   void setMoodColor(uint8_t red, uint8_t green, uint8_t blue);
 
+  // Temporary LED flash that automatically restores the base mood color
+  void flashColor(uint8_t red, uint8_t green, uint8_t blue, unsigned long durationMs = 300);
+
   // Toggle sound mute ON/OFF (triggered by TOUCH0 + TOUCH4 combo)
   void toggleMute();
   bool isMuted() const;
