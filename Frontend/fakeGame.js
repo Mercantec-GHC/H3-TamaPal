@@ -5,6 +5,7 @@ import { BALL_RADIUS, PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_X } from './field.js';
 const START_LIVES = 3;
 const START_SPEED = 0.5;  // field widths per second
 const SPEED_UP = 1.05;    // +5% speed after every hit
+const MAX_SPEED = 1.2;    // limit, else the ball jumps through the paddle in one frame
 const PADDLE_SPEED = 1.0; // field heights per second (arrow keys)
 
 const state = {
@@ -28,6 +29,11 @@ export function getState() {
 
 export function setPaddleDirection(direction) {
   paddleDirection = direction;
+}
+
+// The fake game has no server, so it is always "connected" (network.js has the real one)
+export function isConnected() {
+  return true;
 }
 
 // Same rule as Oliver's backend: only start from waiting or gameover
@@ -88,8 +94,11 @@ export function updateGame(dt) {
     Math.abs(ball.y - state.paddle.y) <= half + BALL_RADIUS;
   if (touchesPaddle) {
     ball.x = paddleRight + BALL_RADIUS;
-    vx = Math.abs(vx) * SPEED_UP;
-    vy = vy * SPEED_UP;
+    // +5%, but never faster than MAX_SPEED
+    const speed = Math.hypot(vx, vy);
+    const factor = Math.min(SPEED_UP, MAX_SPEED / speed);
+    vx = Math.abs(vx) * factor;
+    vy = vy * factor;
     state.score += 1;
   }
 

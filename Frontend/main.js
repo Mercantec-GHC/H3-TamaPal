@@ -1,10 +1,12 @@
 import { draw } from './draw.js';
-// Fake backend for now – later replaced by a SignalR connection to /gamehub
-import { getState, startGame, updateGame, setPaddleDirection } from './fakeGame.js';
+// Where the game runs. Both files have the same functions, so only this line changes:
+// './fakeGame.js' = fake game in the browser, './network.js' = Oliver's /gamehub (SignalR)
+import { getState, startGame, updateGame, setPaddleDirection, isConnected } from './fakeGame.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const startButton = document.getElementById('start');
+const statusText = document.getElementById('status');
 
 // Start / "Spil igen" button → message 4 StartGame() later
 startButton.addEventListener('click', () => startGame());
@@ -12,7 +14,7 @@ startButton.addEventListener('click', () => startGame());
 // Arrow keys move the paddle (temporary, until the Oplà sends input)
 const keys = { up: false, down: false };
 
-function onKey(event, pressed) {
+function onKey(event, pressed) { // pressed: true on keydown, false on keyup
   if (event.key === 'ArrowUp') keys.up = pressed;
   else if (event.key === 'ArrowDown') keys.down = pressed;
   else return;
@@ -36,7 +38,8 @@ function frame(now) {
   draw(ctx, state);
 
   startButton.textContent = state.status === 'gameover' ? 'Spil igen' : 'Start';
-  startButton.disabled = state.status === 'playing';
+  startButton.disabled = state.status === 'playing' || !isConnected();
+  statusText.textContent = isConnected() ? '' : 'Ingen forbindelse til serveren';
 
   requestAnimationFrame(frame);
 }
