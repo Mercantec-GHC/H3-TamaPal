@@ -449,3 +449,29 @@ Udfyldes sammen. Når vi er enige, skriver vi navn og dato nederst.
 - [ ] Andrii – dato:
 
 Ændringer efter aftalen: ret både Del 1 og tabellen her, og skriv det i gruppens chat.
+
+Instruktion: Hardware- og Git-opsætning for TamaPal Touch-sensorer
+Kernen i problemet:
+Oplà-kortet bruger kapacitive touch-sensorer. En printplade i plastik-case kræver høj følsomhed (tærskel 60) for at registrere tryk gennem plasten. En "bar" printplade kræver lav følsomhed (tærskel 200) for at undgå fejlreaktioner ("spøgelsestryk").
+
+1. Git-niveau: Individuel konfiguration (engangsopsætning)
+Fil: arduino_secrets.h (ignoreres af Git, overskrives ikke ved pull/push).
+Handling: Åbn filen på din computer og tilføj/ret følgende linje alt efter din hardware:
+cpp
+
+// Sæt til true, hvis dit kort er i plastik-case. Sæt til false, hvis kortet er bart:
+#define SECRET_USE_CASE false
+
+Используйте код с осторожностью.
+2. Runtime-niveau: Skift tilstand "on-the-fly" (uden genprogrammering)
+Handling: Åbn Serial Monitor i Arduino IDE.
+Kommando: Skriv c (eller case) og tryk Enter.
+Resultat: Systemet skifter øjeblikkeligt følsomhed og bekræfter i loggen:
+[Hardware] Tilstand: MED PLASTIK-CASE (Følsomhed: 60)
+[Hardware] Tilstand: UDEN CASE / BARE BOARD (Følsomhed: 200)
+
+Status på opgaven
+Kodeændringer: Gennemført i settings.h, TamaPal.ino og arduino_secrets.example.h.
+Test & kompilering: Succesfuld (57 ud af 57 enhedstest bestået via arduino-cli).
+Git: Ændringerne er gemt (committed) og pushet til branch: feature/arduino-needs.
+Hvis du har brug for det, kan jeg tilpasse teksten i Serial Monitor eller justere standardværdierne for følsomheden. Lad mig vide, hvordan du vil fortsætte!
