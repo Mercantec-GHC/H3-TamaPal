@@ -53,7 +53,8 @@ void onGameEventReceived(GameEvent event) {
 }
 
 // Track screen transitions to redraw viewports only when needed
-ScreenType previousScreen = (ScreenType)99;
+ScreenType previousScreen = SCREEN_HOME;
+const char* lastHomeMood = nullptr;
 
 // Performance monitor (measures frames per second without blocking)
 unsigned long lastFpsTimeMs = 0;
@@ -168,7 +169,9 @@ void setup() {
   // Initial full screen draw
   uiMenu.drawInitialScreen();
   uiMenu.drawMenuBar(menuLogic, true);
-  uiMenu.drawPlaceholderScreen("LUMI HOME", "Vaelg et ikon i toppen");
+  lastHomeMood = petLogic.getMoodStatusDanish();
+  uiMenu.drawPlaceholderScreen("LUMI HOME", lastHomeMood);
+  previousScreen = SCREEN_HOME;
 
   Serial.println(F("=================================================="));
   Serial.println(F("TamaPal klar! (MKR WiFi 1010 + MKR IoT Carrier)"));
@@ -186,11 +189,10 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // Listen for 'c' or 'case' in Serial Monitor to toggle plastic case mode on-the-fly!
-  if (Serial.available() > 0) {
-    char c = Serial.peek();
+  // Listen for 'c' in Serial Monitor to toggle plastic case mode on-the-fly (non-blocking, no String)
+  while (Serial.available() > 0) {
+    char c = (char)Serial.read();
     if (c == 'c' || c == 'C') {
-      Serial.readStringUntil('\n');
       setCaseMode(!currentCaseMode, true);
     }
   }
@@ -290,8 +292,10 @@ void loop() {
   petLogic.update(now);
   soundLed.update(now);
 
-  // Non-blocking environmental sensor sampling (every 2.5 seconds)
-  if (now - lastSensorReadTimeMs >= SENSOR_READ_INTERVAL_MS) {
+  currentScreen = menuLogic.getActiveScreen();
+
+  // Non-blocking environmental sensor sampling (every 2.5s, paused in Controller mode to keep I2C free for IMU)
+  if (currentScreen != SCREEN_CONTROLLER && (now - lastSensorReadTimeMs >= SENSOR_READ_INTERVAL_MS)) {
     lastSensorReadTimeMs = now;
     float ambientTemp = carrier.Env.readTemperature();
     petLogic.setAmbientTemperature(ambientTemp);
@@ -303,20 +307,21 @@ void loop() {
     }
   }
 
-  currentScreen = menuLogic.getActiveScreen();
-
   // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller, stats, or action mode)
   if (currentScreen != previousScreen) {
-    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_ACTION) {
-      // Exiting controller, stats, action, or player selection: clean up, restore mood LEDs, and redraw full home UI
+    muteMessageEndTimeMs = 0; // Cancel any active mute toast when switching screens
+
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS) {
+      // Exiting a fullscreen view: clean up, restore mood LEDs, and redraw full home UI
       if (previousScreen == SCREEN_CONTROLLER) {
         netMqtt.disconnect();
-        soundLed.setMoodColor(0, 0, 0);
-      } else {
-        soundLed.setMoodColor(0, 150, 220); // Restore calm cyan glow after action
       }
+      soundLed.setMoodColor(0, 150, 220);
       uiMenu.drawInitialScreen();
       uiMenu.drawMenuBar(menuLogic, true);
+    } else if (previousScreen == SCREEN_ACTION) {
+      // Exiting temporary center overlay: top menu bar is still intact, only restore LED glow
+      soundLed.setMoodColor(0, 150, 220);
     }
 
     previousScreen = currentScreen;
@@ -324,7 +329,8 @@ void loop() {
     switch (currentScreen) {
       case SCREEN_HOME:
         Serial.println(F("[UI] Skærm: HOME (Lumi Tamagotchi)"));
-        uiMenu.drawPlaceholderScreen("LUMI HOME", petLogic.getMoodStatusDanish());
+        lastHomeMood = petLogic.getMoodStatusDanish();
+        uiMenu.drawPlaceholderScreen("LUMI HOME", lastHomeMood);
         break;
 
       case SCREEN_STATS:
@@ -359,10 +365,11 @@ void loop() {
 
       case SCREEN_ACTION:
         Serial.println(F("[UI] Skærm: HANDLING udføres"));
-        // Execute Tamagotchi need action and show temporary banner
-        if (menuLogic.getSelectedIcon() == ICON_FOOD) {
-          bool fed = petLogic.feed();
-          if (fed) {
+        if (petLogic.isSleeping()) {
+          uiMenu.drawPlaceholderScreen("SOVER ZZZ!", "Lumi sover lige nu...");
+          soundLed.setMoodColor(80, 140, 255); // Soft sleep blue
+        } else if (menuLogic.getSelectedIcon() == ICON_FOOD) {
+          if (petLogic.feed()) {
             uiMenu.drawPlaceholderScreen("MUMS: MAD!", "Giver Lumi et baer...");
             soundLed.setMoodColor(80, 255, 80); // Green glow
           } else {
@@ -370,8 +377,7 @@ void loop() {
             soundLed.setMoodColor(255, 180, 50); // Orange glow
           }
         } else if (menuLogic.getSelectedIcon() == ICON_PLAY) {
-          bool played = petLogic.play();
-          if (played) {
+          if (petLogic.play()) {
             uiMenu.drawPlaceholderScreen("JUBII: LEG!", "Lumi leger og hopper!");
             soundLed.setMoodColor(255, 220, 50); // Gold glow
           } else {
@@ -416,9 +422,11 @@ void loop() {
     // - Immediately on button state change (< 1 ms latency!)
     // - Plus 20 Hz periodic heartbeat (~50 ms) for smooth 2D tilt & keep-alive
     netMqtt.update(now);
-    char jsonBuffer[96];
-    tiltLogic.formatInputJson(jsonBuffer, sizeof(jsonBuffer));
-    netMqtt.publishInput(jsonBuffer, now, buttonEdge);
+    if (netMqtt.canPublish(now, buttonEdge)) {
+      char jsonBuffer[96];
+      tiltLogic.formatInputJson(jsonBuffer, sizeof(jsonBuffer));
+      netMqtt.publishInput(jsonBuffer, now, buttonEdge);
+    }
 
     // 5d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
     uiController.updateDisplay(tiltLogic, netMqtt.isConnected());
@@ -428,6 +436,15 @@ void loop() {
   } else if (currentScreen != SCREEN_CHOOSE_PLAYER) {
     // Normal menu modes (HOME, ACTION): update sliding top menu bar
     uiMenu.drawMenuBar(menuLogic, false);
+
+    // Refresh home mood text automatically if Lumi's status changes while on HOME screen
+    if (currentScreen == SCREEN_HOME && muteMessageEndTimeMs == 0) {
+      const char* curMood = petLogic.getMoodStatusDanish();
+      if (curMood != lastHomeMood) {
+        lastHomeMood = curMood;
+        uiMenu.drawPlaceholderScreen("LUMI HOME", curMood);
+      }
+    }
   }
 
   // 6. Non-blocking FPS diagnostics (printed to Serial once per second)

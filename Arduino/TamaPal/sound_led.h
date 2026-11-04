@@ -38,6 +38,11 @@ private:
   bool soundMuted;
   unsigned long toneEndTimeMs;
   unsigned long ledResetTimeMs;
+  uint8_t baseRed;
+  uint8_t baseGreen;
+  uint8_t baseBlue;
+
+  void applyLedColor(uint8_t red, uint8_t green, uint8_t blue);
 };
 
 #endif // SOUND_LED_H

@@ -85,7 +85,12 @@ int NetMqttClient::getPlayerId() const {
 }
 
 bool NetMqttClient::isConnected() {
-  return (WiFi.status() == WL_CONNECTED) && mqttClient.connected();
+  return lastReportedWifiConnected && (bool)mqttClient.connected();
+}
+
+bool NetMqttClient::canPublish(unsigned long now, bool forceImmediate) {
+  if (!isConnected()) return false;
+  return forceImmediate || (now - lastPublishTime >= MQTT_PUBLISH_INTERVAL_MS);
 }
 
 bool NetMqttClient::isConnecting() const {
@@ -118,6 +123,7 @@ void NetMqttClient::attemptConnection(unsigned long now) {
   // 1. Check / establish Wi-Fi
   uint8_t wifiStatus = WiFi.status();
   if (wifiStatus != WL_CONNECTED) {
+    lastReportedWifiConnected = false;
     #if defined(SECRET_WIFI_SSID) && defined(SECRET_WIFI_PASS)
     if (strlen(SECRET_WIFI_SSID) == 0) {
       Serial.println(F("[WiFi] FEJL: SECRET_WIFI_SSID er tom! Udfyld arduino_secrets.h."));

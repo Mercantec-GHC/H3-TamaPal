@@ -33,9 +33,9 @@ void UiMenuRenderer::drawInitialScreen() {
   // Touch button guide at the bottom of the screen (tightly centered so round bezel won't cut it off)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(color565(110, 140, 190));
-  carrier->display.setCursor(72, 206);
+  carrier->display.setCursor(72, 202);
   carrier->display.print("T0:<  T1:>  T2:OK");
-  carrier->display.setCursor(69, 218);
+  carrier->display.setCursor(69, 213);
   carrier->display.print("T3:Tilb  T4:Stats");
 }
 
@@ -329,20 +329,22 @@ void UiMenuRenderer::drawMenuBar(const MenuLogic& menu, bool forceRedrawAll) {
 
 // Display temporary placeholder screen for other views (Stats, Controller, Action)
 void UiMenuRenderer::drawPlaceholderScreen(const char* title, const char* hint) {
-  if (carrier == nullptr) return;
+  if (carrier == nullptr || title == nullptr || hint == nullptr) return;
+
+  uint16_t boxBg = color565(12, 18, 38);
 
   // Clear center area of screen (matches the 152x120 viewport area of Lumi)
-  carrier->display.fillRect(38, 72, 164, 124, color565(12, 18, 38));
+  carrier->display.fillRect(38, 72, 164, 124, boxBg);
   carrier->display.drawRoundRect(42, 76, 156, 116, 6, color565(40, 80, 150));
 
   carrier->display.setTextSize(2);
-  carrier->display.setTextColor(color565(255, 230, 80));
+  carrier->display.setTextColor(color565(255, 230, 80), boxBg);
   int titleWidth = strlen(title) * 12;
   carrier->display.setCursor((SCREEN_WIDTH - titleWidth) / 2, 108);
   carrier->display.print(title);
 
   carrier->display.setTextSize(1);
-  carrier->display.setTextColor(color565(150, 190, 240));
+  carrier->display.setTextColor(color565(150, 190, 240), boxBg);
   int hintWidth = strlen(hint) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - hintWidth) / 2, 142);
   carrier->display.print(hint);

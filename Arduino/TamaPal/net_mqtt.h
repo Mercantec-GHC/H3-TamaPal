@@ -30,6 +30,9 @@ public:
   // Maintain Wi-Fi and MQTT connection non-blockingly
   void update(unsigned long now);
 
+  // Check if client is ready and due to publish a packet right now
+  bool canPublish(unsigned long now, bool forceImmediate = false);
+
   // Publish tilt & button JSON packet to tamapal/opla-1/input
   // Sends immediately if forceImmediate is true (instant state-change edge),
   // otherwise maintains periodic heartbeat at 20 Hz (~50 ms)
