@@ -27,7 +27,12 @@ NetMqttClient netMqtt;
 PetLogic petLogic;
 UiStatsRenderer uiStats;
 
-// Forward declaration of incoming game event callback (hit, miss, gameover, slot auto-assignment)
+// Forward declarations
+void onGameEventReceived(GameEvent event);
+void onPetRewardReceived(const char* type, int amount);
+void syncPetStateToBackend(bool forceImmediate = false);
+
+// Incoming game event callback (hit, miss, gameover, slot auto-assignment)
 void onGameEventReceived(GameEvent event) {
   if (event == EVENT_ASSIGN_P2) {
     if (menuLogic.getPlayerId() != 2) {
@@ -50,6 +55,20 @@ void onGameEventReceived(GameEvent event) {
   }
 
   soundLed.playEventFeedback(event);
+}
+
+// Handler for incoming pet rewards from backend (e.g. happy_boost after Pong point)
+void onPetRewardReceived(const char* type, int amount) {
+  Serial.print(F("[REWARD] Modtaget belønning fra backend: "));
+  Serial.print(type);
+  Serial.print(F(" +"));
+  Serial.println(amount);
+
+  if (petLogic.applyReward(type, amount)) {
+    soundLed.playSound(SOUND_CONFIRM);
+    soundLed.setMoodColor(255, 230, 80); // Bright golden reward flash
+    syncPetStateToBackend(true);          // Sync immediately to update stats in DB
+  }
 }
 
 // Track screen transitions to redraw viewports only when needed
@@ -78,7 +97,7 @@ bool lastCtrlAction = false;
 // Pet state sync to backend interval (30 seconds or immediately on action)
 unsigned long lastPetStatePublishTimeMs = 0;
 
-void syncPetStateToBackend(bool forceImmediate = false) {
+void syncPetStateToBackend(bool forceImmediate) {
   unsigned long now = millis();
   if (!forceImmediate && (now - lastPetStatePublishTimeMs < MQTT_PET_STATE_INTERVAL_MS)) {
     return;
@@ -92,9 +111,9 @@ void syncPetStateToBackend(bool forceImmediate = false) {
   netMqtt.publishPetState(petJson);
 }
 
-// Environmental sensor reading interval (every 2.5 seconds, non-blocking)
+// Environmental sensor reading interval (every 1.0 second, non-blocking)
 unsigned long lastSensorReadTimeMs = 0;
-const unsigned long SENSOR_READ_INTERVAL_MS = 2500;
+const unsigned long SENSOR_READ_INTERVAL_MS = 1000;
 
 // Hardware case mode (true = with plastic enclosure, false = bare board)
 bool currentCaseMode = SECRET_USE_CASE;
@@ -181,7 +200,7 @@ void setup() {
   uiMenu.begin(&carrier);
   uiController.begin(&carrier);
   uiStats.begin(&carrier);
-  netMqtt.begin(onGameEventReceived);
+  netMqtt.begin(onGameEventReceived, onPetRewardReceived);
 
   // Initial full screen draw
   uiMenu.drawInitialScreen();
@@ -320,7 +339,7 @@ void loop() {
     if (carrier.Light.colorAvailable()) {
       int r = 0, g = 0, b = 0, ambient = 0;
       carrier.Light.readColor(r, g, b, ambient);
-      petLogic.setAmbientLight(ambient);
+      petLogic.setAmbientLight(ambient, now);
     }
   }
 

@@ -37,6 +37,7 @@ static const char* mqttErrorToString(int err) {
 NetMqttClient::NetMqttClient()
   : mqttClient(wifiClient),
     onEventCallback(nullptr),
+    onRewardCallback(nullptr),
     playerId(1),
     lastPublishTime(0),
     lastReconnectAttempt(0),
@@ -46,12 +47,14 @@ NetMqttClient::NetMqttClient()
   // Pure in-memory initialization only: NO hardware I/O (WiFi, SPI) before setup()!
   topicInput[0] = '\0';
   topicEvent[0] = '\0';
+  topicReward[0] = '\0';
   topicPetState[0] = '\0';
   clientMqttId[0] = '\0';
 }
 
-void NetMqttClient::begin(GameEventCallback callback) {
-  onEventCallback = callback;
+void NetMqttClient::begin(GameEventCallback eventCallback, PetRewardCallback rewardCallback) {
+  onEventCallback = eventCallback;
+  onRewardCallback = rewardCallback;
   setPlayerId(1);
 
   // Set MQTT client credentials, keep-alive, and connection timeout
@@ -78,6 +81,7 @@ void NetMqttClient::setPlayerId(int id) {
   playerId = newId;
   snprintf(topicInput, sizeof(topicInput), "%s/opla-%d/input", MQTT_TOPIC_PREFIX, playerId);
   snprintf(topicEvent, sizeof(topicEvent), "%s/opla-%d/event", MQTT_TOPIC_PREFIX, playerId);
+  snprintf(topicReward, sizeof(topicReward), "%s/opla-%d/pet/reward", MQTT_TOPIC_PREFIX, playerId);
   snprintf(topicPetState, sizeof(topicPetState), "%s/opla-%d/pet/state", MQTT_TOPIC_PREFIX, playerId);
   snprintf(clientMqttId, sizeof(clientMqttId), "tamapal-opla-%d", playerId);
 }
@@ -215,8 +219,11 @@ void NetMqttClient::attemptConnection(unsigned long now) {
     if (connResult != 0) {
       Serial.println(F("[MQTT] SUCCES! Forbundet til broker."));
       mqttClient.subscribe(topicEvent, 1);
+      mqttClient.subscribe(topicReward, 1);
       Serial.print(F("[MQTT] Abonnerer paa event-topic: "));
       Serial.println(topicEvent);
+      Serial.print(F("[MQTT] Abonnerer paa reward-topic: "));
+      Serial.println(topicReward);
       connectingState = false;
       hasPublishedFirstPacket = false;
     } else {
@@ -266,11 +273,20 @@ void NetMqttClient::pollIncomingEvents() {
     return;
   }
 
-  const char* typeStr = doc["type"];
-  if (typeStr != nullptr && onEventCallback != nullptr) {
-    GameEvent event = TiltLogic::parseEventType(typeStr);
-    if (event != EVENT_NONE) {
-      onEventCallback(event);
+  String currentTopic = mqttClient.messageTopic();
+  if (currentTopic.indexOf(F("/reward")) >= 0) {
+    const char* typeStr = doc["type"];
+    int amount = doc["amount"] | 0;
+    if (typeStr != nullptr && onRewardCallback != nullptr) {
+      onRewardCallback(typeStr, amount);
+    }
+  } else {
+    const char* typeStr = doc["type"];
+    if (typeStr != nullptr && onEventCallback != nullptr) {
+      GameEvent event = TiltLogic::parseEventType(typeStr);
+      if (event != EVENT_NONE) {
+        onEventCallback(event);
+      }
     }
   }
 }

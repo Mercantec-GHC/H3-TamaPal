@@ -79,6 +79,7 @@ const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 #define MQTT_TOPIC_PREFIX "StormLamaerne/Tamapal"
 #define MQTT_TOPIC_INPUT "StormLamaerne/Tamapal/opla-1/input"
 #define MQTT_TOPIC_EVENT "StormLamaerne/Tamapal/opla-1/event"
+#define MQTT_TOPIC_REWARD "StormLamaerne/Tamapal/opla-1/pet/reward"
 #define MQTT_TOPIC_PET_STATE "StormLamaerne/Tamapal/opla-1/pet/state"
 
 // ============================================================================
@@ -153,6 +154,12 @@ const float PET_SLEEP_ENERGY_RECOVERY = 2.0f; // Recovers 2% every 10 sec
 const float PET_FEED_RESTORE = 25.0f;
 const float PET_PLAY_RESTORE = 25.0f;
 const float PET_SCOLD_RESTORE = 20.0f;
+
+// Environmental sleep & wake light thresholds & timings (MESSAGES.md Del 1b Proposal 4)
+const int SENSOR_DARK_LUX_THRESHOLD = 30;              // Under 30 lux is dark (hand covering sensor)
+const int SENSOR_LIGHT_LUX_THRESHOLD = 80;             // Over 80 lux is normal indoor light
+const unsigned long SENSOR_DARK_SLEEP_DELAY_MS = 5000; // 5 seconds continuous darkness triggers sleep
+const unsigned long SENSOR_LIGHT_WAKE_DELAY_MS = 2000; // 2 seconds continuous light wakes Lumi up
 
 // Attention threshold: below 20%, Lumi needs immediate care
 const int PET_CRITICAL_THRESHOLD = 20;

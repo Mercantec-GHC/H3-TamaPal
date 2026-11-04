@@ -20,12 +20,13 @@ public:
   bool feed();     // Increases Hunger (sult/mæthed) and slightly Happiness
   bool play();     // Increases Happiness, consumes Energy and Hunger
   bool scold();    // Increases Discipline, slightly reduces Happiness
+  bool applyReward(const char* rewardType, int amount); // Backend reward (e.g. "happy_boost")
   void toggleSleep();
   void setSleeping(bool sleep);
 
   // Environmental sensor updates (ambient room temperature & light from MKR Carrier)
   void setAmbientTemperature(float celsius);
-  void setAmbientLight(int lux);
+  void setAmbientLight(int lux, unsigned long nowMs = 0);
 
   // Periodic decay and simulation step (called periodically with millis())
   void update(unsigned long currentTimeMs);
@@ -61,6 +62,8 @@ private:
   bool isAsleep;
   bool decayInitialized;
   unsigned long lastDecayTimeMs;
+  unsigned long darkStartTimeMs;
+  unsigned long lightStartTimeMs;
   float ambientTemp;
   int ambientLux;
 

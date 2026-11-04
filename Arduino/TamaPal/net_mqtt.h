@@ -20,12 +20,15 @@
 // Callback signature for handling incoming game events from backend (hit, miss, gameover)
 typedef void (*GameEventCallback)(GameEvent event);
 
+// Callback signature for handling incoming pet rewards from backend (e.g. "happy_boost", 25)
+typedef void (*PetRewardCallback)(const char* type, int amount);
+
 class NetMqttClient {
 public:
   NetMqttClient();
 
-  // Initialize network module and register event callback
-  void begin(GameEventCallback callback = nullptr);
+  // Initialize network module and register event & reward callbacks
+  void begin(GameEventCallback eventCallback = nullptr, PetRewardCallback rewardCallback = nullptr);
 
   // Maintain Wi-Fi and MQTT connection non-blockingly
   void update(unsigned long now);
@@ -56,10 +59,12 @@ private:
   WiFiClient wifiClient;
   MqttClient mqttClient;
   GameEventCallback onEventCallback;
+  PetRewardCallback onRewardCallback;
 
   int playerId;
   char topicInput[64];
   char topicEvent[64];
+  char topicReward[64];
   char topicPetState[64];
   char clientMqttId[64];
 

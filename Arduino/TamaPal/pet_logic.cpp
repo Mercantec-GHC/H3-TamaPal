@@ -4,6 +4,7 @@
 
 #include "pet_logic.h"
 #include <stdio.h>
+#include <string.h>
 
 PetLogic::PetLogic() {
   reset();
@@ -25,6 +26,8 @@ void PetLogic::reset() {
   isAsleep = false;
   decayInitialized = false;
   lastDecayTimeMs = 0;
+  darkStartTimeMs = 0;
+  lightStartTimeMs = 0;
   ambientTemp = 22.0f;
   ambientLux = 150;
 }
@@ -64,6 +67,20 @@ bool PetLogic::scold() {
   return true;
 }
 
+bool PetLogic::applyReward(const char* rewardType, int amount) {
+  if (rewardType == nullptr || amount <= 0) return false;
+
+  if (strcmp(rewardType, "happy_boost") == 0) {
+    happinessVal = clamp0100(happinessVal + (float)amount);
+    return true;
+  }
+  if (strcmp(rewardType, "energy_boost") == 0) {
+    energyVal = clamp0100(energyVal + (float)amount);
+    return true;
+  }
+  return false;
+}
+
 void PetLogic::toggleSleep() {
   setSleeping(!isAsleep);
 }
@@ -90,17 +107,41 @@ void PetLogic::setAmbientTemperature(float celsius) {
   warmthVal = clamp0100(warmthVal);
 }
 
-void PetLogic::setAmbientLight(int lux) {
+void PetLogic::setAmbientLight(int lux, unsigned long nowMs) {
   if (lux < 0) lux = 0;
   ambientLux = lux;
 
-  // If very dark (< 30 lux) and Lumi is getting tired, Lumi falls asleep
-  if (ambientLux < 30 && energyVal < 40.0f && !isAsleep) {
-    isAsleep = true;
+  // If nowMs is not supplied (0), use immediate trigger for legacy compatibility
+  if (nowMs == 0) {
+    if (ambientLux < SENSOR_DARK_LUX_THRESHOLD && !isAsleep) {
+      isAsleep = true;
+    } else if (ambientLux >= SENSOR_LIGHT_LUX_THRESHOLD && isAsleep) {
+      isAsleep = false;
+    }
+    return;
   }
-  // If lights turn on (> 100 lux) and Lumi is well-rested, Lumi wakes up
-  else if (ambientLux > 100 && isAsleep && energyVal > 85.0f) {
-    isAsleep = false;
+
+  // Dark state timing (hand covering sensor for SENSOR_DARK_SLEEP_DELAY_MS = 5000 ms)
+  if (ambientLux < SENSOR_DARK_LUX_THRESHOLD) {
+    lightStartTimeMs = 0;
+    if (darkStartTimeMs == 0) {
+      darkStartTimeMs = nowMs;
+    } else if (!isAsleep && (nowMs - darkStartTimeMs >= SENSOR_DARK_SLEEP_DELAY_MS)) {
+      isAsleep = true;
+    }
+  }
+  // Light state timing (uncovered room light for SENSOR_LIGHT_WAKE_DELAY_MS = 2000 ms)
+  else if (ambientLux >= SENSOR_LIGHT_LUX_THRESHOLD) {
+    darkStartTimeMs = 0;
+    if (lightStartTimeMs == 0) {
+      lightStartTimeMs = nowMs;
+    } else if (isAsleep && (nowMs - lightStartTimeMs >= SENSOR_LIGHT_WAKE_DELAY_MS)) {
+      isAsleep = false;
+    }
+  } else {
+    // Intermediate lighting resets both delay counters
+    darkStartTimeMs = 0;
+    lightStartTimeMs = 0;
   }
 }
 

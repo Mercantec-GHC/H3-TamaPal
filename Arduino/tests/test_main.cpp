@@ -287,6 +287,16 @@ void testPetActions() {
   CHECK(!pet.feed(), "Cannot feed while asleep");
   CHECK(!pet.play(), "Cannot play while asleep");
   CHECK(!pet.scold(), "Cannot scold while asleep");
+
+  // Backend reward handling (e.g. from winning Pong points)
+  pet.setSleeping(false);
+  pet.setVitals(50, 50, 50, 50, 50);
+  CHECK(pet.applyReward("happy_boost", 25), "Reward happy_boost applies successfully");
+  CHECK(pet.getHappiness() == 75, "Happiness increased by 25% (50 -> 75)");
+  CHECK(pet.applyReward("energy_boost", 20), "Reward energy_boost applies successfully");
+  CHECK(pet.getEnergy() == 70, "Energy increased by 20% (50 -> 70)");
+  CHECK(!pet.applyReward("invalid_type", 10), "Invalid reward type returns false");
+  CHECK(!pet.applyReward(nullptr, 10), "Nullptr reward type handled safely");
 }
 
 void testPetSleepAndSensors() {
@@ -304,16 +314,29 @@ void testPetSleepAndSensors() {
   pet.setAmbientTemperature(10.0f);
   CHECK(pet.getWarmth() < 60, "Cold room (10C) pulls warmth down");
 
-  // Light sensor: dark room puts tired Lumi to sleep
-  pet.setVitals(80, 80, 30, 80, 50);
-  CHECK(!pet.isSleeping(), "Lumi is awake before dark");
-  pet.setAmbientLight(15); // < 30 lux
-  CHECK(pet.isSleeping(), "Dark room (<30 lux) puts tired Lumi to sleep");
+  // Light sensor: 5-second dark timer puts Lumi to sleep
+  pet.setSleeping(false);
+  CHECK(!pet.isSleeping(), "Lumi is awake before covering sensor");
 
-  // Light sensor: bright room wakes well-rested Lumi
-  pet.setVitals(80, 80, 95, 80, 50);
-  pet.setAmbientLight(150); // > 100 lux
-  CHECK(!pet.isSleeping(), "Bright lights wake up well-rested Lumi");
+  // Cover sensor at t = 1000 ms
+  pet.setAmbientLight(15, 1000); // < 30 lux
+  CHECK(!pet.isSleeping(), "Lumi stays awake after only 1 second of dark");
+
+  // Still dark at t = 4000 ms (elapsed 3000 ms)
+  pet.setAmbientLight(15, 4000);
+  CHECK(!pet.isSleeping(), "Lumi stays awake after 3 seconds of dark (< 5s threshold)");
+
+  // Still dark at t = 6000 ms (elapsed 5000 ms -> triggers sleep!)
+  pet.setAmbientLight(15, 6000);
+  CHECK(pet.isSleeping(), "Lumi falls asleep after 5 continuous seconds in dark (hand covering sensor)");
+
+  // Bright lights uncovered at t = 7000 ms
+  pet.setAmbientLight(150, 7000); // > 80 lux
+  CHECK(pet.isSleeping(), "Lumi stays asleep after only 1 second of room light");
+
+  // Still light at t = 9000 ms (elapsed 2000 ms -> wakes up!)
+  pet.setAmbientLight(150, 9000);
+  CHECK(!pet.isSleeping(), "Lumi wakes up after 2 continuous seconds in light");
 }
 
 void testPetDecayAndStatus() {
