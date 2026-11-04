@@ -11,11 +11,8 @@ Status: 4/11 (onsdag). Ret filen, når noget ændrer sig.
 |---|---|---|
 | tor 5/11 | Første test hele vejen: Oplà → backend → browser | vores plan (MESSAGES Del 1c) |
 | fre 6/11 | Brugertest | vores plan |
-| **lør 7/11** | **Demo: grupperne viser spillet for besøgende (30–45 min pr. gruppe)** | Mathias, lektion 3/11 |
 | man 9/11 | Kode-stop – derefter kun fejlrettelser | vores plan |
 | ons 11/11 | Fremlæggelse | Notion / AGENTS.md |
-
-Spillet skal altså kunne spilles **7/11**, ikke først 11/11.
 
 ## Status pr. del (4/11)
 
@@ -69,4 +66,4 @@ I DoD står den under Nice to Have. Forslag: kun highscore (navn + score) efter 
 3. Hvad sker der ved afbrudt forbindelse? (Del 2, spørgsmål 14)
 4. Hvilken broker: Mathias' eller vores egen?
 5. Hvornår er `/gamehub` med falsk `GameState` klar? (Frontend venter på den)
-6. Hvem tester spillet 6/11, og hvem står ved standen 7/11?
+6. Hvem tester spillet 6/11?
