@@ -178,6 +178,42 @@ public class PetStateDto
 * Tegn 5 vandrette bjælker (0–100%): Sult (Sulten $\to$ Mæt), Varme (Kold $\to$ Varm), Energi (Træt $\to$ Frisk), Glæde (Trist $\to$ Glad), Disciplin.
 * Hvis `alive === false`, vis en gravsten på kirkegården med teksten "Lumi hviler her".
 
+---
+
+### 🌟 Stor Opdatering 5/11: 2.5D Lumi, sømløs scene og dynamisk vejr (Oleh)
+
+> **Implementeret 5/11 på branchen `feature/arduino-lumi`:**  
+> Kæledyret Lumi er nu fuldt integreret på Oplàens 240×240 ST7789 skærm i en 2.5D Nintendo/Zelda Kokiri-inspireret æstetik.  
+> Samtlige elementer renderes **proceduralt med delta-opdateringer uden RAM-framebuffer** (bruger kun 25% RAM på SAMD21).
+
+#### Hvad er tilføjet på Arduino-siden:
+1. **Sømløs visning (ingen firkantet baggrundsboks):**  
+   - Baggrunden matcher nu præcist hele Oplà-skærmens mørke navy farve (`#080C1A`).  
+   - Den flydende mosbeklædte Kokiri-skovplatform, lysende svamp og skovblomst blender naturligt ind i skærmen uden hårde kanter.
+2. **Dynamisk himmel og vejr (`SkyWeatherMode`):**  
+   - ☀️ **Dag (`SKY_DAY_SUNNY`):** Varm Nintendo-sol med animerede pulserende stråleprikker og lysende guldstøv.
+   - 🌙 **Nat / Søvn (`SKY_NIGHT_STARRY`):** Halvmåne og tindrende 4-takkede stjerner, når Lumi sover (aktiveres automatisk, hvis lyssensoren tildækkes i 5 sekunder).
+   - ❄️ **Vinter / Kulde (`SKY_WINTER_SNOW`):** Krystalklare faldende snefnug og rimfrost på platformen, når `warmth < 45%`.
+3. **To fe-ledsagere (Zelda OoT inspiration):**  
+   - **Navi:** Cyan-hvid lysende fe med blafrende vinger over venstre side af Lumi.
+   - **Tatl:** Lille guld-lyserød skovfe, som svæver lavere i synkron rytme.
+4. **Organiske animationer (15 FPS, flimmerfri):**  
+   - Squashing/stretching åndedræt, rystelser ved kulde ($\pm 2$ px), naturligt øjenblink hvert 3,2 sek., mundbevægelser og flydende `z Z Z` ved søvn eller tankeboble med bær ved sult.
+
+#### Konsekvenser og instruktioner til Oliver (Backend):
+* **MQTT-emnet forbliver uændret:** `StormLamaerne/Tamapal/opla-1/pet/state` sendes fortsat hvert 30. sek og ved handlinger.
+* **Vejr og tilstand i backend:** Hvis I vil vise vejret på web eller i loggen, kan I udlede det direkte fra `PetStateDto`:
+  - `Warmth < 45` $\to$ Vinter / Snevejr.
+  - `Energy` faldet under søvn / lyssensor dækket $\to$ Nat / Stjernehimmel.
+  - Ellers $\to$ Solskin.
+* **Test af belønninger:** I kan fortsat sende `StormLamaerne/Tamapal/opla-1/pet/reward` med fx `{"type":"happy_boost","amount":25}` efter et vundet point i Pong; Lumi kvitterer nu med jubel-animation, stjerner og hævede poter!
+
+#### Konsekvenser og instruktioner til Andrii (Frontend):
+* **Design-justering:** På websiden kan du lade dig inspirere af Oplàens nye visuelle tema:
+  - Baggrund: Mørk navy (`#080C1A`).
+  - Farver på Lumi: Kokiri-mint (`#9BF8DC`) med dyb jade-kontur (`#237D6E`).
+  - Sol-/Måne-indikator ved siden af Lumis navn baseret på om han sover eller fryser!
+
 ## Hvem laver hvad
 
 | | Opgave |
