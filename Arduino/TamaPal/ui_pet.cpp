@@ -393,6 +393,10 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
       // Determined angled eyebrows
       carrier->display.drawLine(leftEyeX - 3, eyeY - 6, leftEyeX + 3, eyeY - 4, eyeDark);
       carrier->display.drawLine(rightEyeX - 3, eyeY - 4, rightEyeX + 3, eyeY - 6, eyeDark);
+    } else if (stage == STAGE_TEEN && expr == EXPR_CONTENT) {
+      // Teen default: raised swag eyebrow on the right side!
+      carrier->display.drawLine(leftEyeX - 3, eyeY - 6, leftEyeX + 3, eyeY - 6, eyeDark);
+      carrier->display.drawLine(rightEyeX - 2, eyeY - 8, rightEyeX + 4, eyeY - 6, eyeDark);
     }
   }
 
@@ -440,11 +444,18 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
 
     case EXPR_CONTENT:
     case EXPR_DEAD:
-      // Classic Tamagotchi 'w' cat smile
-      carrier->display.drawLine(cx - 4, mouthY, cx - 2, mouthY + 2, mouthDark);
-      carrier->display.drawLine(cx - 2, mouthY + 2, cx, mouthY, mouthDark);
-      carrier->display.drawLine(cx, mouthY, cx + 2, mouthY + 2, mouthDark);
-      carrier->display.drawLine(cx + 2, mouthY + 2, cx + 4, mouthY, mouthDark);
+      if (stage == STAGE_TEEN) {
+        // Teen: totally swag confident smirk tilted to the right!
+        carrier->display.drawLine(cx - 3, mouthY + 1, cx, mouthY + 2, mouthDark);
+        carrier->display.drawLine(cx, mouthY + 2, cx + 4, mouthY - 1, mouthDark);
+        carrier->display.drawPixel(cx + 4, mouthY - 2, mouthDark);
+      } else {
+        // Classic Tamagotchi 'w' cat smile
+        carrier->display.drawLine(cx - 4, mouthY, cx - 2, mouthY + 2, mouthDark);
+        carrier->display.drawLine(cx - 2, mouthY + 2, cx, mouthY, mouthDark);
+        carrier->display.drawLine(cx, mouthY, cx + 2, mouthY + 2, mouthDark);
+        carrier->display.drawLine(cx + 2, mouthY + 2, cx + 4, mouthY, mouthDark);
+      }
       break;
 
     case EXPR_SLEEPING:
@@ -525,13 +536,34 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillRect(cx - 1, cy - 23, 2, 5, stemGreen);
     carrier->display.fillCircle(cx + 2, cy - 24, 3, leafEmerald);
     carrier->display.drawPixel(cx + 2, cy - 25, leafHighlight);
+  } else if (stage == STAGE_TEEN) {
+    // -------------------------------------------------------------
+    // TEEN STAGE: Swag Kokiri Horns / Spiky Antennas with gold tips!
+    // -------------------------------------------------------------
+    uint16_t hornDark   = color565(30, 95, 65);
+    uint16_t hornGold   = color565(255, 220, 60);
+
+    // Left curved spirit horn
+    carrier->display.fillTriangle(cx - 2, cy - 24, cx - 10, cy - 34, cx - 6, cy - 21, hornDark);
+    carrier->display.fillTriangle(cx - 2, cy - 23, cx - 9, cy - 32, cx - 5, cy - 21, leafEmerald);
+    // Left golden tip sparkle
+    carrier->display.fillTriangle(cx - 7, cy - 30, cx - 10, cy - 34, cx - 9, cy - 28, hornGold);
+    carrier->display.drawPixel(cx - 9, cy - 33, 0xFFFF);
+
+    // Right curved spirit horn
+    carrier->display.fillTriangle(cx + 2, cy - 24, cx + 10, cy - 34, cx + 6, cy - 21, hornDark);
+    carrier->display.fillTriangle(cx + 2, cy - 23, cx + 9, cy - 32, cx + 5, cy - 21, leafEmerald);
+    // Right golden tip sparkle
+    carrier->display.fillTriangle(cx + 7, cy - 30, cx + 10, cy - 34, cx + 9, cy - 28, hornGold);
+    carrier->display.drawPixel(cx + 9, cy - 33, 0xFFFF);
+
+    // Center sharp crest sprout
+    carrier->display.fillTriangle(cx - 2, cy - 22, cx, cy - 29, cx + 2, cy - 22, leafHighlight);
   } else {
-    // Stem
+    // Adult / Default: Stem + Kokiri Leaves
     carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
-    // Left & Right Kokiri Leaves
     carrier->display.fillTriangle(cx - 1, cy - 25, cx - 10, cy - 31, cx - 7, cy - 23, leafEmerald);
     carrier->display.fillTriangle(cx + 1, cy - 25, cx + 10, cy - 31, cx + 7, cy - 23, leafEmerald);
-    // Specular leaf vein highlights
     carrier->display.drawLine(cx - 2, cy - 26, cx - 8, cy - 29, leafHighlight);
     carrier->display.drawLine(cx + 2, cy - 26, cx + 8, cy - 29, leafHighlight);
   }
@@ -632,6 +664,27 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
 
   // 6. Facial Features (Eyes, Cheeks, Mouth / Pacifier)
   drawFaceFeatures(cx, cy, expr, isBlinking, stage, bodyMain);
+
+  // 7. Swag Gamer/DJ Headphones for TEEN stage!
+  if (stage == STAGE_TEEN && expr != EXPR_DEAD) {
+    uint16_t hpBand     = color565(30, 35, 55);    // Dark matte headband
+    uint16_t hpNeonCyan = color565(0, 230, 255);   // Glowing cyber cyan ear cups
+    uint16_t hpAccent   = color565(255, 60, 110);  // Neon pink accent ring
+
+    // Arch headband over the head
+    carrier->display.drawCircle(cx, cy - 8, 22, hpBand);
+    carrier->display.drawCircle(cx, cy - 8, 23, hpBand);
+
+    // Left DJ Ear Cup (rounded capsule over left ear)
+    carrier->display.fillRoundRect(cx - 27, cy - 13, 6, 12, 3, hpBand);
+    carrier->display.fillRoundRect(cx - 26, cy - 11, 4, 8, 2, hpNeonCyan);
+    carrier->display.drawPixel(cx - 25, cy - 7, hpAccent);
+
+    // Right DJ Ear Cup (rounded capsule over right ear)
+    carrier->display.fillRoundRect(cx + 21, cy - 13, 6, 12, 3, hpBand);
+    carrier->display.fillRoundRect(cx + 22, cy - 11, 4, 8, 2, hpNeonCyan);
+    carrier->display.drawPixel(cx + 24, cy - 7, hpAccent);
+  }
 }
 
 void UiPetRenderer::updateFairies(int naviX, int naviY, int smallFairyY, bool isSleeping, uint16_t bgColor, bool force) {

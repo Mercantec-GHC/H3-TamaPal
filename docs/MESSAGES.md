@@ -612,4 +612,22 @@ Vi har implementeret Lumis første livsfase: **Baby-stadiet**, samt et interakti
     med bekræftelsestone og øjeblikkelig opdatering på skærmen!
 * (Bogstavet `c` kan fortsat bruges til at skifte touch-følsomhed for plastik-case).
 
+___
+
+### 🎧 Opdatering 5/11 (Sen Aften): Swag Teenager-stadie med Kokiri-horn og DJ-høretelefoner
+**Branch:** `feature/arduino-stages`  
+**Ansvarlig:** Oleh
+
+Lumis **Teenager-stadie** har fået sit fulde swag-look med attitude og gaming/DJ-æstetik som beskrevet i Game Design Doc.
+
+#### Hvad er tilføjet:
+1. **Kokiri-horn med guldspidser:**
+   - I stedet for en simpel spire har teenageren nu to seje buede skovhorn med gyldne spidser og skinnende highlights (`hornGold`), samt en skarp midterkam.
+2. **Cyber DJ / Gamer-høretelefoner:**
+   - Mørk bøjle over hovedet og neongrønne/cyan ørekopper med pink detaljer hen over ørerne.
+3. **Flabet attitude og mimik:**
+   - Hævet "swag" højre øjenbryn, når Lumi er tilfreds.
+   - Skævt selvsikkert katte-smil mod højre (smug smirk), der oser af selvtillid.
+
+
 
