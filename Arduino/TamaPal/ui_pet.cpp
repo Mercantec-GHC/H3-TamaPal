@@ -20,9 +20,11 @@ UiPetRenderer::UiPetRenderer()
     lastDrawnCy(LUMI_BASE_CY),
     lastNaviX(-1),
     lastNaviY(-1),
+    lastSmallFairyY(-1),
     lastZzzPhase(-1),
     lastBlinking(false),
     lastExpression(EXPR_CONTENT),
+    lastWeather(SKY_DAY_SUNNY),
     lastMoodText(nullptr),
     lastAnimTickMs(0) {}
 
@@ -56,25 +58,143 @@ LumiExpression UiPetRenderer::determineExpression(const PetLogic& pet) {
   return EXPR_CONTENT;
 }
 
-void UiPetRenderer::drawForestStage(bool isNightMode) {
+SkyWeatherMode UiPetRenderer::determineSkyWeather(const PetLogic& pet, LumiExpression expr) {
+  if (expr == EXPR_SLEEPING || pet.isSleeping()) {
+    return SKY_NIGHT_STARRY;
+  }
+  if (expr == EXPR_FREEZING || pet.getWarmth() < 45) {
+    return SKY_WINTER_SNOW;
+  }
+  return SKY_DAY_SUNNY;
+}
+
+void UiPetRenderer::drawSnowflake(int x, int y, uint16_t color) {
+  if (carrier == nullptr) return;
+  // Crisp 5x5 pixel crystal snowflake (+ cross with bright center & diagonal tips)
+  carrier->display.drawFastHLine(x - 2, y, 5, color);
+  carrier->display.drawFastVLine(x, y - 2, 5, color);
+  carrier->display.drawPixel(x - 1, y - 1, color);
+  carrier->display.drawPixel(x + 1, y - 1, color);
+  carrier->display.drawPixel(x - 1, y + 1, color);
+  carrier->display.drawPixel(x + 1, y + 1, color);
+  carrier->display.drawPixel(x, y, 0xFFFF);
+}
+
+void UiPetRenderer::updateSkyWeather(SkyWeatherMode weather, int phase, uint16_t bgColor, bool force) {
+  if (carrier == nullptr) return;
+  if (!force && phase == lastZzzPhase && weather == lastWeather) {
+    return;
+  }
+
+  // Clear the 4 dedicated sky weather patches (all outside Lumi's & Navi's boxes)
+  // Patch A: Upper-left sky (X=46..62, Y=72..86)
+  carrier->display.fillRect(46, 72, 18, 15, bgColor);
+  // Patch B: Upper-mid-left sky (X=86..100, Y=71..85)
+  carrier->display.fillRect(86, 71, 15, 15, bgColor);
+  // Patch C: Upper-mid-right sky (X=142..156, Y=71..85)
+  carrier->display.fillRect(142, 71, 15, 15, bgColor);
+  // Patch D: Upper-right celestial corner for Sun / Moon / Big Snowflake (X=164..190, Y=70..92)
+  carrier->display.fillRect(164, 70, 26, 22, bgColor);
+
+  if (weather == SKY_DAY_SUNNY) {
+    // 1. Radiant Nintendo Sun at (176, 80): warm circle + ring of pulsing dot rays
+    int sunX = 176;
+    int sunY = 80;
+    uint16_t sunCore   = color565(255, 245, 130);
+    uint16_t sunRim    = color565(255, 190, 55);
+    uint16_t rayBright = color565(255, 230, 95);
+    uint16_t raySoft   = color565(210, 155, 45);
+
+    carrier->display.fillCircle(sunX, sunY, 5, sunRim);
+    carrier->display.fillCircle(sunX, sunY, 3, sunCore);
+
+    // 8 surrounding ray dots that gently breathe outward/inward with phase
+    int cardinalDist = (phase % 2 == 0) ? 8 : 9;
+    int diagDist     = (phase % 2 == 0) ? 6 : 5;
+    uint16_t cColor  = (phase % 2 == 0) ? rayBright : raySoft;
+    uint16_t dColor  = (phase % 2 == 0) ? raySoft   : rayBright;
+
+    // Cardinal ray dots (N, S, W, E)
+    carrier->display.drawPixel(sunX, sunY - cardinalDist, cColor);
+    carrier->display.drawPixel(sunX, sunY + cardinalDist, cColor);
+    carrier->display.drawPixel(sunX - cardinalDist, sunY, cColor);
+    carrier->display.drawPixel(sunX + cardinalDist, sunY, cColor);
+
+    // Diagonal ray dots (NW, NE, SW, SE)
+    carrier->display.drawPixel(sunX - diagDist, sunY - diagDist, dColor);
+    carrier->display.drawPixel(sunX + diagDist, sunY - diagDist, dColor);
+    carrier->display.drawPixel(sunX - diagDist, sunY + diagDist, dColor);
+    carrier->display.drawPixel(sunX + diagDist, sunY + diagDist, dColor);
+
+    // Subtle warm forest sunbeams / pollen motes in upper sky
+    uint16_t moteGold = color565(190, 230, 110);
+    carrier->display.drawPixel(52, 78 + (phase % 2), moteGold);
+    carrier->display.drawPixel(92, 75 + ((phase + 1) % 2), raySoft);
+    carrier->display.drawPixel(147, 76 + (phase % 2), moteGold);
+
+  } else if (weather == SKY_NIGHT_STARRY) {
+    // 2. Starry Night: Glowing Crescent Moon at (176, 80) + twinkling stars
+    int moonX = 176;
+    int moonY = 80;
+    uint16_t moonGold = color565(255, 240, 150);
+    carrier->display.fillCircle(moonX, moonY, 5, moonGold);
+    carrier->display.fillCircle(moonX - 3, moonY - 2, 4, bgColor); // Cutout creates crescent moon!
+
+    uint16_t starBright = 0xFFFF;
+    uint16_t starCyan   = color565(130, 215, 255);
+    uint16_t starDim    = color565(70, 115, 170);
+
+    // Twinkling star 1 at (53, 79)
+    if (phase % 2 == 0) {
+      carrier->display.drawFastHLine(51, 79, 5, starCyan);
+      carrier->display.drawFastVLine(53, 77, 5, starCyan);
+      carrier->display.drawPixel(53, 79, starBright);
+    } else {
+      carrier->display.drawPixel(53, 79, starDim);
+    }
+
+    // Twinkling star 2 at (92, 76)
+    if ((phase + 1) % 2 == 0) {
+      carrier->display.drawFastHLine(90, 76, 5, starCyan);
+      carrier->display.drawFastVLine(92, 74, 5, starCyan);
+      carrier->display.drawPixel(92, 76, starBright);
+    } else {
+      carrier->display.drawPixel(92, 76, starDim);
+    }
+
+    // Twinkling star 3 at (148, 77)
+    carrier->display.drawPixel(148, 77, (phase % 2 == 0) ? starBright : starDim);
+    carrier->display.drawPixel(166, 86, ((phase + 1) % 2 == 0) ? starCyan : starDim);
+
+  } else if (weather == SKY_WINTER_SNOW) {
+    // 3. Winter Cold: Falling/drifting crystal snowflakes across the sky
+    uint16_t snowCyan  = color565(150, 230, 255);
+    uint16_t snowLight = color565(210, 245, 255);
+
+    int driftA = (phase % 3) * 2;
+    int driftB = ((phase + 1) % 3) * 2;
+    int driftC = ((phase + 2) % 3) * 2;
+
+    drawSnowflake(54,  76 + driftA, snowCyan);
+    drawSnowflake(92,  75 + driftB, snowLight);
+    drawSnowflake(148, 75 + driftC, snowCyan);
+    drawSnowflake(176, 78 + driftA, snowLight);
+  }
+}
+
+void UiPetRenderer::drawForestStage(SkyWeatherMode weather) {
   if (carrier == nullptr) return;
 
-  uint16_t skyBg = isNightMode ? color565(6, 11, 22) : color565(10, 18, 34);
-  carrier->display.fillRect(STAGE_X, STAGE_Y, STAGE_W, STAGE_H, skyBg);
-
-  // Subtle distant Kokiri forest fireflies / stars in upper sky corners
-  uint16_t fireflyGold = color565(220, 255, 130);
-  uint16_t starDim     = color565(100, 160, 210);
-  carrier->display.drawPixel(48, 78, starDim);
-  carrier->display.drawPixel(56, 118, fireflyGold);
-  carrier->display.drawPixel(188, 80, starDim);
-  carrier->display.drawPixel(142, 76, fireflyGold);
+  // Use exact native screen background color (8, 12, 26) so there is NO square box behind Lumi!
+  uint16_t nativeBg = color565(8, 12, 26);
+  carrier->display.fillRect(STAGE_X, STAGE_Y, STAGE_W, STAGE_H, nativeBg);
 
   // 2.5D Mossy Kokiri Forest Glade Platform (Y = 153..169)
+  // Frosty snow-covered platform in winter, lush emerald moss otherwise
   uint16_t mossShadow = color565(14, 48, 36);
   uint16_t mossBase   = color565(26, 86, 56);
-  uint16_t mossTop    = color565(56, 148, 86);
-  uint16_t mossEdge   = color565(110, 215, 125);
+  uint16_t mossTop    = (weather == SKY_WINTER_SNOW) ? color565(150, 215, 245) : color565(56, 148, 86);
+  uint16_t mossEdge   = (weather == SKY_WINTER_SNOW) ? color565(230, 250, 255) : color565(110, 215, 125);
 
   carrier->display.fillRoundRect(52, 155, 136, 14, 7, mossShadow);
   carrier->display.fillRoundRect(54, 153, 132, 13, 6, mossBase);
@@ -109,7 +229,7 @@ void UiPetRenderer::drawMoodBanner(const char* moodText, LumiExpression expr) {
   if (carrier == nullptr || moodText == nullptr) return;
 
   // Compact rounded status pill at Y = 173..193
-  uint16_t pillBg     = color565(16, 28, 48);
+  uint16_t pillBg     = color565(14, 24, 44);
   uint16_t pillBorder = color565(55, 130, 175);
   uint16_t textColor  = color565(225, 245, 255);
 
@@ -430,36 +550,45 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   drawFaceFeatures(cx, cy, expr, isBlinking, bodyMain);
 }
 
-void UiPetRenderer::updateNaviFairy(int targetX, int targetY, bool isSleeping, uint16_t bgColor, bool force) {
+void UiPetRenderer::updateFairies(int naviX, int naviY, int smallFairyY, bool isSleeping, uint16_t bgColor, bool force) {
   if (carrier == nullptr) return;
-  if (!force && targetX == lastNaviX && targetY == lastNaviY) {
+  if (!force && naviX == lastNaviX && naviY == lastNaviY && smallFairyY == lastSmallFairyY) {
     return;
   }
 
-  // Erase previous Navi 20x18 bounding box if she moved
-  if (lastNaviX >= 0 && lastNaviY >= 0 && (lastNaviX != targetX || lastNaviY != targetY)) {
+  // 1. Primary Fairy: Navi (Cyan-White orb with wings around X=75, Y=96)
+  if (lastNaviX >= 0 && lastNaviY >= 0 && (lastNaviX != naviX || lastNaviY != naviY)) {
     carrier->display.fillRect(lastNaviX - 10, lastNaviY - 9, 21, 18, bgColor);
   }
+  lastNaviX = naviX;
+  lastNaviY = naviY;
 
-  lastNaviX = targetX;
-  lastNaviY = targetY;
-
-  // Zelda Ocarina of Time 'Navi' Fairy Companion:
-  // Translucent lavender-white wings + glowing cyan aura + bright white fairy core
   uint16_t wingColor = isSleeping ? color565(110, 145, 200) : color565(200, 225, 255);
   uint16_t auraCyan  = isSleeping ? color565(40, 120, 190)  : color565(65, 220, 255);
   uint16_t coreWhite = 0xFFFF;
 
   // Upper wings
-  carrier->display.fillTriangle(targetX - 2, targetY - 1, targetX - 8, targetY - 7, targetX - 4, targetY - 1, wingColor);
-  carrier->display.fillTriangle(targetX + 2, targetY - 1, targetX + 8, targetY - 7, targetX + 4, targetY - 1, wingColor);
+  carrier->display.fillTriangle(naviX - 2, naviY - 1, naviX - 8, naviY - 7, naviX - 4, naviY - 1, wingColor);
+  carrier->display.fillTriangle(naviX + 2, naviY - 1, naviX + 8, naviY - 7, naviX + 4, naviY - 1, wingColor);
   // Lower small wings
-  carrier->display.drawPixel(targetX - 5, targetY + 2, wingColor);
-  carrier->display.drawPixel(targetX + 5, targetY + 2, wingColor);
-
+  carrier->display.drawPixel(naviX - 5, naviY + 2, wingColor);
+  carrier->display.drawPixel(naviX + 5, naviY + 2, wingColor);
   // Glowing cyan halo + bright white center
-  carrier->display.fillCircle(targetX, targetY, 4, auraCyan);
-  carrier->display.fillCircle(targetX, targetY, 2, coreWhite);
+  carrier->display.fillCircle(naviX, naviY, 4, auraCyan);
+  carrier->display.fillCircle(naviX, naviY, 2, coreWhite);
+
+  // 2. Secondary Miniature Forest Spirit Fairy (Tatl-inspired warm gold-pink fairy at X=53, Y=120..125)
+  int sfX = 53;
+  if (lastSmallFairyY >= 0 && lastSmallFairyY != smallFairyY) {
+    carrier->display.fillRect(sfX - 6, lastSmallFairyY - 5, 13, 11, bgColor);
+  }
+  lastSmallFairyY = smallFairyY;
+
+  uint16_t tatlAura = isSleeping ? color565(150, 110, 160) : color565(255, 190, 95);
+  carrier->display.drawLine(sfX - 2, smallFairyY - 1, sfX - 5, smallFairyY - 4, wingColor);
+  carrier->display.drawLine(sfX + 2, smallFairyY - 1, sfX + 5, smallFairyY - 4, wingColor);
+  carrier->display.fillCircle(sfX, smallFairyY, 2, tatlAura);
+  carrier->display.drawPixel(sfX, smallFairyY, coreWhite);
 }
 
 void UiPetRenderer::updateSideOverlay(int baseCx, int baseCy, LumiExpression expr, int phase, uint16_t bgColor, bool force) {
@@ -467,12 +596,11 @@ void UiPetRenderer::updateSideOverlay(int baseCx, int baseCy, LumiExpression exp
   if (!force && phase == lastZzzPhase && expr == lastExpression) {
     return;
   }
-  lastZzzPhase = phase;
 
-  // Dedicated right-side overlay zone: X = 152..188, Y = 84..128 (never overlaps Lumi or right flower)
+  // Dedicated right-side overlay zone below the Sun/Moon: X = 152..188, Y = 94..134
   int boxX = baseCx + 32; // 152
-  int boxY = baseCy - 47; // 84
-  carrier->display.fillRect(boxX, boxY, 36, 44, bgColor);
+  int boxY = baseCy - 37; // 94
+  carrier->display.fillRect(boxX, boxY, 36, 40, bgColor);
 
   if (expr == EXPR_SLEEPING) {
     // Floating animated 'z Z' sleep letters
@@ -482,30 +610,34 @@ void UiPetRenderer::updateSideOverlay(int baseCx, int baseCy, LumiExpression exp
 
     if (phase >= 1) {
       carrier->display.setTextColor(zzzDim);
-      carrier->display.setCursor(boxX + 3, boxY + 28);
+      carrier->display.setCursor(boxX + 3, boxY + 26);
       carrier->display.print("z");
     }
     if (phase >= 2) {
       carrier->display.setTextColor(zzzLight);
-      carrier->display.setCursor(boxX + 11, boxY + 16);
+      carrier->display.setCursor(boxX + 11, boxY + 14);
       carrier->display.print("Z");
     }
     if (phase >= 3) {
       carrier->display.setTextColor(0xFFFF);
-      carrier->display.setCursor(boxX + 20, boxY + 4);
+      carrier->display.setCursor(boxX + 20, boxY + 3);
       carrier->display.print("Z");
     }
   } else if (expr == EXPR_HUNGRY) {
     // Cute Tamagotchi thought-bubble with a red Kokiri berry inside
     uint16_t bubbleWhite = color565(225, 240, 255);
-    carrier->display.fillCircle(boxX + 4, boxY + 28, 2, bubbleWhite);
-    carrier->display.fillRoundRect(boxX + 7, boxY + 8, 22, 18, 6, bubbleWhite);
-    carrier->display.fillCircle(boxX + 18, boxY + 18, 4, color565(255, 55, 75));
-    carrier->display.fillRect(boxX + 17, boxY + 12, 3, 2, color565(70, 200, 90));
+    carrier->display.fillCircle(boxX + 4, boxY + 26, 2, bubbleWhite);
+    carrier->display.fillRoundRect(boxX + 7, boxY + 6, 22, 18, 6, bubbleWhite);
+    carrier->display.fillCircle(boxX + 18, boxY + 16, 4, color565(255, 55, 75));
+    carrier->display.fillRect(boxX + 17, boxY + 10, 3, 2, color565(70, 200, 90));
+  } else if (expr == EXPR_FREEZING) {
+    // Extra floating snowflake on the right side when freezing
+    int sy = boxY + 12 + (phase % 3) * 3;
+    drawSnowflake(boxX + 14, sy, color565(165, 235, 255));
   } else if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING) {
     // Twinkling Nintendo star / heart sparkles
     uint16_t starGold = color565(255, 235, 80);
-    int sy = boxY + 18 - (phase % 2) * 4;
+    int sy = boxY + 16 - (phase % 2) * 4;
     carrier->display.drawFastHLine(boxX + 10, sy, 7, starGold);
     carrier->display.drawFastVLine(boxX + 13, sy - 3, 7, starGold);
     carrier->display.drawPixel(boxX + 13, sy, 0xFFFF);
@@ -526,9 +658,12 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   }
   lastAnimTickMs = nowMs;
 
-  LumiExpression expr = determineExpression(pet);
-  bool isNight = pet.isSleeping();
-  uint16_t skyBg = isNight ? color565(6, 11, 22) : color565(10, 18, 34);
+  LumiExpression expr    = determineExpression(pet);
+  SkyWeatherMode weather = determineSkyWeather(pet, expr);
+  bool isNight           = (weather == SKY_NIGHT_STARRY);
+
+  // Match the exact screen background from ui_menu.cpp so there is no rectangular box
+  uint16_t nativeBg = color565(8, 12, 26);
 
   // 1. Compute procedural squash/stretch breathing, happy hop, and cold shiver offsets
   int dx = 0;
@@ -557,40 +692,44 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   // Natural eye blink: 140 ms blink every 3.2 seconds
   bool isBlinking = (!isNight) && ((nowMs % 3200) < 140);
 
-  // Navi fairy gentle figure-8 orbit on upper-left (X = 74..78, Y = 90..96)
+  // Fairies gentle floating orbits
   const int naviDx[4] = {0, 2, 0, -2};
   const int naviDy[4] = {0, -2, -4, -2};
-  int naviStep = (nowMs / 280) % 4;
-  int targetNaviX = 75 + naviDx[naviStep];
-  int targetNaviY = (isNight ? 100 : 94) + naviDy[naviStep];
+  int naviStep        = (nowMs / 280) % 4;
+  int targetNaviX     = 75 + naviDx[naviStep];
+  int targetNaviY     = (isNight ? 100 : 96) + naviDy[naviStep];
+  int targetSmallY    = 123 - naviDy[(naviStep + 2) % 4];
 
-  // Side overlay phase (0..3)
+  // Weather & side overlay phase (0..3)
   int overlayPhase = (nowMs / 450) % 4;
 
-  // 2. Full stage initialization when entering SCREEN_HOME or switching Day/Night mode
-  bool nightChanged = (expr == EXPR_SLEEPING) != (lastExpression == EXPR_SLEEPING);
-  if (forceRedraw || !stageInitialized || nightChanged) {
-    drawForestStage(isNight);
-    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, skyBg);
-    updateNaviFairy(targetNaviX, targetNaviY, isNight, skyBg, true);
-    updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, expr, overlayPhase, skyBg, true);
+  // 2. Full stage initialization when entering SCREEN_HOME or when weather mode changes
+  bool weatherChanged = (weather != lastWeather);
+  if (forceRedraw || !stageInitialized || weatherChanged) {
+    drawForestStage(weather);
+    updateSkyWeather(weather, overlayPhase, nativeBg, true);
+    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, nativeBg);
+    updateFairies(targetNaviX, targetNaviY, targetSmallY, isNight, nativeBg, true);
+    updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, expr, overlayPhase, nativeBg, true);
 
     const char* mood = pet.getMoodStatusDanish();
     drawMoodBanner(mood, expr);
 
-    lastDrawnCx     = targetCx;
-    lastDrawnCy     = targetCy;
-    lastBlinking    = isBlinking;
-    lastExpression  = expr;
-    lastMoodText    = mood;
+    lastDrawnCx      = targetCx;
+    lastDrawnCy      = targetCy;
+    lastBlinking     = isBlinking;
+    lastExpression   = expr;
+    lastWeather      = weather;
+    lastZzzPhase     = overlayPhase;
+    lastMoodText     = mood;
     stageInitialized = true;
     return;
   }
 
   // 3. Delta-update Lumi (zero-flicker partial redraw)
   if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression) {
-    eraseOldCharacterRim(lastDrawnCx, lastDrawnCy, targetCx, targetCy, skyBg);
-    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, skyBg);
+    eraseOldCharacterRim(lastDrawnCx, lastDrawnCy, targetCx, targetCy, nativeBg);
+    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, nativeBg);
     lastDrawnCx    = targetCx;
     lastDrawnCy    = targetCy;
     lastBlinking   = isBlinking;
@@ -607,9 +746,12 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     lastBlinking = isBlinking;
   }
 
-  // 4. Delta-update Navi and side overlay
-  updateNaviFairy(targetNaviX, targetNaviY, isNight, skyBg, false);
-  updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, expr, overlayPhase, skyBg, false);
+  // 4. Delta-update Fairies, Sky Weather (Sun/Stars/Snow), and Side Overlay
+  updateFairies(targetNaviX, targetNaviY, targetSmallY, isNight, nativeBg, false);
+  updateSkyWeather(weather, overlayPhase, nativeBg, false);
+  updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, expr, overlayPhase, nativeBg, false);
+  lastZzzPhase = overlayPhase;
+  lastWeather  = weather;
 
   // 5. Delta-update Danish mood banner if status text changed
   const char* currentMood = pet.getMoodStatusDanish();
@@ -627,15 +769,16 @@ void UiPetRenderer::drawActionScene(const PetLogic& pet,
   if (carrier == nullptr) return;
   (void)nowMs;
 
-  bool isNight = (actionExpr == EXPR_SLEEPING);
-  uint16_t skyBg = isNight ? color565(6, 11, 22) : color565(10, 18, 34);
+  SkyWeatherMode weather = determineSkyWeather(pet, actionExpr);
+  bool isNight = (weather == SKY_NIGHT_STARRY);
+  uint16_t nativeBg = color565(8, 12, 26);
 
-  // 1. Draw the Kokiri forest stage with Lumi performing the action
-  drawForestStage(isNight);
+  // 1. Draw the seamless stage with Lumi performing the action
+  drawForestStage(weather);
   int actionCy = (actionExpr == EXPR_PLAYING || actionExpr == EXPR_EATING) ? (LUMI_BASE_CY - 3) : LUMI_BASE_CY;
-  drawLumiCharacter(LUMI_BASE_CX, actionCy, actionExpr, false, skyBg);
-  updateNaviFairy(74, 96, isNight, skyBg, true);
-  updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, actionExpr, 2, skyBg, true);
+  drawLumiCharacter(LUMI_BASE_CX, actionCy, actionExpr, false, nativeBg);
+  updateFairies(74, 98, 123, isNight, nativeBg, true);
+  updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, actionExpr, 2, nativeBg, true);
 
   // 2. Draw compact top action title badge at Y = 71..91 (above Lumi's sprout)
   uint16_t badgeBg     = color565(20, 36, 62);
@@ -662,7 +805,6 @@ void UiPetRenderer::drawActionScene(const PetLogic& pet,
   // 3. Draw subtitle in the bottom mood banner pill (Y = 173..193)
   drawMoodBanner(subtitle != nullptr ? subtitle : pet.getMoodStatusDanish(), actionExpr);
 
-  // Mark stage so returning to SCREEN_HOME cleanly refreshes the top sky strip
+  // Mark stage so returning to SCREEN_HOME cleanly refreshes the sky weather
   stageInitialized = false;
 }
-

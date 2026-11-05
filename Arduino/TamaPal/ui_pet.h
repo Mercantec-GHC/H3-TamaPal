@@ -25,6 +25,13 @@ enum LumiExpression {
   EXPR_DEAD             // Health == 0: Peaceful spirit with glowing halo
 };
 
+// Ambient sky weather / time-of-day visual state
+enum SkyWeatherMode {
+  SKY_DAY_SUNNY = 0,    // Warm sun with pulsing ray dots + fairies
+  SKY_NIGHT_STARRY,     // Crescent moon + twinkling stars + dimmed fairies
+  SKY_WINTER_SNOW       // Drifting pixel snowflakes + frosty sparkles + fairies
+};
+
 class UiPetRenderer {
 public:
   UiPetRenderer();
@@ -34,6 +41,9 @@ public:
 
   // Determine which expression Lumi should show based on vitals
   static LumiExpression determineExpression(const PetLogic& pet);
+
+  // Determine sky weather mode (Sunny Day, Starry Night, or Winter Snow)
+  static SkyWeatherMode determineSkyWeather(const PetLogic& pet, LumiExpression expr);
 
   // Render or animate Lumi on SCREEN_HOME (flicker-free delta updates)
   void updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, bool forceRedraw = false);
@@ -53,14 +63,22 @@ private:
   int lastDrawnCy;
   int lastNaviX;
   int lastNaviY;
+  int lastSmallFairyY;
   int lastZzzPhase;
   bool lastBlinking;
   LumiExpression lastExpression;
+  SkyWeatherMode lastWeather;
   const char* lastMoodText;
   unsigned long lastAnimTickMs;
 
-  // Draw static Kokiri forest glade background, mossy platform, and flora
-  void drawForestStage(bool isNightMode);
+  // Draw seamless Kokiri forest glade platform and flora (no colored background box)
+  void drawForestStage(SkyWeatherMode weather);
+
+  // Draw animated sky weather (sun with ray dots, night stars, or winter snowflakes)
+  void updateSkyWeather(SkyWeatherMode weather, int phase, uint16_t bgColor, bool force);
+
+  // Helper to draw a crisp pixel snowflake at (x, y)
+  void drawSnowflake(int x, int y, uint16_t color);
 
   // Draw bottom Danish mood status bar
   void drawMoodBanner(const char* moodText, LumiExpression expr);
@@ -74,8 +92,8 @@ private:
   // Draw eyes & mouth based on expression
   void drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, uint16_t bodyColor);
 
-  // Draw floating Navi fairy companion
-  void updateNaviFairy(int targetX, int targetY, bool isSleeping, uint16_t bgColor, bool force);
+  // Draw floating Navi fairy + secondary miniature forest fairy
+  void updateFairies(int naviX, int naviY, int smallFairyY, bool isSleeping, uint16_t bgColor, bool force);
 
   // Draw floating Zzz or thought-bubble props on the right side
   void updateSideOverlay(int baseCx, int baseCy, LumiExpression expr, int phase, uint16_t bgColor, bool force);
@@ -87,4 +105,3 @@ private:
 };
 
 #endif // UI_PET_H
-
