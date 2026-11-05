@@ -41,13 +41,14 @@ bool StoragePet::isCardReady() const {
 void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pet) {
   if (buffer == nullptr || bufSize == 0) return;
   snprintf(buffer, bufSize,
-           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\n",
+           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\n",
            pet.getHunger(),
            pet.getWarmth(),
            pet.getEnergy(),
            pet.getHappiness(),
            pet.getDiscipline(),
-           pet.isSleeping() ? 1 : 0);
+           pet.isSleeping() ? 1 : 0,
+           (int)pet.getStageEnum());
 }
 
 bool StoragePet::deserializeState(const char* text,
@@ -57,9 +58,22 @@ bool StoragePet::deserializeState(const char* text,
                                  float& happiness,
                                  float& discipline,
                                  bool& asleep) {
+  PetStage unusedStage = STAGE_BABY;
+  return deserializeState(text, hunger, warmth, energy, happiness, discipline, asleep, unusedStage);
+}
+
+bool StoragePet::deserializeState(const char* text,
+                                 float& hunger,
+                                 float& warmth,
+                                 float& energy,
+                                 float& happiness,
+                                 float& discipline,
+                                 bool& asleep,
+                                 PetStage& stage) {
   if (text == nullptr || text[0] == '\0') return false;
 
   int h = -1, w = -1, e = -1, hap = -1, d = -1, s = -1;
+  int st = (int)STAGE_BABY; // Default to baby if not present in legacy file
   const char* p = text;
 
   // Robust line-by-line parser supporting arbitrary line order
@@ -76,6 +90,8 @@ bool StoragePet::deserializeState(const char* text,
       d = atoi(p + 11);
     } else if (strncmp(p, "ASLEEP=", 7) == 0) {
       s = atoi(p + 7);
+    } else if (strncmp(p, "STAGE=", 6) == 0) {
+      st = atoi(p + 6);
     }
 
     const char* nextLine = strchr(p, '\n');
@@ -89,7 +105,8 @@ bool StoragePet::deserializeState(const char* text,
       e < 0 || e > 100 ||
       hap < 0 || hap > 100 ||
       d < 0 || d > 100 ||
-      s < 0 || s > 1) {
+      s < 0 || s > 1 ||
+      st < 0 || st > 3) {
     return false;
   }
 
@@ -99,6 +116,7 @@ bool StoragePet::deserializeState(const char* text,
   happiness = (float)hap;
   discipline = (float)d;
   asleep = (s == 1);
+  stage = (PetStage)st;
   return true;
 }
 
@@ -155,9 +173,11 @@ bool StoragePet::loadPet(PetLogic& pet) {
 
   float h = 0, w = 0, e = 0, hap = 0, d = 0;
   bool asleep = false;
-  if (deserializeState(buffer, h, w, e, hap, d, asleep)) {
+  PetStage stage = STAGE_BABY;
+  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage)) {
     pet.setVitals(h, w, e, hap, d);
     pet.setSleeping(asleep);
+    pet.setStage(stage);
     Serial.print(F("[STORAGE] SUCCES: Indlaeste Lumi fra MicroSD! Sult: "));
     Serial.print((int)h);
     Serial.print(F("%, Energi: "));

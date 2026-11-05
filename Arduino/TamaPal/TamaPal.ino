@@ -227,6 +227,7 @@ void setup() {
   Serial.print(F("Touch-tilstand: "));
   Serial.println(currentCaseMode ? F("PLASTIK-CASE (Følsomhed 60)") : F("BARE BOARD (Følsomhed 200)"));
   Serial.println(F("Tip: Skriv 'c' i Serial Monitor for at skifte mellem case/bare board on-the-fly!"));
+  Serial.println(F("Tip: Skriv 's' i Serial Monitor for at skifte stadie (Baby -> Teen -> Adult -> Old)!"));
   Serial.println(F("Naviger med TOUCH 0 (<) og TOUCH 1 (>)"));
   Serial.println(F("For at forbinde til Pong over MQTT:"));
   Serial.println(F(" 1. Gaa til CONNECT (antenne-ikonet helt til hoejre)"));
@@ -238,11 +239,23 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // Listen for 'c' in Serial Monitor to toggle plastic case mode on-the-fly (non-blocking, no String)
+  // Listen for 'c' or 's' in Serial Monitor:
+  // 'c' = toggle plastic case sensitivity
+  // 's' = cycle through life stages (Baby -> Teen -> Adult -> Old) on-the-fly!
   while (Serial.available() > 0) {
     char c = (char)Serial.read();
     if (c == 'c' || c == 'C') {
       setCaseMode(!currentCaseMode, true);
+    } else if (c == 's' || c == 'S') {
+      int nextStage = ((int)petLogic.getStageEnum() + 1) % 4;
+      petLogic.setStage((PetStage)nextStage);
+      soundLed.playSound(SOUND_CONFIRM);
+      Serial.print(F("[STAGE] Skiftet stadie til: "));
+      Serial.println(petLogic.getStage());
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
     }
   }
 

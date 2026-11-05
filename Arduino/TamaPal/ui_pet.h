@@ -67,6 +67,7 @@ private:
   int lastZzzPhase;
   bool lastBlinking;
   LumiExpression lastExpression;
+  PetStage lastStage;
   SkyWeatherMode lastWeather;
   const char* lastMoodText;
   unsigned long lastAnimTickMs;
@@ -87,10 +88,10 @@ private:
   void eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int newCy, uint16_t bgColor);
 
   // Core 2.5D character drawing routine
-  void drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, uint16_t bgColor);
+  void drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, uint16_t bgColor);
 
-  // Draw eyes & mouth based on expression
-  void drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, uint16_t bodyColor);
+  // Draw eyes & mouth based on expression and stage
+  void drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, uint16_t bodyColor);
 
   // Draw floating Navi fairy + secondary miniature forest fairy
   void updateFairies(int naviX, int naviY, int smallFairyY, bool isSleeping, uint16_t bgColor, bool force);

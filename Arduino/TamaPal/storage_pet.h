@@ -37,6 +37,14 @@ public:
                               float& happiness,
                               float& discipline,
                               bool& asleep);
+  static bool deserializeState(const char* text,
+                              float& hunger,
+                              float& warmth,
+                              float& energy,
+                              float& happiness,
+                              float& discipline,
+                              bool& asleep,
+                              PetStage& stage);
 
 private:
   bool cardInitialized;

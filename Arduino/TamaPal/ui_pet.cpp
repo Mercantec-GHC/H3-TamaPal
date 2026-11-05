@@ -24,6 +24,7 @@ UiPetRenderer::UiPetRenderer()
     lastZzzPhase(-1),
     lastBlinking(false),
     lastExpression(EXPR_CONTENT),
+    lastStage(STAGE_BABY),
     lastWeather(SKY_DAY_SUNNY),
     lastMoodText(nullptr),
     lastAnimTickMs(0) {}
@@ -288,7 +289,7 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
   }
 }
 
-void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, uint16_t bodyColor) {
+void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, uint16_t bodyColor) {
   if (carrier == nullptr) return;
 
   // 1. Wipe interior face canvas with bodyColor so blinking/expression switches never leave ghost pixels
@@ -304,19 +305,25 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   uint16_t mouthDark   = color565(28, 45, 58);
   uint16_t tonguePink  = color565(255, 115, 140);
 
-  // Rosy kawaii cheeks
+  // Rosy kawaii cheeks (extra round & rosy for baby!)
   uint16_t activeCheek = cheekPink;
   if (expr == EXPR_SUPER_HAPPY || expr == EXPR_EATING || expr == EXPR_PLAYING || expr == EXPR_SCOLDED) {
     activeCheek = cheekCoral;
   } else if (expr == EXPR_FREEZING) {
     activeCheek = cheekIce;
   }
-  carrier->display.fillRoundRect(cx - 18, cy + 1, 6, 3, 1, activeCheek);
-  carrier->display.fillRoundRect(cx + 12, cy + 1, 6, 3, 1, activeCheek);
 
-  int leftEyeX  = cx - 10;
-  int rightEyeX = cx + 10;
-  int eyeY      = cy - 4;
+  if (stage == STAGE_BABY) {
+    carrier->display.fillCircle(cx - 12, cy + 2, 3, activeCheek);
+    carrier->display.fillCircle(cx + 12, cy + 2, 3, activeCheek);
+  } else {
+    carrier->display.fillRoundRect(cx - 18, cy + 1, 6, 3, 1, activeCheek);
+    carrier->display.fillRoundRect(cx + 12, cy + 1, 6, 3, 1, activeCheek);
+  }
+
+  int leftEyeX  = (stage == STAGE_BABY) ? (cx - 7) : (cx - 10);
+  int rightEyeX = (stage == STAGE_BABY) ? (cx + 7) : (cx + 10);
+  int eyeY      = (stage == STAGE_BABY) ? (cy - 3) : (cy - 4);
 
   // 2. Render Eyes according to expression and blink state
   if (isBlinking || expr == EXPR_SLEEPING || expr == EXPR_DEAD) {
@@ -343,9 +350,11 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
     carrier->display.drawLine(rightEyeX + 3, eyeY - 2, rightEyeX - 2, eyeY + 1, eyeDark);
     carrier->display.drawLine(rightEyeX - 2, eyeY + 1, rightEyeX + 3, eyeY + 4, eyeDark);
   } else {
-    // Large Glossy Tamagotchi Paradise / Zelda Anime Eyes (9x10 rounded ovals)
-    carrier->display.fillRoundRect(leftEyeX - 4, eyeY - 5, 9, 10, 4, eyeDark);
-    carrier->display.fillRoundRect(rightEyeX - 4, eyeY - 5, 9, 10, 4, eyeDark);
+    // Large Glossy Tamagotchi Paradise / Zelda Anime Eyes
+    int eyeW = (stage == STAGE_BABY) ? 8 : 9;
+    int eyeH = (stage == STAGE_BABY) ? 9 : 10;
+    carrier->display.fillRoundRect(leftEyeX - 4, eyeY - 5, eyeW, eyeH, 4, eyeDark);
+    carrier->display.fillRoundRect(rightEyeX - 4, eyeY - 5, eyeW, eyeH, 4, eyeDark);
 
     // Lower iris color glow
     uint16_t irisColor = (expr == EXPR_HUNGRY || expr == EXPR_SAD) ? irisBlue : irisEmerald;
@@ -387,8 +396,30 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
     }
   }
 
-  // 3. Render Mouth according to expression
+  // 3. Render Mouth / Pacifier
   int mouthY = cy + 2;
+
+  // If Baby is eating berry, show the berry eating action. Otherwise, Baby wears a cute pacifier/dummy!
+  if (stage == STAGE_BABY && expr != EXPR_EATING && expr != EXPR_DEAD) {
+    // Cute Baby Pacifier (Dummy)
+    uint16_t paciShield = color565(255, 220, 70);  // Bright sunny yellow shield
+    uint16_t paciBorder = color565(210, 150, 20);  // Warm outline
+    uint16_t paciCenter = color565(255, 110, 130); // Cute coral pink button
+    uint16_t paciRing   = color565(255, 245, 170); // Little dangling ring
+
+    // Pacifier shield (oval disk in center mouth)
+    carrier->display.fillRoundRect(cx - 5, mouthY - 1, 11, 7, 3, paciShield);
+    carrier->display.drawRoundRect(cx - 5, mouthY - 1, 11, 7, 3, paciBorder);
+
+    // Center button knob
+    carrier->display.fillCircle(cx, mouthY + 2, 2, paciCenter);
+    carrier->display.drawPixel(cx - 1, mouthY + 1, pureWhite); // Tiny reflection
+
+    // Hanging little ring handle
+    carrier->display.drawCircle(cx, mouthY + 5, 2, paciRing);
+    return;
+  }
+
   switch (expr) {
     case EXPR_SUPER_HAPPY:
     case EXPR_PLAYING:
@@ -446,7 +477,7 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   }
 }
 
-void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, uint16_t bgColor) {
+void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, uint16_t bgColor) {
   if (carrier == nullptr) return;
   (void)bgColor;
 
@@ -489,6 +520,11 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   if (expr == EXPR_DEAD) {
     // Golden Spirit Halo above head
     carrier->display.drawRoundRect(cx - 10, cy - 29, 20, 5, 2, color565(255, 235, 90));
+  } else if (stage == STAGE_BABY) {
+    // Baby stage: A tiny, tender green sprout bud (only 1 single cute mini-leaf!)
+    carrier->display.fillRect(cx - 1, cy - 23, 2, 5, stemGreen);
+    carrier->display.fillCircle(cx + 2, cy - 24, 3, leafEmerald);
+    carrier->display.drawPixel(cx + 2, cy - 25, leafHighlight);
   } else {
     // Stem
     carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
@@ -500,54 +536,102 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.drawLine(cx + 2, cy - 26, cx + 8, cy - 29, leafHighlight);
   }
 
-  // 2. Expressive Forest Spirit Ears (Perky when happy, slightly drooped when sad/tired)
-  int earTipOffsetY = (expr == EXPR_SAD || expr == EXPR_EXHAUSTED || expr == EXPR_SCOLDED) ? -19 : -25;
-  // Left Ear
-  carrier->display.fillTriangle(cx - 21, cy - 11, cx - 26, cy + earTipOffsetY, cx - 10, cy - 18, bodyOutline);
-  carrier->display.fillTriangle(cx - 20, cy - 12, cx - 24, cy + earTipOffsetY + 2, cx - 11, cy - 17, bodyMain);
-  carrier->display.fillTriangle(cx - 19, cy - 13, cx - 22, cy + earTipOffsetY + 4, cx - 13, cy - 16, earInner);
-  // Right Ear
-  carrier->display.fillTriangle(cx + 21, cy - 11, cx + 26, cy + earTipOffsetY, cx + 10, cy - 18, bodyOutline);
-  carrier->display.fillTriangle(cx + 20, cy - 12, cx + 24, cy + earTipOffsetY + 2, cx + 11, cy - 17, bodyMain);
-  carrier->display.fillTriangle(cx + 19, cy - 13, cx + 22, cy + earTipOffsetY + 4, cx + 13, cy - 16, earInner);
+  // 2. Expressive Forest Spirit Ears
+  if (stage == STAGE_BABY) {
+    // Baby stage: Cute tiny rounded nub ears
+    carrier->display.fillCircle(cx - 17, cy - 11, 4, bodyOutline);
+    carrier->display.fillCircle(cx - 17, cy - 11, 3, bodyMain);
+    carrier->display.fillCircle(cx - 17, cy - 11, 2, earInner);
 
-  // 3. Cute Stubby Feet resting on the mossy forest glade
-  carrier->display.fillRoundRect(cx - 16, cy + 16, 10, 6, 3, footColor);
-  carrier->display.fillRoundRect(cx + 6,  cy + 16, 10, 6, 3, footColor);
-
-  // 4. 2.5D Chubby Mochi Body (48x38 rounded silhouette)
-  carrier->display.fillRoundRect(cx - 24, cy - 20, 48, 39, 16, bodyOutline);
-  carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 35, 14, bodyShade);
-  carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 31, 13, bodyMain);
-
-  // Top-left 2.5D Specular Gloss Highlight on forehead
-  carrier->display.fillRoundRect(cx - 13, cy - 16, 10, 3, 1, 0xFFFF);
-  carrier->display.drawPixel(cx - 15, cy - 14, 0xFFFF);
-
-  // Soft Cream Belly Patch (Tamagotchi Paradise aesthetic)
-  carrier->display.fillRoundRect(cx - 13, cy + 7, 26, 9, 4, bellyPatch);
-
-  // 5. Stubby Arms / Paws (Raised in celebration when super happy/playing/eating!)
-  if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING || expr == EXPR_EATING) {
-    // Raised cheering paws
-    carrier->display.fillRoundRect(cx - 27, cy - 7, 6, 8, 3, bodyOutline);
-    carrier->display.fillRoundRect(cx - 26, cy - 6, 4, 6, 2, bodyMain);
-    carrier->display.fillRoundRect(cx + 21, cy - 7, 6, 8, 3, bodyOutline);
-    carrier->display.fillRoundRect(cx + 22, cy - 6, 4, 6, 2, bodyMain);
-  } else if (expr == EXPR_FREEZING) {
-    // Tucked-in shivering paws hugging body
-    carrier->display.fillRoundRect(cx - 21, cy + 2, 6, 6, 2, bodyOutline);
-    carrier->display.fillRoundRect(cx + 15, cy + 2, 6, 6, 2, bodyOutline);
+    carrier->display.fillCircle(cx + 17, cy - 11, 4, bodyOutline);
+    carrier->display.fillCircle(cx + 17, cy - 11, 3, bodyMain);
+    carrier->display.fillCircle(cx + 17, cy - 11, 2, earInner);
   } else {
-    // Relaxed side paws
-    carrier->display.fillRoundRect(cx - 26, cy - 1, 5, 8, 2, bodyOutline);
-    carrier->display.fillRoundRect(cx - 25, cy,     3, 6, 1, bodyMain);
-    carrier->display.fillRoundRect(cx + 21, cy - 1, 5, 8, 2, bodyOutline);
-    carrier->display.fillRoundRect(cx + 22, cy,     3, 6, 1, bodyMain);
+    // Teen/Adult ears (Perky when happy, slightly drooped when sad/tired)
+    int earTipOffsetY = (expr == EXPR_SAD || expr == EXPR_EXHAUSTED || expr == EXPR_SCOLDED) ? -19 : -25;
+    // Left Ear
+    carrier->display.fillTriangle(cx - 21, cy - 11, cx - 26, cy + earTipOffsetY, cx - 10, cy - 18, bodyOutline);
+    carrier->display.fillTriangle(cx - 20, cy - 12, cx - 24, cy + earTipOffsetY + 2, cx - 11, cy - 17, bodyMain);
+    carrier->display.fillTriangle(cx - 19, cy - 13, cx - 22, cy + earTipOffsetY + 4, cx - 13, cy - 16, earInner);
+    // Right Ear
+    carrier->display.fillTriangle(cx + 21, cy - 11, cx + 26, cy + earTipOffsetY, cx + 10, cy - 18, bodyOutline);
+    carrier->display.fillTriangle(cx + 20, cy - 12, cx + 24, cy + earTipOffsetY + 2, cx + 11, cy - 17, bodyMain);
+    carrier->display.fillTriangle(cx + 19, cy - 13, cx + 22, cy + earTipOffsetY + 4, cx + 13, cy - 16, earInner);
   }
 
-  // 6. Facial Features (Eyes, Cheeks, Mouth)
-  drawFaceFeatures(cx, cy, expr, isBlinking, bodyMain);
+  // 3. Cute Stubby Feet resting on the mossy forest glade
+  if (stage == STAGE_BABY) {
+    // Tiny baby button paws
+    carrier->display.fillCircle(cx - 10, cy + 16, 4, footColor);
+    carrier->display.fillCircle(cx + 10, cy + 16, 4, footColor);
+  } else {
+    carrier->display.fillRoundRect(cx - 16, cy + 16, 10, 6, 3, footColor);
+    carrier->display.fillRoundRect(cx + 6,  cy + 16, 10, 6, 3, footColor);
+  }
+
+  // 4. 2.5D Chubby Mochi Body
+  if (stage == STAGE_BABY) {
+    // Baby stage: Chubby egg-like round mochi body (38x34 px)
+    carrier->display.fillRoundRect(cx - 19, cy - 17, 38, 34, 15, bodyOutline);
+    carrier->display.fillRoundRect(cx - 17, cy - 15, 34, 30, 13, bodyShade);
+    carrier->display.fillRoundRect(cx - 17, cy - 15, 34, 27, 12, bodyMain);
+
+    // Baby Specular Gloss Highlight
+    carrier->display.fillRoundRect(cx - 10, cy - 14, 8, 3, 1, 0xFFFF);
+    carrier->display.drawPixel(cx - 11, cy - 12, 0xFFFF);
+
+    // Cute Baby Soft Belly Patch
+    carrier->display.fillRoundRect(cx - 10, cy + 5, 20, 8, 4, bellyPatch);
+  } else {
+    // Teen stage: 48x38 rounded silhouette
+    carrier->display.fillRoundRect(cx - 24, cy - 20, 48, 39, 16, bodyOutline);
+    carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 35, 14, bodyShade);
+    carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 31, 13, bodyMain);
+
+    // Top-left 2.5D Specular Gloss Highlight on forehead
+    carrier->display.fillRoundRect(cx - 13, cy - 16, 10, 3, 1, 0xFFFF);
+    carrier->display.drawPixel(cx - 15, cy - 14, 0xFFFF);
+
+    // Soft Cream Belly Patch (Tamagotchi Paradise aesthetic)
+    carrier->display.fillRoundRect(cx - 13, cy + 7, 26, 9, 4, bellyPatch);
+  }
+
+  // 5. Stubby Arms / Paws (Raised in celebration when super happy/playing/eating!)
+  if (stage == STAGE_BABY) {
+    // Baby tiny cute flipper paws
+    if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING || expr == EXPR_EATING) {
+      carrier->display.fillCircle(cx - 20, cy - 5, 3, bodyOutline);
+      carrier->display.fillCircle(cx - 20, cy - 5, 2, bodyMain);
+      carrier->display.fillCircle(cx + 20, cy - 5, 3, bodyOutline);
+      carrier->display.fillCircle(cx + 20, cy - 5, 2, bodyMain);
+    } else {
+      carrier->display.fillCircle(cx - 20, cy + 1, 3, bodyOutline);
+      carrier->display.fillCircle(cx - 20, cy + 1, 2, bodyMain);
+      carrier->display.fillCircle(cx + 20, cy + 1, 3, bodyOutline);
+      carrier->display.fillCircle(cx + 20, cy + 1, 2, bodyMain);
+    }
+  } else {
+    if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING || expr == EXPR_EATING) {
+      // Raised cheering paws
+      carrier->display.fillRoundRect(cx - 27, cy - 7, 6, 8, 3, bodyOutline);
+      carrier->display.fillRoundRect(cx - 26, cy - 6, 4, 6, 2, bodyMain);
+      carrier->display.fillRoundRect(cx + 21, cy - 7, 6, 8, 3, bodyOutline);
+      carrier->display.fillRoundRect(cx + 22, cy - 6, 4, 6, 2, bodyMain);
+    } else if (expr == EXPR_FREEZING) {
+      // Tucked-in shivering paws hugging body
+      carrier->display.fillRoundRect(cx - 21, cy + 2, 6, 6, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx + 15, cy + 2, 6, 6, 2, bodyOutline);
+    } else {
+      // Relaxed side paws
+      carrier->display.fillRoundRect(cx - 26, cy - 1, 5, 8, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx - 25, cy,     3, 6, 1, bodyMain);
+      carrier->display.fillRoundRect(cx + 21, cy - 1, 5, 8, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx + 22, cy,     3, 6, 1, bodyMain);
+    }
+  }
+
+  // 6. Facial Features (Eyes, Cheeks, Mouth / Pacifier)
+  drawFaceFeatures(cx, cy, expr, isBlinking, stage, bodyMain);
 }
 
 void UiPetRenderer::updateFairies(int naviX, int naviY, int smallFairyY, bool isSleeping, uint16_t bgColor, bool force) {
@@ -659,6 +743,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   lastAnimTickMs = nowMs;
 
   LumiExpression expr    = determineExpression(pet);
+  PetStage stage         = pet.getStageEnum();
   SkyWeatherMode weather = determineSkyWeather(pet, expr);
   bool isNight           = (weather == SKY_NIGHT_STARRY);
 
@@ -703,12 +788,13 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   // Weather & side overlay phase (0..3)
   int overlayPhase = (nowMs / 450) % 4;
 
-  // 2. Full stage initialization when entering SCREEN_HOME or when weather mode changes
+  // 2. Full stage initialization when entering SCREEN_HOME or when weather / stage changes
   bool weatherChanged = (weather != lastWeather);
-  if (forceRedraw || !stageInitialized || weatherChanged) {
+  bool stageChanged   = (stage != lastStage);
+  if (forceRedraw || !stageInitialized || weatherChanged || stageChanged) {
     drawForestStage(weather);
     updateSkyWeather(weather, overlayPhase, nativeBg, true);
-    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, nativeBg);
+    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, nativeBg);
     updateFairies(targetNaviX, targetNaviY, targetSmallY, isNight, nativeBg, true);
     updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, expr, overlayPhase, nativeBg, true);
 
@@ -719,6 +805,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     lastDrawnCy      = targetCy;
     lastBlinking     = isBlinking;
     lastExpression   = expr;
+    lastStage        = stage;
     lastWeather      = weather;
     lastZzzPhase     = overlayPhase;
     lastMoodText     = mood;
@@ -729,7 +816,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   // 3. Delta-update Lumi (zero-flicker partial redraw)
   if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression) {
     eraseOldCharacterRim(lastDrawnCx, lastDrawnCy, targetCx, targetCy, nativeBg);
-    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, nativeBg);
+    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, nativeBg);
     lastDrawnCx    = targetCx;
     lastDrawnCy    = targetCy;
     lastBlinking   = isBlinking;
@@ -742,7 +829,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     else if (expr == EXPR_SCOLDED) bodyMain = color565(180, 240, 215);
     else if (expr == EXPR_DEAD) bodyMain = color565(210, 225, 235);
 
-    drawFaceFeatures(targetCx, targetCy, expr, isBlinking, bodyMain);
+    drawFaceFeatures(targetCx, targetCy, expr, isBlinking, stage, bodyMain);
     lastBlinking = isBlinking;
   }
 
@@ -776,7 +863,7 @@ void UiPetRenderer::drawActionScene(const PetLogic& pet,
   // 1. Draw the seamless stage with Lumi performing the action
   drawForestStage(weather);
   int actionCy = (actionExpr == EXPR_PLAYING || actionExpr == EXPR_EATING) ? (LUMI_BASE_CY - 3) : LUMI_BASE_CY;
-  drawLumiCharacter(LUMI_BASE_CX, actionCy, actionExpr, false, nativeBg);
+  drawLumiCharacter(LUMI_BASE_CX, actionCy, actionExpr, false, pet.getStageEnum(), nativeBg);
   updateFairies(74, 98, 123, isNight, nativeBg, true);
   updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, actionExpr, 2, nativeBg, true);
 

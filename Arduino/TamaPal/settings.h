@@ -164,5 +164,15 @@ const unsigned long SENSOR_LIGHT_WAKE_DELAY_MS = 2000; // 2 seconds continuous l
 // Attention threshold: below 20%, Lumi needs immediate care
 const int PET_CRITICAL_THRESHOLD = 20;
 
+// ============================================================================
+// LIFECYCLE STAGES (GDD 4 livsstadier: Baby -> Teen -> Adult -> Old)
+// ============================================================================
+enum PetStage {
+  STAGE_BABY = 0, // Round egg-like mochi baby with paci/dummy, tiny ears & sprout
+  STAGE_TEEN,     // Adventurous Kokiri teen with 2 leaves & perky ears (default)
+  STAGE_ADULT,    // Business look with briefcase & tie/vest
+  STAGE_OLD       // Wise elder with top hat, round glasses & cane
+};
+
 #endif // SETTINGS_H
 

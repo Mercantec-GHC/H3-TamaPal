@@ -369,9 +369,15 @@ void testPetSerialization() {
   char buf[256];
 
   CHECK(pet.isAlive(), "Default Lumi is alive");
-  CHECK(strcmp(pet.getStage(), "teen") == 0, "Default stage is teen");
+  CHECK(strcmp(pet.getStage(), "baby") == 0, "Default stage is baby");
+  CHECK(pet.getStageEnum() == STAGE_BABY, "Default stage enum is STAGE_BABY");
 
-  // Format default state JSON
+  // Stage transition
+  pet.setStage(STAGE_TEEN);
+  CHECK(strcmp(pet.getStage(), "teen") == 0, "Changed stage to teen");
+  CHECK(pet.getStageEnum() == STAGE_TEEN, "Stage enum is STAGE_TEEN");
+
+  // Format state JSON
   pet.formatStateJson(buf, sizeof(buf));
   CHECK(strstr(buf, "\"name\":\"Lumi\"") != NULL, "JSON contains name Lumi");
   CHECK(strstr(buf, "\"stage\":\"teen\"") != NULL, "JSON contains stage teen");
@@ -409,17 +415,20 @@ void testPetStorageSerialization() {
   CHECK(strstr(buffer, "HAPPINESS=99\n") != NULL, "Serialized text contains HAPPINESS=99");
   CHECK(strstr(buffer, "DISCIPLINE=44\n") != NULL, "Serialized text contains DISCIPLINE=44");
   CHECK(strstr(buffer, "ASLEEP=1\n") != NULL, "Serialized text contains ASLEEP=1");
+  CHECK(strstr(buffer, "STAGE=0\n") != NULL, "Serialized text contains STAGE=0 (BABY)");
 
   // Test deserialization into fresh variables
   float h = 0, w = 0, e = 0, hap = 0, d = 0;
   bool asleep = false;
-  CHECK(StoragePet::deserializeState(buffer, h, w, e, hap, d, asleep), "Deserialization succeeds on valid text");
+  PetStage stage = STAGE_TEEN;
+  CHECK(StoragePet::deserializeState(buffer, h, w, e, hap, d, asleep, stage), "Deserialization succeeds on valid text");
   CHECK((int)h == 77, "Restored hunger is 77");
   CHECK((int)w == 88, "Restored warmth is 88");
   CHECK((int)e == 66, "Restored energy is 66");
   CHECK((int)hap == 99, "Restored happiness is 99");
   CHECK((int)d == 44, "Restored discipline is 44");
   CHECK(asleep == true, "Restored asleep state is true");
+  CHECK(stage == STAGE_BABY, "Restored stage is STAGE_BABY");
 
   // Test corrupt or truncated inputs
   CHECK(!StoragePet::deserializeState("HUNGER=50\n", h, w, e, hap, d, asleep), "Fails on incomplete file");

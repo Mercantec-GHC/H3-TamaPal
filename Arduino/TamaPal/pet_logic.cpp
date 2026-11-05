@@ -23,6 +23,7 @@ void PetLogic::reset() {
   happinessVal = 75.0f;   // Cheerful
   disciplineVal = 50.0f;  // Balanced
 
+  currentStage = STAGE_BABY; // Starts as cute egg baby
   isAsleep = false;
   decayInitialized = false;
   lastDecayTimeMs = 0;
@@ -240,7 +241,21 @@ bool PetLogic::isAlive() const {
 }
 
 const char* PetLogic::getStage() const {
-  return "teen";
+  switch (currentStage) {
+    case STAGE_BABY:  return "baby";
+    case STAGE_TEEN:  return "teen";
+    case STAGE_ADULT: return "adult";
+    case STAGE_OLD:   return "old";
+    default:          return "teen";
+  }
+}
+
+PetStage PetLogic::getStageEnum() const {
+  return currentStage;
+}
+
+void PetLogic::setStage(PetStage stage) {
+  currentStage = stage;
 }
 
 void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char* petName, const char* petStage) const {
