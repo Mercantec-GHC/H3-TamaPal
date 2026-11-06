@@ -535,6 +535,7 @@ void loop() {
     // TOUCH3 allows graceful early exit back to normal interactive home screen:
     if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
       showcaseDirector.stop();
+      uiPet.setCelestialAura(false);
       menuLogic.setScreen(SCREEN_HOME, now);
       uiPet.updateHomeDisplay(petLogic, now, true);
       soundLed.playSound(SOUND_CLICK);
@@ -798,14 +799,27 @@ void loop() {
     syncPetStateToBackend(true);
   }
 
-  // 3b. AUTONOMOUS SHOWCASE DIRECTOR UPDATE (~70s full cinematic presentation)
+  // 3b. AUTONOMOUS SHOWCASE DIRECTOR UPDATE (~72s full cinematic presentation)
   if (showcaseDirector.isActive()) {
     ShowcaseAction act = showcaseDirector.update(now, petLogic, menuLogic, nameEntry, pongLogic, storagePet.getGraveRecordCount());
     if (act.soundToPlay != SOUND_NONE) {
       soundLed.playSound(act.soundToPlay);
     }
-    if (act.hasFlash) {
+    if (act.triggerChaser) {
+      soundLed.startChaser(act.flashR, act.flashG, act.flashB, act.flashDurationMs > 0 ? act.flashDurationMs : 600);
+    } else if (act.triggerBreathing) {
+      soundLed.startBreathing(act.flashR, act.flashG, act.flashB, 9500);
+    } else if (act.hasFlash) {
       soundLed.flashColor(act.flashR, act.flashG, act.flashB, act.flashDurationMs);
+    }
+    if (act.triggerShake) {
+      uiPet.triggerScreenShake(now, 180);
+    }
+    if (act.triggerNova) {
+      uiPet.triggerNova(now, 700);
+    }
+    if (act.triggerCelestialAura) {
+      uiPet.setCelestialAura(true);
     }
     if (act.triggerBath) {
       uiPet.triggerBath(now);
@@ -814,11 +828,17 @@ void loop() {
       storagePet.logGraveRecord(petLogic);
       storagePet.savePet(petLogic);
     }
-    if (act.forceRedraw) {
+    if (act.phase == SHOWCASE_TITLE_SPLASH) {
+      if (act.forceRedraw) {
+        uiPet.drawTitleSplash(now);
+      }
+    } else if (act.forceRedraw) {
       if (menuLogic.getActiveScreen() == SCREEN_HOME) {
         uiPet.updateHomeDisplay(petLogic, now, true);
       }
     }
+  } else {
+    uiPet.setCelestialAura(false);
   }
 
   currentScreen = menuLogic.getActiveScreen();
@@ -1121,8 +1141,12 @@ void loop() {
     if (phase != lastHatchPhase) {
       if (phase == 1) {
         soundLed.playSound(SOUND_CRACK);
+        uiPet.triggerScreenShake(now, 180);
       } else if (phase == 2) {
         soundLed.playSound(SOUND_REBIRTH);
+        uiPet.triggerScreenShake(now, 220);
+        uiPet.triggerNova(now, 700);
+        soundLed.startChaser(255, 220, 60, 800);
       }
       lastHatchPhase = phase;
     }
@@ -1141,39 +1165,42 @@ void loop() {
   } else if (currentScreen == SCREEN_NAME_ENTRY) {
     uiName.drawNameEntry(nameEntry, now, false);
   } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_MEMORIAL) {
-    // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME)
-    if (petLogic.isAlive() || currentScreen != SCREEN_HOME) {
-      uiMenu.drawMenuBar(menuLogic, false);
-    }
-
-    // Real-time 2.5D Lumi character animation on HOME screen (breathing, blinking, Navi, shivering, ghost cenotaph)
-    if (currentScreen == SCREEN_HOME && muteMessageEndTimeMs == 0) {
-      // Shake detection via accelerometer to wash away poop with foamy soap bubbles:
-      if (carrier.IMUmodule.accelerationAvailable()) {
-        float ax = 0.0f, ay = 0.0f, az = 0.0f;
-        carrier.IMUmodule.readAcceleration(ax, ay, az);
-        static float lastShakeAx = 0.0f, lastShakeAy = 0.0f, lastShakeAz = 1.0f;
-        static unsigned long lastShakeCheckMs = 0;
-        if (now - lastShakeCheckMs >= 40) {
-          lastShakeCheckMs = now;
-          float jerk = fabs(ax - lastShakeAx) + fabs(ay - lastShakeAy) + fabs(az - lastShakeAz);
-          lastShakeAx = ax;
-          lastShakeAy = ay;
-          lastShakeAz = az;
-          static unsigned long lastBathTriggerMs = 0;
-          if (jerk > 2.0f && petLogic.isAlive() && !petLogic.isSleeping() && (now - lastBathTriggerMs > 2000)) {
-            lastBathTriggerMs = now;
-            petLogic.cleanPoop();
-            uiPet.triggerBath(now);
-            soundLed.playSound(SOUND_BUBBLES);
-            soundLed.flashColor(0, 220, 255, 600); // 600 ms aqua-foam glow
-            Serial.println(F("[RYST-BEVÆGELSE] Du rystede Oplà-kortet! Lumi bades i sæbeskum!"));
-            syncPetStateToBackend(true);
-          }
-        }
+    // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME or title splash)
+    if (!showcaseDirector.isActive() || showcaseDirector.getPhase() != SHOWCASE_TITLE_SPLASH) {
+      if (petLogic.isAlive() || currentScreen != SCREEN_HOME) {
+        uiMenu.drawMenuBar(menuLogic, false);
       }
 
-      uiPet.updateHomeDisplay(petLogic, now, false);
+      // Real-time 2.5D Lumi character animation on HOME screen (breathing, blinking, Navi, shivering, ghost cenotaph)
+      if (currentScreen == SCREEN_HOME && muteMessageEndTimeMs == 0) {
+        // Shake detection via accelerometer to wash away poop with foamy soap bubbles:
+        if (carrier.IMUmodule.accelerationAvailable()) {
+          float ax = 0.0f, ay = 0.0f, az = 0.0f;
+          carrier.IMUmodule.readAcceleration(ax, ay, az);
+          static float lastShakeAx = 0.0f, lastShakeAy = 0.0f, lastShakeAz = 1.0f;
+          static unsigned long lastShakeCheckMs = 0;
+          if (now - lastShakeCheckMs >= 40) {
+            lastShakeCheckMs = now;
+            float jerk = fabs(ax - lastShakeAx) + fabs(ay - lastShakeAy) + fabs(az - lastShakeAz);
+            lastShakeAx = ax;
+            lastShakeAy = ay;
+            lastShakeAz = az;
+            static unsigned long lastBathTriggerMs = 0;
+            if (jerk > 2.0f && petLogic.isAlive() && !petLogic.isSleeping() && (now - lastBathTriggerMs > 2000)) {
+              lastBathTriggerMs = now;
+              petLogic.cleanPoop();
+              uiPet.triggerBath(now);
+              uiPet.triggerScreenShake(now, 160);
+              soundLed.playSound(SOUND_BUBBLES);
+              soundLed.flashColor(0, 220, 255, 600); // 600 ms aqua-foam glow
+              Serial.println(F("[RYST-BEVÆGELSE] Du rystede Oplà-kortet! Lumi bades i sæbeskum!"));
+              syncPetStateToBackend(true);
+            }
+          }
+        }
+
+        uiPet.updateHomeDisplay(petLogic, now, false);
+      }
     }
   }
 

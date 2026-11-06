@@ -52,6 +52,11 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
   action.flashB = 0;
   action.flashDurationMs = 0;
   action.triggerBath = false;
+  action.triggerShake = false;
+  action.triggerNova = false;
+  action.triggerCelestialAura = false;
+  action.triggerChaser = false;
+  action.triggerBreathing = false;
   action.saveGrave = false;
   action.forceRedraw = false;
 
@@ -79,7 +84,7 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
     }
   }
   // -------------------------------------------------------------
-  // ACT 2: Egg Hatching & Rebirth (2,500 ms .. 7,000 ms)
+  // ACT 2: Egg Hatching & Heartbeat Suspense (2,500 ms .. 7,000 ms)
   // -------------------------------------------------------------
   else if (elapsed < 7000) {
     if (currentPhase != SHOWCASE_EGG_HATCH) {
@@ -93,11 +98,32 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       action.flashR = 255; action.flashG = 235; action.flashB = 90;
       action.flashDurationMs = 400;
       action.forceRedraw = true;
-    } else if (subPhaseStep == 0 && elapsed >= 5350) {
+    } else if (subPhaseStep == 0 && elapsed >= 3800) {
+      // Heartbeat 1 (deep organic thump + ruby LED pulse)
       subPhaseStep = 1;
+      action.soundToPlay = SOUND_HEARTBEAT;
+      action.hasFlash = true;
+      action.flashR = 220; action.flashG = 15; action.flashB = 25;
+      action.flashDurationMs = 150;
+    } else if (subPhaseStep == 1 && elapsed >= 4600) {
+      // Heartbeat 2 (urgent thump before cracking)
+      subPhaseStep = 2;
+      action.soundToPlay = SOUND_HEARTBEAT;
+      action.hasFlash = true;
+      action.flashR = 255; action.flashG = 20; action.flashB = 30;
+      action.flashDurationMs = 150;
+    } else if (subPhaseStep <= 2 && elapsed >= 5350) {
+      // CRACK & NOVA! Egg cracks with impact screen shake & golden starburst!
+      subPhaseStep = 3;
       pet.update(nowMs);
       menu.setScreen(SCREEN_HOME, nowMs);
-      action.soundToPlay = SOUND_CONFIRM;
+      action.soundToPlay = SOUND_REBIRTH;
+      action.triggerShake = true;
+      action.triggerNova = true;
+      action.triggerChaser = true;
+      action.hasFlash = true;
+      action.flashR = 255; action.flashG = 220; action.flashB = 60;
+      action.flashDurationMs = 600;
       action.forceRedraw = true;
     }
   }
@@ -133,6 +159,7 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       subPhaseStep = 0;
       pet.cleanPoop();
       action.triggerBath = true;
+      action.triggerShake = true; // Hydro-bubble pop impact shake!
       action.soundToPlay = SOUND_BUBBLES;
       action.hasFlash = true;
       action.flashR = 0; action.flashG = 220; action.flashB = 255;
@@ -149,10 +176,12 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       subPhaseStep = 0;
       pet.setStage(STAGE_TEEN);
       pet.setAgeMinutes(15);
-      action.soundToPlay = SOUND_CONFIRM;
+      action.soundToPlay = SOUND_REBIRTH;
+      action.triggerNova = true;     // Evolution Nova starburst!
+      action.triggerChaser = true;   // Circular LED spinning portal!
       action.hasFlash = true;
-      action.flashR = 255; action.flashG = 220; action.flashB = 60;
-      action.flashDurationMs = 400;
+      action.flashR = 0; action.flashG = 255; action.flashB = 200;
+      action.flashDurationMs = 500;
       action.forceRedraw = true;
     } else if (subPhaseStep == 0 && elapsed >= 19000) {
       subPhaseStep = 1;
@@ -203,9 +232,10 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       menu.setScreen(SCREEN_HOME, nowMs);
       pet.setSleeping(true);
       action.soundToPlay = SOUND_CLICK;
+      action.triggerBreathing = true; // Soft LED nocturnal breathing!
       action.hasFlash = true;
-      action.flashR = 40; action.flashG = 70; action.flashB = 150;
-      action.flashDurationMs = 500;
+      action.flashR = 40; action.flashG = 70; action.flashB = 160;
+      action.flashDurationMs = 600;
       action.forceRedraw = true;
     }
   }
@@ -263,18 +293,19 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       subPhaseStep = 0;
       pet.setAgeMinutes(100);
       pet.triggerDeath(DEATH_OLD_AGE);
+      action.triggerCelestialAura = true; // Celestial halo & ascension spirit particles!
       action.soundToPlay = SOUND_REBIRTH;
       action.hasFlash = true;
-      action.flashR = 180; action.flashG = 220; action.flashB = 255;
+      action.flashR = 160; action.flashG = 220; action.flashB = 255;
       action.flashDurationMs = 800;
       action.saveGrave = true;
       action.forceRedraw = true;
     }
   }
   // -------------------------------------------------------------
-  // ACT 10: Ancestral Memorial Graveyard Stele (62,000 ms .. 70,000 ms)
+  // ACT 10: Ancestral Memorial Graveyard Stele (62,000 ms .. 68,000 ms)
   // -------------------------------------------------------------
-  else if (elapsed < 70000) {
+  else if (elapsed < 68000) {
     if (currentPhase != SHOWCASE_MEMORIAL_STELE) {
       currentPhase = SHOWCASE_MEMORIAL_STELE;
       subPhaseStep = 0;
@@ -284,10 +315,25 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
     }
   }
   // -------------------------------------------------------------
-  // FINALE: Showcase Completed! (>= 70,000 ms)
+  // ACT 11: Grand Finale Title Splash Screen (68,000 ms .. 72,000 ms)
+  // -------------------------------------------------------------
+  else if (elapsed < 72000) {
+    if (currentPhase != SHOWCASE_TITLE_SPLASH) {
+      currentPhase = SHOWCASE_TITLE_SPLASH;
+      subPhaseStep = 0;
+      action.soundToPlay = SOUND_FANFARE;
+      action.triggerChaser = true;
+      action.hasFlash = true;
+      action.flashR = 255; action.flashG = 215; action.flashB = 0;
+      action.flashDurationMs = 800;
+      action.forceRedraw = true;
+    }
+  }
+  // -------------------------------------------------------------
+  // FINALE: Showcase Completed! (>= 72,000 ms)
   // -------------------------------------------------------------
   else {
-    menu.onButtonBack();
+    menu.setScreen(SCREEN_HOME, nowMs);
     stop();
     action.active = false;
     currentPhase = SHOWCASE_COMPLETED;

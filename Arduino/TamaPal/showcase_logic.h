@@ -16,15 +16,16 @@
 enum ShowcasePhase {
   SHOWCASE_INACTIVE = 0,
   SHOWCASE_NAME_ENTRY,      // Act 1: 0.0s .. 2.5s (Arcade name entry "LUMI")
-  SHOWCASE_EGG_HATCH,       // Act 2: 2.5s .. 7.0s (Wobble, crack, Baby hatch)
+  SHOWCASE_EGG_HATCH,       // Act 2: 2.5s .. 7.0s (Heartbeat suspense, crack, Nova explosion)
   SHOWCASE_BABY_FEED_POOP,  // Act 3: 7.0s .. 12.0s (Eat berry, digest, poop drops)
-  SHOWCASE_BATH_CLEAN,      // Act 4: 12.0s .. 16.5s (Shaking bath, soap bubbles)
-  SHOWCASE_GROW_TEEN_PET,   // Act 5: 16.5s .. 23.5s (Teen evolution, cuddle pet <3)
+  SHOWCASE_BATH_CLEAN,      // Act 4: 12.0s .. 16.5s (Shaking bath, bubble pop shake)
+  SHOWCASE_GROW_TEEN_PET,   // Act 5: 16.5s .. 23.5s (Teen evolution, Nova burst, cuddle pet)
   SHOWCASE_SOLO_PONG,       // Act 6: 23.5s .. 35.0s (Auto-Pong, hits wall, scores berries)
-  SHOWCASE_NIGHT_SLEEP,     // Act 7: 35.0s .. 45.0s (Starry night, wooden crib with quilt)
+  SHOWCASE_NIGHT_SLEEP,     // Act 7: 35.0s .. 45.0s (Starry night, crib, LED breathing)
   SHOWCASE_OLD_MEDICINE,    // Act 8: 45.0s .. 54.0s (Elder Lumi 100d, beard, medicine)
-  SHOWCASE_PEACEFUL_DEATH,  // Act 9: 54.0s .. 62.0s (Peaceful passing, angel wings & halo)
-  SHOWCASE_MEMORIAL_STELE,  // Act 10: 62.0s .. 70.0s (Ancestral graveyard stele)
+  SHOWCASE_PEACEFUL_DEATH,  // Act 9: 54.0s .. 62.0s (Celestial aura, golden halo, ascension glow)
+  SHOWCASE_MEMORIAL_STELE,  // Act 10: 62.0s .. 68.0s (Ancestral graveyard stele)
+  SHOWCASE_TITLE_SPLASH,    // Act 11: 68.0s .. 72.0s (Grand Finale: TamaPal Mercantec title splash!)
   SHOWCASE_COMPLETED        // Finished
 };
 
@@ -38,6 +39,11 @@ struct ShowcaseAction {
   uint8_t flashB;
   uint16_t flashDurationMs;
   bool triggerBath;
+  bool triggerShake;        // Impact camera shake!
+  bool triggerNova;         // Burst of golden stars / explosion!
+  bool triggerCelestialAura;// Angelic rotating halo & spirit motes!
+  bool triggerChaser;       // Circular running LED chaser!
+  bool triggerBreathing;    // Soft pulsating LED breathing!
   bool saveGrave;
   bool forceRedraw;
 };

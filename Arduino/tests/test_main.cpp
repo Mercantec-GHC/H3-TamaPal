@@ -1626,12 +1626,24 @@ void testShowcaseDirector() {
   CHECK(nameEntry.isCompleted(), "Name entry confirmed at 1200ms elapsed");
   CHECK(act1b.soundToPlay == SOUND_CLICK, "Click sound on confirm");
 
-  // Act 2: Egg hatching (2500 .. 7000 ms)
+  // Act 2: Egg hatching (2500 .. 7000 ms) with Heartbeat & Nova Breakout
   ShowcaseAction act2 = showcase.update(3600, pet, menu, nameEntry, pong); // elapsed 2600
   CHECK(act2.phase == SHOWCASE_EGG_HATCH, "Phase is SHOWCASE_EGG_HATCH");
   CHECK(menu.getActiveScreen() == SCREEN_HATCHING, "Switched to SCREEN_HATCHING");
   CHECK(pet.isHatching(), "Pet is actively hatching");
   CHECK(act2.soundToPlay == SOUND_REBIRTH, "Plays rebirth sound on egg start");
+
+  ShowcaseAction act2_hb1 = showcase.update(4850, pet, menu, nameEntry, pong); // elapsed 3850
+  CHECK(act2_hb1.soundToPlay == SOUND_HEARTBEAT, "Plays heartbeat pulse 1 prior to hatching");
+
+  ShowcaseAction act2_hb2 = showcase.update(5650, pet, menu, nameEntry, pong); // elapsed 4650
+  CHECK(act2_hb2.soundToPlay == SOUND_HEARTBEAT, "Plays heartbeat pulse 2 prior to hatching");
+
+  ShowcaseAction act2_crack = showcase.update(6400, pet, menu, nameEntry, pong); // elapsed 5400
+  CHECK(act2_crack.triggerShake, "Triggers impact shake on egg breakout");
+  CHECK(act2_crack.triggerNova, "Triggers starburst Nova on egg breakout");
+  CHECK(act2_crack.triggerChaser, "Triggers LED chaser on egg breakout");
+  CHECK(act2_crack.soundToPlay == SOUND_REBIRTH, "Plays celebratory rebirth sound on breakout");
 
   ShowcaseAction act2b = showcase.update(6500, pet, menu, nameEntry, pong); // elapsed 5500
   CHECK(act2b.phase == SHOWCASE_EGG_HATCH, "Act 2b phase is SHOWCASE_EGG_HATCH");
@@ -1655,12 +1667,15 @@ void testShowcaseDirector() {
   ShowcaseAction act4 = showcase.update(13500, pet, menu, nameEntry, pong); // elapsed 12500
   CHECK(act4.phase == SHOWCASE_BATH_CLEAN, "Phase is SHOWCASE_BATH_CLEAN");
   CHECK(act4.triggerBath, "Triggers bath bubble animation");
+  CHECK(act4.triggerShake, "Triggers impact shake during bath shower");
   CHECK(act4.soundToPlay == SOUND_BUBBLES, "Plays bubble sound");
   CHECK(!pet.getHasPoop(), "Poop cleaned from screen");
 
   // Act 5: Teen & cuddle pet (16500 .. 23500 ms)
   ShowcaseAction act5 = showcase.update(18000, pet, menu, nameEntry, pong); // elapsed 17000
   CHECK(act5.phase == SHOWCASE_GROW_TEEN_PET, "Phase is SHOWCASE_GROW_TEEN_PET");
+  CHECK(act5.triggerNova, "Triggers starburst Nova on Teen evolution");
+  CHECK(act5.triggerChaser, "Triggers LED chaser portal on Teen evolution");
   CHECK(pet.getStageEnum() == STAGE_TEEN, "Evolved to Teenager");
 
   ShowcaseAction act5b = showcase.update(20500, pet, menu, nameEntry, pong); // elapsed 19500
@@ -1675,6 +1690,7 @@ void testShowcaseDirector() {
   // Act 7: Starry night sleep (35000 .. 45000 ms)
   ShowcaseAction act7 = showcase.update(37000, pet, menu, nameEntry, pong); // elapsed 36000
   CHECK(act7.phase == SHOWCASE_NIGHT_SLEEP, "Phase is SHOWCASE_NIGHT_SLEEP");
+  CHECK(act7.triggerBreathing, "Triggers soft nocturnal LED breathing pulse");
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "Switched back to SCREEN_HOME");
   CHECK(pet.isSleeping(), "Pet is tucked in bed sleeping");
 
@@ -1696,20 +1712,27 @@ void testShowcaseDirector() {
   showcase.update(53000, pet, menu, nameEntry, pong); // elapsed 52000
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "Act 8 returns to SCREEN_HOME after medicine cure");
 
-  // Act 9: Peaceful death with angel wings (54000 .. 62000 ms)
+  // Act 9: Peaceful death with celestial aura (54000 .. 62000 ms)
   ShowcaseAction act9 = showcase.update(56000, pet, menu, nameEntry, pong); // elapsed 55000
   CHECK(act9.phase == SHOWCASE_PEACEFUL_DEATH, "Phase is SHOWCASE_PEACEFUL_DEATH");
+  CHECK(act9.triggerCelestialAura, "Triggers celestial aura & ascension particles");
   CHECK(!pet.isAlive(), "Passed away peacefully at 100 days");
   CHECK(pet.getDeathCause() == DEATH_OLD_AGE, "Cause is DEATH_OLD_AGE");
   CHECK(act9.saveGrave, "Signals to save grave memorial");
 
-  // Act 10: Memorial stele (62000 .. 70000 ms)
+  // Act 10: Memorial stele (62000 .. 68000 ms)
   ShowcaseAction act10 = showcase.update(64000, pet, menu, nameEntry, pong); // elapsed 63000
   CHECK(act10.phase == SHOWCASE_MEMORIAL_STELE, "Phase is SHOWCASE_MEMORIAL_STELE");
   CHECK(menu.getActiveScreen() == SCREEN_MEMORIAL, "Switched to SCREEN_MEMORIAL");
 
-  // Finale: Showcase completed (>= 70000 ms)
-  ShowcaseAction actEnd = showcase.update(72000, pet, menu, nameEntry, pong); // elapsed 71000
+  // Act 11: Grand Finale Title Splash Screen (68000 .. 72000 ms)
+  ShowcaseAction act11 = showcase.update(69500, pet, menu, nameEntry, pong); // elapsed 68500
+  CHECK(act11.phase == SHOWCASE_TITLE_SPLASH, "Phase is SHOWCASE_TITLE_SPLASH");
+  CHECK(act11.soundToPlay == SOUND_FANFARE, "Fanfare plays for Title Splash");
+  CHECK(act11.triggerChaser, "Chaser activates for Title Splash");
+
+  // Finale: Showcase completed (>= 72000 ms)
+  ShowcaseAction actEnd = showcase.update(73500, pet, menu, nameEntry, pong); // elapsed 72500
   CHECK(!showcase.isActive(), "Showcase finished and inactive");
   CHECK(actEnd.phase == SHOWCASE_COMPLETED, "Phase is SHOWCASE_COMPLETED");
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "Returned safely to SCREEN_HOME");

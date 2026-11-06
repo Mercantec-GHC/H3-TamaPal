@@ -135,7 +135,9 @@ enum SoundType : uint8_t {
   SOUND_PURR,              // Gentle purring cuddle chime when petted (500 ms)
   SOUND_CRACK,             // Sharp eggshell cracking tick (25 ms)
   SOUND_BUBBLES,           // Effervescent soap bubbles splash when shaking board
-  SOUND_HEAL               // Uplifting medicine healing chime
+  SOUND_HEAL,              // Uplifting medicine healing chime
+  SOUND_HEARTBEAT,         // Deep organic heartbeat thump (~110 Hz, 45 ms)
+  SOUND_FANFARE            // Grand victory / title splash retro chime
 };
 
 // Events received from backend over MQTT (tamapal/opla-1/event)

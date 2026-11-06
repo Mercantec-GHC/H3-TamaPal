@@ -64,6 +64,19 @@ public:
   void triggerBath(unsigned long nowMs);
   bool isBathing(unsigned long nowMs) const;
 
+  // Trigger impact camera shake (e.g. egg crack, bubble pop)
+  void triggerScreenShake(unsigned long nowMs, uint16_t durationMs = 180);
+
+  // Trigger starburst / nova explosion around Lumi
+  void triggerNova(unsigned long nowMs, uint16_t durationMs = 600);
+
+  // Toggle celestial aura (radiant golden halo & spirit motes) during ascension
+  void setCelestialAura(bool active);
+  bool isCelestialAura() const;
+
+  // Render glorious finale title splash screen (TAMAPAL • MERCANTEC H3)
+  void drawTitleSplash(unsigned long nowMs);
+
 private:
   MKRIoTCarrier* carrier;
   const char* lastMoodText;
@@ -85,6 +98,13 @@ private:
   bool lastPromptBlink;
   bool lastHadPoop;
   unsigned long bathEndTimeMs;
+
+  // Impact shake, Nova burst and Celestial Aura effects
+  unsigned long screenShakeEndTimeMs;
+  unsigned long novaStartTimeMs;
+  uint16_t novaDurationMs;
+  int16_t lastNovaRadius;
+  bool celestialAuraActive;
 
   // Draw seamless Kokiri forest glade platform and flora (cenotaph gravestone when dead)
   void drawForestStage(SkyWeatherMode weather, bool isDead = false);

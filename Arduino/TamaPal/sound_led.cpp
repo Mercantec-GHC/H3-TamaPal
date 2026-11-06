@@ -12,7 +12,18 @@ SoundLedController::SoundLedController()
     ledResetTimeMs(0),
     baseRed(0),
     baseGreen(150),
-    baseBlue(220) {
+    baseBlue(220),
+    chaserActive(false),
+    chaserEndTimeMs(0),
+    chaserStepMs(60),
+    chaserR(0),
+    chaserG(0),
+    chaserB(0),
+    breathingActive(false),
+    breathingEndTimeMs(0),
+    breathR(0),
+    breathG(0),
+    breathB(0) {
 }
 
 // Store hardware carrier reference and configure initial LED brightness
@@ -72,6 +83,12 @@ void SoundLedController::playSound(SoundType sound) {
   } else if (sound == SOUND_HEAL) {
     applyLedColor(80, 255, 120);      // Emerald healing brilliance
     ledResetTimeMs = now + 500;
+  } else if (sound == SOUND_HEARTBEAT) {
+    applyLedColor(220, 15, 20);       // Ruby pulse
+    ledResetTimeMs = now + 120;
+  } else if (sound == SOUND_FANFARE) {
+    applyLedColor(255, 215, 0);       // Brilliant gold victory
+    ledResetTimeMs = now + 350;
   }
 
   if (soundMuted) return;
@@ -149,6 +166,18 @@ void SoundLedController::playSound(SoundType sound) {
       isBuzzerPlaying = true;
       break;
 
+    case SOUND_HEARTBEAT:
+      carrier->Buzzer.sound(110);    // Low organic heart thump
+      toneEndTimeMs = now + 45;
+      isBuzzerPlaying = true;
+      break;
+
+    case SOUND_FANFARE:
+      carrier->Buzzer.sound(1760);   // Celebratory retro fanfare
+      toneEndTimeMs = now + 350;
+      isBuzzerPlaying = true;
+      break;
+
     default:
       break;
   }
@@ -164,6 +193,23 @@ void SoundLedController::playEventFeedback(GameEvent event) {
   }
 }
 
+void SoundLedController::startChaser(uint8_t r, uint8_t g, uint8_t b, unsigned long durationMs, uint16_t stepMs) {
+  chaserActive = true;
+  chaserEndTimeMs = millis() + durationMs;
+  chaserStepMs = (stepMs > 10) ? stepMs : 60;
+  chaserR = r; chaserG = g; chaserB = b;
+  breathingActive = false;
+  ledResetTimeMs = 0;
+}
+
+void SoundLedController::startBreathing(uint8_t r, uint8_t g, uint8_t b, unsigned long durationMs) {
+  breathingActive = true;
+  breathingEndTimeMs = millis() + durationMs;
+  breathR = r; breathG = g; breathB = b;
+  chaserActive = false;
+  ledResetTimeMs = 0;
+}
+
 // Periodic check: turn off buzzer automatically when tone duration has passed
 void SoundLedController::update(unsigned long currentTimeMs) {
   if (carrier == nullptr) return;
@@ -172,6 +218,40 @@ void SoundLedController::update(unsigned long currentTimeMs) {
   if (isBuzzerPlaying && currentTimeMs >= toneEndTimeMs) {
     carrier->Buzzer.noSound();
     isBuzzerPlaying = false;
+  }
+
+  // Active circular chaser animation
+  if (chaserActive) {
+    if (currentTimeMs >= chaserEndTimeMs) {
+      chaserActive = false;
+      applyLedColor(baseRed, baseGreen, baseBlue);
+    } else {
+      uint8_t activeLed = (uint8_t)((currentTimeMs / chaserStepMs) % 5);
+      uint32_t activeColor = carrier->leds.Color(chaserR, chaserG, chaserB);
+      uint32_t dimColor = carrier->leds.Color(chaserR / 5, chaserG / 5, chaserB / 5);
+      for (int i = 0; i < 5; i++) {
+        carrier->leds.setPixelColor(i, (i == activeLed) ? activeColor : dimColor);
+      }
+      carrier->leds.show();
+      return;
+    }
+  }
+
+  // Active pulsating breathing animation
+  if (breathingActive) {
+    if (currentTimeMs >= breathingEndTimeMs) {
+      breathingActive = false;
+      applyLedColor(baseRed, baseGreen, baseBlue);
+    } else {
+      uint16_t cycle = (uint16_t)(currentTimeMs % 2400); // 2.4s calm breathing period
+      uint8_t wave = (cycle < 1200) ? (cycle * 255 / 1200) : ((2400 - cycle) * 255 / 1200);
+      uint8_t factor = 40 + (wave * 215 / 255);
+      uint8_t r = (uint16_t)breathR * factor / 255;
+      uint8_t g = (uint16_t)breathG * factor / 255;
+      uint8_t b = (uint16_t)breathB * factor / 255;
+      applyLedColor(r, g, b);
+      return;
+    }
   }
 
   // Restore saved base mood LED color after event flash

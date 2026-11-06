@@ -31,7 +31,12 @@ UiPetRenderer::UiPetRenderer()
     lastBlinking(false),
     lastPromptBlink(false),
     lastHadPoop(false),
-    bathEndTimeMs(0) {}
+    bathEndTimeMs(0),
+    screenShakeEndTimeMs(0),
+    novaStartTimeMs(0),
+    novaDurationMs(0),
+    lastNovaRadius(0),
+    celestialAuraActive(false) {}
 
 void UiPetRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
@@ -971,6 +976,28 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillRect(cx - 1, cy - 24, 2, 4, stemGreen);
     carrier->display.fillCircle(cx + 2, cy - 25, 3, leafEmerald);
     carrier->display.drawPixel(cx + 2, cy - 26, leafHighlight);
+
+    if (celestialAuraActive) {
+      // Celestial radiant halo double ring
+      carrier->display.drawRoundRect(cx - 12, cy - 30, 24, 7, 3, color565(255, 215, 60));
+      // Rotating golden sparkle on the halo rim
+      int haloStep = ((int)(lastAnimTickMs / 50)) % 8;
+      const int haloOffsets[8][2] = {
+        {10, 0}, {7, 2}, {0, 3}, {-7, 2}, {-10, 0}, {-7, -2}, {0, -3}, {7, -2}
+      };
+      carrier->display.drawPixel(cx + haloOffsets[haloStep][0], (cy - 27) + haloOffsets[haloStep][1], 0xFFFF);
+
+      // Ascending spirit motes rising gracefully
+      uint16_t spiritCyan = color565(140, 230, 255);
+      for (int i = 0; i < 4; i++) {
+        int moteStep = (int)((lastAnimTickMs / 40 + i * 22) % 40);
+        int mx = cx + ((i % 2 == 0) ? -18 : 18) + (i * 2);
+        int my = cy + 6 - moteStep;
+        if (my > 35 && my < cy + 8) {
+          carrier->display.drawPixel(mx, my, (i % 2 == 0) ? 0xFFFF : spiritCyan);
+        }
+      }
+    }
   } else if (outfit == OUTFIT_WINTER) {
     // =============================================================
     // WINTER WARDROBE: Stage-adapted winter headgear & beanies
@@ -1798,6 +1825,13 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     dy = idleBreath[(nowMs / 340) % 4];
   }
 
+  // Screen shake micro-jitter on impact events
+  if (nowMs < screenShakeEndTimeMs) {
+    int shake = ((nowMs / 25) % 2 == 0) ? -2 : 2;
+    dx += shake;
+    dy += (shake > 0 ? 1 : -1);
+  }
+
   int targetCx = LUMI_BASE_CX + dx;
   int targetCy = (expr == EXPR_DEAD) ? (98 + dy) : (LUMI_BASE_CY + dy);
 
@@ -1929,6 +1963,47 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
       drawSoapBubbles(nowMs);
     }
   }
+
+  // 7. Dynamic Evolution / Hatching Starburst (Nova)
+  if (nowMs < novaStartTimeMs + novaDurationMs) {
+    unsigned long elapsedNova = nowMs - novaStartTimeMs;
+    int radius = 12 + (int)((elapsedNova * 38) / novaDurationMs);
+    uint16_t starGold  = color565(255, 230, 90);
+    uint16_t starCyan  = color565(90, 240, 255);
+    uint16_t starWhite = 0xFFFF;
+
+    // Erase previous star ring
+    if (lastNovaRadius > 0 && lastNovaRadius != radius) {
+      for (int i = 0; i < 8; i++) {
+        int oldX = targetCx + (int)(cos(i * 0.785) * lastNovaRadius);
+        int oldY = targetCy + (int)(sin(i * 0.785) * (lastNovaRadius * 0.75));
+        if (oldX > 20 && oldX < 220 && oldY > 30 && oldY < 160) {
+          carrier->display.drawPixel(oldX, oldY, nativeBg);
+        }
+      }
+    }
+
+    // Draw expanding 8-star ring
+    for (int i = 0; i < 8; i++) {
+      int sx = targetCx + (int)(cos(i * 0.785) * radius);
+      int sy = targetCy + (int)(sin(i * 0.785) * (radius * 0.75));
+      if (sx > 20 && sx < 220 && sy > 30 && sy < 160) {
+        uint16_t col = (i % 2 == 0) ? starGold : (i % 4 == 1 ? starCyan : starWhite);
+        carrier->display.drawPixel(sx, sy, col);
+      }
+    }
+    lastNovaRadius = radius;
+  } else if (lastNovaRadius > 0) {
+    // Erase final stars when nova burst finishes
+    for (int i = 0; i < 8; i++) {
+      int oldX = targetCx + (int)(cos(i * 0.785) * lastNovaRadius);
+      int oldY = targetCy + (int)(sin(i * 0.785) * (lastNovaRadius * 0.75));
+      if (oldX > 20 && oldX < 220 && oldY > 30 && oldY < 160) {
+        carrier->display.drawPixel(oldX, oldY, nativeBg);
+      }
+    }
+    lastNovaRadius = 0;
+  }
 }
 
 void UiPetRenderer::drawActionScene(const PetLogic& pet,
@@ -2028,6 +2103,9 @@ void UiPetRenderer::drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16
 
   int cx = 120;
   int cy = 114;
+  if (nowMs < screenShakeEndTimeMs) {
+    cx += ((nowMs / 25) % 2 == 0) ? -2 : 2;
+  }
 
   // Clear egg center dynamic region (X = 85..155, Y = 68..133)
   carrier->display.fillRect(85, 68, 70, 65, bgColor);
@@ -2203,4 +2281,87 @@ void UiPetRenderer::drawSoapBubbles(unsigned long nowMs) {
     carrier->display.drawCircle(bx, by, r, bubbleCyan);
     carrier->display.drawPixel(bx - 1, by - 1, bubbleWhite);
   }
+}
+
+void UiPetRenderer::triggerScreenShake(unsigned long nowMs, uint16_t durationMs) {
+  screenShakeEndTimeMs = nowMs + durationMs;
+}
+
+void UiPetRenderer::triggerNova(unsigned long nowMs, uint16_t durationMs) {
+  novaStartTimeMs = nowMs;
+  novaDurationMs = durationMs;
+  lastNovaRadius = 0;
+}
+
+void UiPetRenderer::setCelestialAura(bool active) {
+  celestialAuraActive = active;
+}
+
+bool UiPetRenderer::isCelestialAura() const {
+  return celestialAuraActive;
+}
+
+void UiPetRenderer::drawTitleSplash(unsigned long nowMs) {
+  if (carrier == nullptr) return;
+  (void)nowMs;
+  uint16_t nativeBg = color565(8, 12, 26);
+  carrier->display.fillScreen(nativeBg);
+
+  // Double golden-cyan circular border ring
+  carrier->display.drawCircle(120, 120, 116, color565(40, 180, 220));
+  carrier->display.drawCircle(120, 120, 114, color565(255, 215, 60));
+
+  // Outer sparkles
+  drawSnowflake(45, 55, color565(255, 230, 100));
+  drawSnowflake(195, 55, color565(80, 240, 255));
+  drawSnowflake(45, 185, color565(80, 240, 255));
+  drawSnowflake(195, 185, color565(255, 230, 100));
+
+  // Subtitle top
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(color565(140, 200, 255));
+  carrier->display.setCursor(68, 42);
+  carrier->display.print("* TAMAPAL 2026 *");
+
+  // Main Title: TAMAPAL in big letters
+  carrier->display.setTextSize(3);
+  carrier->display.setTextColor(color565(20, 45, 80));
+  carrier->display.setCursor(55, 78);
+  carrier->display.print("TAMAPAL");
+
+  carrier->display.setTextColor(color565(255, 225, 90));
+  carrier->display.setCursor(53, 76);
+  carrier->display.print("TAMAPAL");
+
+  // Golden separator line
+  carrier->display.drawFastHLine(48, 110, 144, color565(255, 215, 60));
+  carrier->display.drawPixel(120, 110, 0xFFFF);
+
+  // Mercantec subtitle
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(0xFFFF);
+  carrier->display.setCursor(76, 122);
+  carrier->display.print("MERCANTEC H3");
+
+  carrier->display.setTextColor(color565(100, 235, 180));
+  carrier->display.setCursor(72, 138);
+  carrier->display.print("MIDDLE PROJEKT");
+
+  // Team authors
+  carrier->display.setTextColor(color565(255, 180, 80));
+  carrier->display.setCursor(58, 158);
+  carrier->display.print("OLEH * OLIVER * ANDRII");
+
+  // Cute mini Lumi pixel mascot at bottom (X=120, Y=194)
+  carrier->display.fillRoundRect(113, 188, 15, 12, 4, color565(155, 248, 220));
+  carrier->display.drawFastVLine(120, 184, 4, color565(255, 215, 60));
+  carrier->display.drawPixel(121, 183, color565(100, 255, 120));
+  carrier->display.drawPixel(116, 191, color565(15, 30, 40));
+  carrier->display.drawPixel(124, 191, color565(15, 30, 40));
+  carrier->display.fillCircle(129, 189, 2, color565(155, 248, 220));
+
+  // Bottom ready message
+  carrier->display.setTextColor(color565(120, 140, 170));
+  carrier->display.setCursor(74, 212);
+  carrier->display.print("KLAR TIL KAMP!");
 }
