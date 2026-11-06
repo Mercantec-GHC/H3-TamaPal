@@ -266,63 +266,45 @@ bool StoragePet::deserializeState(const char* text,
   return deserializeState(text, hunger, warmth, energy, happiness, discipline, asleep, stage, outfit, pong, maze, age, gen, al, dc);
 }
 
-bool StoragePet::savePet(const PetLogic& pet) {
 #if defined(ARDUINO)
-  if (!cardInitialized) return false;
-
-  char buffer[256];
-  serializeState(buffer, sizeof(buffer), pet);
-
-  uint32_t currentHash = computeHash(buffer);
-  if (currentHash == lastSavedHash) {
-    return true; // Zero SPI bus traffic when pet state is identical
+static void backupFile(const char* srcFilename, const char* bakFilename) {
+  if (!SD.exists(srcFilename)) return;
+  if (SD.exists(bakFilename)) {
+    SD.remove(bakFilename);
   }
-
-  // Remove stale file before writing to prevent appending
-  if (SD.exists(PET_STORAGE_FILENAME)) {
-    SD.remove(PET_STORAGE_FILENAME);
+  File src = SD.open(srcFilename, FILE_READ);
+  if (!src) return;
+  File bak = SD.open(bakFilename, FILE_WRITE);
+  if (!bak) {
+    src.close();
+    return;
   }
-
-  File file = SD.open(PET_STORAGE_FILENAME, FILE_WRITE);
-  if (!file) {
-    Serial.println(F("[STORAGE] FEJL: Kunne ikke aabne lumi.txt til skrivning!"));
-    return false;
+  uint8_t copyBuf[64];
+  while (src.available()) {
+    int bytes = src.read(copyBuf, sizeof(copyBuf));
+    if (bytes > 0) {
+      bak.write(copyBuf, bytes);
+    }
   }
-
-  file.print(buffer);
-  file.close();
-  lastSavedHash = currentHash;
-  Serial.println(F("[STORAGE] Lumi gemt paa MicroSD-kort."));
-  return true;
-#else
-  (void)pet;
-  return false;
-#endif
+  bak.flush();
+  bak.close();
+  src.close();
 }
 
-bool StoragePet::loadPet(PetLogic& pet) {
-#if defined(ARDUINO)
-  if (!cardInitialized) return false;
-
-  if (!SD.exists(PET_STORAGE_FILENAME)) {
-    Serial.println(F("[STORAGE] Ingen tidligere gemt lumi.txt fundet paa SD-kort."));
-    return false;
-  }
-
-  File file = SD.open(PET_STORAGE_FILENAME, FILE_READ);
-  if (!file) {
-    Serial.println(F("[STORAGE] FEJL: Kunne ikke laese lumi.txt fra SD-kort!"));
-    return false;
-  }
-
-  char buffer[256];
+static bool readFileToBuffer(const char* filename, char* buffer, size_t bufSize) {
+  if (!SD.exists(filename)) return false;
+  File file = SD.open(filename, FILE_READ);
+  if (!file) return false;
   int bytesRead = 0;
-  while (file.available() && bytesRead < (int)(sizeof(buffer) - 1)) {
+  while (file.available() && bytesRead < (int)(bufSize - 1)) {
     buffer[bytesRead++] = (char)file.read();
   }
   buffer[bytesRead] = '\0';
   file.close();
+  return (bytesRead > 0);
+}
 
+static bool applyStateToPet(const char* buffer, PetLogic& pet, uint32_t& hashOut) {
   float h = 0, w = 0, e = 0, hap = 0, d = 0;
   bool asleep = false;
   PetStage stage = STAGE_BABY;
@@ -336,7 +318,7 @@ bool StoragePet::loadPet(PetLogic& pet) {
   uint16_t berries = 0;
   bool sick = false;
   bool poop = false;
-  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age, gen, alive, deathCause, berries, sick, poop)) {
+  if (StoragePet::deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age, gen, alive, deathCause, berries, sick, poop)) {
     pet.setVitals(h, w, e, hap, d);
     pet.setSleeping(asleep);
     pet.setStage(stage);
@@ -351,25 +333,93 @@ bool StoragePet::loadPet(PetLogic& pet) {
     if (!alive) {
       pet.triggerDeath(deathCause);
     }
-    lastSavedHash = computeHash(buffer);
-    Serial.print(F("[STORAGE] SUCCES: Indlaeste Lumi fra MicroSD! GEN: "));
-    Serial.print((unsigned int)gen);
-    Serial.print(F(", Status: "));
-    Serial.print(alive ? F("Levende") : F("Doed"));
-    Serial.print(F(", Sult: "));
-    Serial.print((int)h);
-    Serial.print(F("%, Energi: "));
-    Serial.print((int)e);
-    Serial.print(F("%, Stadie: "));
-    Serial.print(pet.getStage());
-    Serial.print(F(", Alder: "));
-    Serial.print((unsigned long)age);
-    Serial.println(F(" min"));
+    hashOut = StoragePet::computeHash(buffer);
     return true;
-  } else {
-    Serial.println(F("[STORAGE] ADVARSEL: lumi.txt data var ugyldig, starter forfra."));
+  }
+  return false;
+}
+#endif
+
+bool StoragePet::savePet(const PetLogic& pet) {
+#if defined(ARDUINO)
+  if (!cardInitialized) return false;
+
+  char buffer[256];
+  serializeState(buffer, sizeof(buffer), pet);
+
+  uint32_t currentHash = computeHash(buffer);
+  if (currentHash == lastSavedHash) {
+    return true; // Zero SPI bus traffic when pet state is identical
+  }
+
+  // Backup current valid file before modifying to prevent data loss on sudden power-off
+  if (SD.exists(PET_STORAGE_FILENAME)) {
+    backupFile(PET_STORAGE_FILENAME, PET_BACKUP_FILENAME);
+    SD.remove(PET_STORAGE_FILENAME);
+  }
+
+  File file = SD.open(PET_STORAGE_FILENAME, FILE_WRITE);
+  if (!file) {
+    Serial.println(F("[STORAGE] FEJL: Kunne ikke aabne lumi.txt til skrivning!"));
     return false;
   }
+
+  file.print(buffer);
+  file.flush();
+  file.close();
+  lastSavedHash = currentHash;
+  Serial.println(F("[STORAGE] Lumi gemt paa MicroSD (sikret med lumi.bak)."));
+  return true;
+#else
+  (void)pet;
+  return false;
+#endif
+}
+
+bool StoragePet::loadPet(PetLogic& pet) {
+#if defined(ARDUINO)
+  if (!cardInitialized) return false;
+
+  char buffer[256];
+  bool loadedFromPrimary = false;
+
+  // 1. First attempt: Read primary state file lumi.txt
+  if (readFileToBuffer(PET_STORAGE_FILENAME, buffer, sizeof(buffer))) {
+    if (applyStateToPet(buffer, pet, lastSavedHash)) {
+      loadedFromPrimary = true;
+      Serial.println(F("[STORAGE] SUCCES: Indlaeste Lumi fra lumi.txt"));
+    } else {
+      Serial.println(F("[STORAGE] ADVARSEL: lumi.txt korrupt! Proever backup lumi.bak..."));
+    }
+  }
+
+  // 2. Fallback attempt: If primary was missing or corrupt, restore from lumi.bak
+  if (!loadedFromPrimary) {
+    if (readFileToBuffer(PET_BACKUP_FILENAME, buffer, sizeof(buffer))) {
+      if (applyStateToPet(buffer, pet, lastSavedHash)) {
+        Serial.println(F("[STORAGE] SUCCES: Lumi gendannet fra sikkerhedskopi lumi.bak!"));
+        // Re-create healthy lumi.txt from the restored backup immediately
+        if (SD.exists(PET_STORAGE_FILENAME)) {
+          SD.remove(PET_STORAGE_FILENAME);
+        }
+        File restoreFile = SD.open(PET_STORAGE_FILENAME, FILE_WRITE);
+        if (restoreFile) {
+          restoreFile.print(buffer);
+          restoreFile.flush();
+          restoreFile.close();
+          Serial.println(F("[STORAGE] lumi.txt er blevet genoprettet fra backup."));
+        }
+        return true;
+      } else {
+        Serial.println(F("[STORAGE] FEJL: Backup lumi.bak var ogsaa korrupt."));
+      }
+    } else {
+      Serial.println(F("[STORAGE] Ingen gyldig lumi.txt eller lumi.bak fundet. Starter forfra."));
+    }
+    return false;
+  }
+
+  return true;
 #else
   (void)pet;
   return false;

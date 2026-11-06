@@ -60,7 +60,7 @@ void NetMqttClient::begin(GameEventCallback eventCallback, PetRewardCallback rew
   // Set MQTT client credentials, keep-alive, and connection timeout
   mqttClient.setId(clientMqttId);
   mqttClient.setKeepAliveInterval(15 * 1000); // 15 seconds keep-alive
-  mqttClient.setConnectionTimeout(4000);       // 4s timeout (prevents 30s freeze if firewall blocks port 1883)
+  mqttClient.setConnectionTimeout(1500);      // 1.5s timeout (prevents noticeable UI freeze if broker is offline)
 
   #if defined(SECRET_MQTT_USER) && defined(SECRET_MQTT_PASS)
   if (strlen(SECRET_MQTT_USER) > 0) {

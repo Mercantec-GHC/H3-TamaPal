@@ -871,6 +871,36 @@ Vi har implementeret det andet store on-board spil: **Procedural IMU Marmor-Laby
 - **Unit tests:** **207 af 207 tests bestået (100% PASS, 0 advarsler)**.
 - **Kompilering:** 0 fejl, 0 advarsler i projektkoden.
 
+___
+
+### 🥚🩺 Opdatering 6/11 (Sen aften): Død/Genfødsel, Æg-klækning, Klap-sensor, Pleje-mekanikker og Hårdhed
+**Branch:** `feature/arduino-death-rebirth`  
+**Ansvarlig:** Oleh
+
+Vi har fuldendt hele livscyklussen og udvidet Tamagotchi-spillet med klassiske plejemekanikker, sensor-interaktioner og robusthed mod strømafbrydelse og netværksforsinkelser:
+
+#### 1. Livscyklus, Død og Genfødsel:
+- **Kirkegård & Genfødsel:** Ved død (af sult, kulde, varme, kedsomhed, udmattelse eller alderdom) gemmes forfædren i `grave.txt` på MicroSD. Spilleren kan genføde Lumi til næste generation via langt tryk (2 sek.) på Touch 2.
+- **Æggeklæknings-animation:** Efter genfødsel vises en 3-sekunders dramatisk æggeklækning: ægget vrikker med lyd, slår revner og klækker med guldstøv (`SOUND_LEVEL_UP`), hvorefter den nye baby-Lumi springer frem!
+- **Klap Lumi (APDS-9960 nærhedssensor):** Før hånden hen over Oplà-kortet (nærhed < 100). Lumi kniber øjnene sammen af velbehag, hjerter svæver op, og glæde stiger med +12% (`SOUND_PETTING`). Hvis Lumi sover, vækkes den blidt.
+
+#### 2. Udvidede Plejemekanikker & Bær-økonomi:
+- **Ny Medicin-menu (`ICON_MEDICIN`):** Menuen er udvidet til 6 ikoner: Mad, Leg, Medicin, Søvn, Statistik, Forbind. Viser en fin medicinflaske med rød korskork.
+- **Sygdom & Helbredelse:** Bliver Lumi syg (eller efterlades snavset i > 60 sekunder), blegner den og kræver medicin. Ubehandlet sygdom i 12 ticks fører til død af udmattelse. Medicin koster 3 gyldne bær (`BERRIES`).
+- **Lort & Ryst-for-at-vaske (Bad):** Efter et måltid efterlades en lort 💩 i hjørnet. Rystes Oplà-kortet kraftigt (akselerations-ryk > 2.0g), vaskes skærmen ren med sæbeskum og boblelyde (`SOUND_BUBBLES`), og Lumi belønnes med +15% glæde.
+- **Bær-pung:** Gyldne bær opsamles i Pong og Labyrinten og overføres til Lumis pung. Bær beholdes på tværs af generationer og gemmes i `lumi.txt`.
+
+#### 3. Robusthed & Fejltolerance (Code Review Forbedringer):
+- **Sikker MicroSD-lagring (`lumi.bak`):** For at forhindre korruption eller tab af fremskridt ved pludseligt strømsvigt oprettes automatisk en sikkerhedskopi `lumi.bak`, før `lumi.txt` overskrives. Ved opstart, hvis `lumi.txt` er beskadiget eller mangler, gendannes kæledyrets tilstand automatisk fra `lumi.bak`.
+- **Hurtig MQTT Forbindelses-timeout (1,5 sek.):** MQTT-forbindelsestimeout er sænket fra 4000 ms til 1500 ms (`mqttClient.setConnectionTimeout(1500)`). Dette sikrer, at kortet og brugerfladen aldrig fryser unødigt, hvis brokeren er midlertidigt offline eller blokeret af en firewall.
+
+#### Verificerede kvalitets- og hukommelsestal (Arduino MKR WiFi 1010):
+- **Flash-forbrug:** **198.828 bytes (75%)** ud af 256 KB.
+- **SRAM-forbrug:** **8.844 bytes (26%)** ud af 32 KB — **23.924 bytes fri RAM** til stakken!
+- **Unit tests:** **379 af 379 tests bestået (100% PASS, 0 advarsler)**.
+- **Kompilering:** 0 fejl, 0 advarsler i projektkoden (`arduino-cli compile --warnings all`).
+
+
 
 
 

@@ -11,6 +11,7 @@
 
 // MicroSD state filename (8.3 FAT filename format for SD library compatibility)
 #define PET_STORAGE_FILENAME "lumi.txt"
+#define PET_BACKUP_FILENAME  "lumi.bak"
 
 class StoragePet {
 public:
