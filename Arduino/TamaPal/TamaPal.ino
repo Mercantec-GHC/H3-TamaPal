@@ -19,6 +19,7 @@
 #include "ui_pong.h"
 #include "maze_logic.h"
 #include "ui_maze.h"
+#include "ui_memorial.h"
 
 // Hardware carrier instance
 MKRIoTCarrier carrier;
@@ -38,6 +39,7 @@ PongLogic pongLogic;
 UiPongRenderer uiPong;
 MazeLogic mazeLogic;
 UiMazeRenderer uiMaze;
+UiMemorialRenderer uiMemorial;
 
 // Forward declarations
 void onGameEventReceived(GameEvent event);
@@ -627,7 +629,7 @@ void loop() {
   if (currentScreen != previousScreen) {
     muteMessageEndTimeMs = 0; // Cancel any active mute toast when switching screens
 
-    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE) {
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE || previousScreen == SCREEN_MEMORIAL) {
       // Exiting a fullscreen view: restore mood LEDs and redraw full home UI
       soundLed.setMoodColor(0, 150, 220);
       if (currentScreen == SCREEN_HOME) {
@@ -650,6 +652,20 @@ void loop() {
       case SCREEN_STATS:
         Serial.println(F("[UI] Skærm: STATISTIK (5 parametre)"));
         uiStats.updateDisplay(petLogic, true);
+        break;
+
+      case SCREEN_MEMORIAL:
+        Serial.println(F("[UI] Skærm: MINDELUND (Lumis Slægtsbog)"));
+        soundLed.setMoodColor(80, 110, 190); // Mystical blue-violet glow
+        {
+          uint16_t total = storagePet.getGraveRecordCount();
+          GraveRecord rec;
+          if (total > 0 && storagePet.loadGraveRecord(menuLogic.getMemorialIndex(), rec)) {
+            uiMemorial.drawRecord(menuLogic.getMemorialIndex(), total, rec);
+          } else {
+            uiMemorial.drawEmpty(petLogic.getGeneration());
+          }
+        }
         break;
 
       case SCREEN_GAMES_MENU:
@@ -820,7 +836,7 @@ void loop() {
   } else if (currentScreen == SCREEN_STATS) {
     // Real-time stats dashboard update (dirty updates only when values decay or change)
     uiStats.updateDisplay(petLogic, false);
-  } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU) {
+  } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_MEMORIAL) {
     // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME)
     if (petLogic.isAlive() || currentScreen != SCREEN_HOME) {
       uiMenu.drawMenuBar(menuLogic, false);

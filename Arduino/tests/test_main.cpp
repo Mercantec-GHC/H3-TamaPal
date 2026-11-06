@@ -1182,6 +1182,118 @@ void testPetDeathAndRebirth() {
   CHECK(strstr(graveRecord, "Maven rumlede til sidst...") != NULL, "Grave record has epitaph");
 }
 
+void testMemorialGallery() {
+  printf("\n--- Test: Memorial Gallery & grave.txt Parser ---\n");
+
+  // 1. Test pure string parser for grave.txt line
+  GraveRecord rec;
+  const char* lineHunger = "GEN 1 | Alder: 145 min | Doed: Doede af sult | Pong: 12 | Labyrint: 45 sek | \"Maven rumlede til sidst...\"\n";
+  bool ok1 = StoragePet::parseGraveLine(lineHunger, rec);
+  CHECK(ok1, "parseGraveLine succeeds for hunger record");
+  CHECK(rec.generation == 1, "Parsed generation is 1");
+  CHECK(rec.ageMinutes == 145, "Parsed age is 145 minutes");
+  CHECK(rec.deathCause == DEATH_HUNGER, "Parsed cause is DEATH_HUNGER");
+  CHECK(rec.highScorePong == 12, "Parsed Pong score is 12");
+  CHECK(rec.highScoreMaze == 45, "Parsed Maze time is 45");
+  CHECK(strcmp(rec.epitaph, "Maven rumlede til sidst...") == 0, "Parsed epitaph matches exactly");
+
+  const char* lineCold = "GEN 2 | Alder: 320 min | Doed: Froes ihjel | Pong: 30 | Labyrint: 28 sek | \"Vinteren var for haard...\"\n";
+  bool ok2 = StoragePet::parseGraveLine(lineCold, rec);
+  CHECK(ok2, "parseGraveLine succeeds for cold record");
+  CHECK(rec.generation == 2, "Parsed generation is 2");
+  CHECK(rec.deathCause == DEATH_COLD, "Parsed cause is DEATH_COLD");
+
+  const char* lineHeat = "GEN 3 | Alder: 80 min | Doed: Doede af hedeslag | Pong: 5 | Labyrint: 0 sek | \"Smeltede i pejsens varme!\"\n";
+  bool ok3 = StoragePet::parseGraveLine(lineHeat, rec);
+  CHECK(ok3, "parseGraveLine succeeds for heat record");
+  CHECK(rec.deathCause == DEATH_HEAT, "Parsed cause is DEATH_HEAT");
+
+  const char* lineBoredom = "GEN 4 | Alder: 500 min | Doed: Doede af ensomhed | Pong: 10 | Labyrint: 60 sek | \"Hjertet visnede af savn.\"\n";
+  bool ok4 = StoragePet::parseGraveLine(lineBoredom, rec);
+  CHECK(ok4, "parseGraveLine succeeds for boredom record");
+  CHECK(rec.deathCause == DEATH_BOREDOM, "Parsed cause is DEATH_BOREDOM");
+
+  const char* lineExhaustion = "GEN 5 | Alder: 600 min | Doed: Doede af udmattelse | Pong: 20 | Labyrint: 50 sek | \"Fik aldrig sovet ud...\"\n";
+  bool ok5 = StoragePet::parseGraveLine(lineExhaustion, rec);
+  CHECK(ok5, "parseGraveLine succeeds for exhaustion record");
+  CHECK(rec.deathCause == DEATH_EXHAUSTION, "Parsed cause is DEATH_EXHAUSTION");
+
+  const char* lineOldAge = "GEN 6 | Alder: 1440 min | Doed: Doede af alderdom | Pong: 88 | Labyrint: 19 sek | \"Levede et lykkeligt liv!\"\n";
+  bool ok6 = StoragePet::parseGraveLine(lineOldAge, rec);
+  CHECK(ok6, "parseGraveLine succeeds for old age record");
+  CHECK(rec.deathCause == DEATH_OLD_AGE, "Parsed cause is DEATH_OLD_AGE");
+
+  // Malformed line handling
+  CHECK(!StoragePet::parseGraveLine(nullptr, rec), "Safe handling of nullptr line");
+  CHECK(!StoragePet::parseGraveLine("", rec), "Safe handling of empty line");
+  CHECK(!StoragePet::parseGraveLine("Corrupted text without markers", rec), "Safe handling of corrupted line");
+
+  // 2. Test in-memory storage logging and retrieval fallback
+  StoragePet storage;
+  PetLogic ancestor1;
+  ancestor1.setGeneration(1);
+  ancestor1.setHighScorePong(15);
+  ancestor1.triggerDeath(DEATH_HUNGER);
+  storage.logGraveRecord(ancestor1);
+
+  PetLogic ancestor2;
+  ancestor2.setGeneration(2);
+  ancestor2.setHighScoreMaze(35);
+  ancestor2.triggerDeath(DEATH_OLD_AGE);
+  storage.logGraveRecord(ancestor2);
+
+  uint16_t count = storage.getGraveRecordCount();
+  CHECK(count >= 2, "Grave record count is at least 2");
+
+  GraveRecord loadedRec;
+  bool loadedOk = storage.loadGraveRecord(count - 2, loadedRec);
+  CHECK(loadedOk, "Loads ancestor 1 successfully");
+  CHECK(loadedRec.generation == 1, "Ancestor 1 has generation 1");
+
+  loadedOk = storage.loadGraveRecord(count - 1, loadedRec);
+  CHECK(loadedOk, "Loads ancestor 2 successfully");
+  CHECK(loadedRec.generation == 2, "Ancestor 2 has generation 2");
+  CHECK(loadedRec.deathCause == DEATH_OLD_AGE, "Ancestor 2 died of old age");
+
+  CHECK(!storage.loadGraveRecord(999, loadedRec), "Out-of-bounds record index returns false");
+
+  // 3. Test MenuLogic memorial state machine and navigation
+  MenuLogic menu;
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "Starts on HOME");
+
+  menu.openMemorial(5, SCREEN_HOME);
+  CHECK(menu.getActiveScreen() == SCREEN_MEMORIAL, "Switches to SCREEN_MEMORIAL");
+  CHECK(menu.getMemorialIndex() == 4, "Initial memorial index defaults to newest ancestor (index 4 of 5)");
+
+  menu.memorialPrev(5);
+  CHECK(menu.getMemorialIndex() == 3, "memorialPrev moves from 4 to 3");
+  menu.memorialPrev(5);
+  menu.memorialPrev(5);
+  menu.memorialPrev(5);
+  CHECK(menu.getMemorialIndex() == 0, "memorialPrev reached oldest ancestor index 0");
+  menu.memorialPrev(5);
+  CHECK(menu.getMemorialIndex() == 0, "memorialPrev clamps at index 0");
+
+  menu.memorialNext(5);
+  CHECK(menu.getMemorialIndex() == 1, "memorialNext moves from 0 to 1");
+  menu.memorialNext(5);
+  menu.memorialNext(5);
+  menu.memorialNext(5);
+  CHECK(menu.getMemorialIndex() == 4, "memorialNext reaches index 4");
+  menu.memorialNext(5);
+  CHECK(menu.getMemorialIndex() == 4, "memorialNext clamps at index 4");
+
+  menu.onButtonBack();
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "Returns to HOME screen via onButtonBack");
+
+  // Memorial opened from STATS returns back to STATS
+  menu.setScreen(SCREEN_STATS);
+  menu.openMemorial(3, SCREEN_STATS);
+  CHECK(menu.getActiveScreen() == SCREEN_MEMORIAL, "Opened from STATS");
+  menu.onButtonBack();
+  CHECK(menu.getActiveScreen() == SCREEN_STATS, "Returns to STATS screen via onButtonBack");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -1209,6 +1321,7 @@ int main() {
   testSoloPongLogic();
   testMarbleMazeLogic();
   testPetDeathAndRebirth();
+  testMemorialGallery();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

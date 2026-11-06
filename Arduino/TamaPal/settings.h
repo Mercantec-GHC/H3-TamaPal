@@ -95,7 +95,8 @@ enum ScreenType : uint8_t {
   SCREEN_ACTION,           // Temporary action banner (e.g., feeding food animation)
   SCREEN_GAMES_MENU,       // On-board minigames selection menu (Pong / Maze)
   SCREEN_MINIGAME_PONG,    // Solo Wall-Pong minigame on Oplà display
-  SCREEN_MINIGAME_MAZE     // Procedural Marble Maze minigame on Oplà display
+  SCREEN_MINIGAME_MAZE,    // Procedural Marble Maze minigame on Oplà display
+  SCREEN_MEMORIAL          // Hall of Fame / Mindelund ancestral memorial gallery
 };
 
 // The 5 icons in the top navigation menu
@@ -198,6 +199,18 @@ enum DeathCause : uint8_t {
   DEATH_BOREDOM,    // Døde af ensomhed (0% glæde, ingen leg)
   DEATH_EXHAUSTION, // Døde af udmattelse (0% energi, aldrig sovet)
   DEATH_OLD_AGE     // Døde af alderdom (Old-stadie, mæt af dage)
+};
+
+// ============================================================================
+// MEMORIAL ANCESTRAL RECORD (Mindelund / Slægtsbog)
+// ============================================================================
+struct GraveRecord {
+  uint16_t generation;
+  uint32_t ageMinutes;
+  DeathCause deathCause;
+  uint16_t highScorePong;
+  uint16_t highScoreMaze;
+  char epitaph[36];
 };
 
 #endif // SETTINGS_H

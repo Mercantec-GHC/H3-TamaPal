@@ -330,7 +330,30 @@ bool StoragePet::loadPet(PetLogic& pet) {
 #endif
 }
 
+static const uint8_t MAX_RAM_GRAVE_RECORDS = 5;
+static GraveRecord ramGraveRecords[MAX_RAM_GRAVE_RECORDS];
+static uint8_t ramGraveCount = 0;
+
 bool StoragePet::logGraveRecord(const PetLogic& pet) {
+  // Always update in-memory ring buffer (acts as fallback if no SD or during tests)
+  GraveRecord rec;
+  rec.generation = pet.getGeneration();
+  rec.ageMinutes = pet.getAgeMinutes();
+  rec.deathCause = pet.getDeathCause();
+  rec.highScorePong = pet.getHighScorePong();
+  rec.highScoreMaze = pet.getHighScoreMaze();
+  strncpy(rec.epitaph, pet.getDeathEpitaph(), sizeof(rec.epitaph) - 1);
+  rec.epitaph[sizeof(rec.epitaph) - 1] = '\0';
+
+  if (ramGraveCount < MAX_RAM_GRAVE_RECORDS) {
+    ramGraveRecords[ramGraveCount++] = rec;
+  } else {
+    for (uint8_t i = 0; i < MAX_RAM_GRAVE_RECORDS - 1; i++) {
+      ramGraveRecords[i] = ramGraveRecords[i + 1];
+    }
+    ramGraveRecords[MAX_RAM_GRAVE_RECORDS - 1] = rec;
+  }
+
 #if defined(ARDUINO)
   if (!cardInitialized) return false;
 
@@ -356,7 +379,145 @@ bool StoragePet::logGraveRecord(const PetLogic& pet) {
   Serial.println((unsigned int)pet.getGeneration());
   return true;
 #else
-  (void)pet;
+  return true;
+#endif
+}
+
+bool StoragePet::parseGraveLine(const char* line, GraveRecord& outRecord) {
+  if (line == nullptr || line[0] == '\0') return false;
+
+  const char* pGen = strstr(line, "GEN ");
+  if (!pGen) return false;
+  outRecord.generation = (uint16_t)atoi(pGen + 4);
+
+  const char* pAge = strstr(line, "| Alder: ");
+  if (!pAge) return false;
+  outRecord.ageMinutes = (uint32_t)atol(pAge + 9);
+
+  const char* pDeath = strstr(line, "| Doed: ");
+  if (!pDeath) return false;
+  const char* causeStart = pDeath + 8;
+  const char* causeEnd = strchr(causeStart, '|');
+  if (!causeEnd) return false;
+
+  if (strstr(causeStart, "sult") && causeStart < causeEnd) {
+    outRecord.deathCause = DEATH_HUNGER;
+  } else if (strstr(causeStart, "ihjel") && causeStart < causeEnd) {
+    outRecord.deathCause = DEATH_COLD;
+  } else if (strstr(causeStart, "hedeslag") && causeStart < causeEnd) {
+    outRecord.deathCause = DEATH_HEAT;
+  } else if (strstr(causeStart, "ensomhed") && causeStart < causeEnd) {
+    outRecord.deathCause = DEATH_BOREDOM;
+  } else if (strstr(causeStart, "udmattelse") && causeStart < causeEnd) {
+    outRecord.deathCause = DEATH_EXHAUSTION;
+  } else if (strstr(causeStart, "alderdom") && causeStart < causeEnd) {
+    outRecord.deathCause = DEATH_OLD_AGE;
+  } else {
+    outRecord.deathCause = DEATH_NONE;
+  }
+
+  const char* pPong = strstr(line, "| Pong: ");
+  outRecord.highScorePong = pPong ? (uint16_t)atoi(pPong + 8) : 0;
+
+  const char* pMaze = strstr(line, "| Labyrint: ");
+  outRecord.highScoreMaze = pMaze ? (uint16_t)atoi(pMaze + 12) : 0;
+
+  const char* pQuoteStart = strchr(line, '"');
+  outRecord.epitaph[0] = '\0';
+  if (pQuoteStart) {
+    pQuoteStart++; // skip opening quote
+    const char* pQuoteEnd = strchr(pQuoteStart, '"');
+    size_t qLen = pQuoteEnd ? (size_t)(pQuoteEnd - pQuoteStart) : strlen(pQuoteStart);
+    if (qLen >= sizeof(outRecord.epitaph)) {
+      qLen = sizeof(outRecord.epitaph) - 1;
+    }
+    memcpy(outRecord.epitaph, pQuoteStart, qLen);
+    outRecord.epitaph[qLen] = '\0';
+  }
+
+  return (outRecord.generation > 0);
+}
+
+uint16_t StoragePet::getGraveRecordCount() {
+#if defined(ARDUINO)
+  if (!cardInitialized || !SD.exists("grave.txt")) {
+    return (uint16_t)ramGraveCount;
+  }
+  File file = SD.open("grave.txt", FILE_READ);
+  if (!file) {
+    return (uint16_t)ramGraveCount;
+  }
+  uint16_t count = 0;
+  while (file.available()) {
+    char c = (char)file.read();
+    if (c == '\n') {
+      count++;
+    }
+  }
+  file.close();
+  return (count > 0) ? count : (uint16_t)ramGraveCount;
+#else
+  return (uint16_t)ramGraveCount;
+#endif
+}
+
+bool StoragePet::loadGraveRecord(uint16_t index, GraveRecord& outRecord) {
+#if defined(ARDUINO)
+  if (!cardInitialized || !SD.exists("grave.txt")) {
+    if (index < ramGraveCount) {
+      outRecord = ramGraveRecords[index];
+      return true;
+    }
+    return false;
+  }
+
+  File file = SD.open("grave.txt", FILE_READ);
+  if (!file) {
+    if (index < ramGraveCount) {
+      outRecord = ramGraveRecords[index];
+      return true;
+    }
+    return false;
+  }
+
+  uint16_t currentLine = 0;
+  char lineBuf[220];
+  int linePos = 0;
+  bool found = false;
+
+  while (file.available()) {
+    char c = (char)file.read();
+    if (c == '\r') continue;
+    if (c == '\n') {
+      lineBuf[linePos] = '\0';
+      if (currentLine == index) {
+        found = parseGraveLine(lineBuf, outRecord);
+        break;
+      }
+      currentLine++;
+      linePos = 0;
+    } else if (linePos < (int)(sizeof(lineBuf) - 1)) {
+      lineBuf[linePos++] = c;
+    }
+  }
+
+  if (!found && linePos > 0 && currentLine == index) {
+    lineBuf[linePos] = '\0';
+    found = parseGraveLine(lineBuf, outRecord);
+  }
+
+  file.close();
+
+  if (!found && index < ramGraveCount) {
+    outRecord = ramGraveRecords[index];
+    return true;
+  }
+  return found;
+#else
+  if (index < ramGraveCount) {
+    outRecord = ramGraveRecords[index];
+    return true;
+  }
   return false;
 #endif
 }

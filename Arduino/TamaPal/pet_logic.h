@@ -47,6 +47,7 @@ public:
   uint16_t getGeneration() const;     // Generation counter (Gen 1, Gen 2...)
   void setGeneration(uint16_t gen);
   const char* getDeathCauseName() const; // E.g. "Døde af sult", "Døde af alderdom"
+  static const char* getDeathCauseName(DeathCause cause);
   const char* getDeathEpitaph() const;   // Humor / memorial epitaph in Danish
   void triggerDeath(DeathCause cause);   // Trigger death with cause
   void rebirth();                        // Rebirth as Baby of next generation

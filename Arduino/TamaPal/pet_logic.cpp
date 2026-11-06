@@ -347,7 +347,11 @@ void PetLogic::setGeneration(uint16_t gen) {
 }
 
 const char* PetLogic::getDeathCauseName() const {
-  switch (deathCause) {
+  return getDeathCauseName(getDeathCause());
+}
+
+const char* PetLogic::getDeathCauseName(DeathCause cause) {
+  switch (cause) {
     case DEATH_HUNGER:     return "Doede af sult";
     case DEATH_COLD:       return "Froes ihjel";
     case DEATH_HEAT:       return "Doede af hedeslag";

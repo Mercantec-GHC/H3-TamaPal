@@ -34,6 +34,14 @@ public:
   void openPongGame();
   void openMazeGame();
 
+  // Memorial gallery navigation
+  void openMemorial(uint16_t totalCount, ScreenType returnScreen = SCREEN_HOME);
+  uint16_t getMemorialIndex() const;
+  void setMemorialIndex(uint16_t index);
+  void memorialNext(uint16_t totalCount);
+  void memorialPrev(uint16_t totalCount);
+  ScreenType getMemorialReturnScreen() const;
+
   // Periodic update for animation interpolation and auto-close timers
   void update(unsigned long currentTimeMs);
 
@@ -55,8 +63,10 @@ public:
 
 private:
   ScreenType activeScreen;
+  ScreenType memorialReturnScreen;
   MenuIcon selectedIcon;
   uint8_t selectedGame;
+  uint16_t memorialIndex;
   int playerId;
 
   float cursorPositionX;

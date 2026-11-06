@@ -86,6 +86,13 @@ public:
   // Memorial ancestral log on MicroSD (appends to grave.txt)
   bool logGraveRecord(const PetLogic& pet);
 
+  // Query records from grave.txt (or RAM fallback)
+  uint16_t getGraveRecordCount();
+  bool loadGraveRecord(uint16_t index, GraveRecord& outRecord);
+
+  // Pure logic parser for a single line from grave.txt (unit testable without SD)
+  static bool parseGraveLine(const char* line, GraveRecord& outRecord);
+
   // FNV-1a non-cryptographic hash for dirty checking before SPI writes
   static uint32_t computeHash(const char* str);
 

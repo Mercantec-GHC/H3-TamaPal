@@ -49,7 +49,7 @@ void UiStatsRenderer::drawInitialScreen() {
 
   // Bottom navigation hint
   carrier->display.setTextColor(color565(100, 135, 180), bgColor);
-  const char* hint = "T3 / T4: Tilbage";
+  const char* hint = "T3:Tilb  T2:Mindelund";
   int hintWidth = strlen(hint) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - hintWidth) / 2, 206);
   carrier->display.print(hint);

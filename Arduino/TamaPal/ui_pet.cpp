@@ -356,18 +356,18 @@ void UiPetRenderer::drawMemorialCard(const PetLogic& pet, unsigned long nowMs, b
     carrier->display.print(statBuf);
   }
 
-  // Line 5: Blinking prompt [OK] FOR NYT AEG (500 ms toggle)
+  // Line 5: Blinking prompt [OK] NYT AEG | T4: MINDE (500 ms toggle)
   bool promptBlink = ((nowMs / 500) % 2 == 0);
   if (force || promptBlink != lastPromptBlink) {
     carrier->display.fillRect(38, 207, 164, 12, cardBg);
     carrier->display.setTextSize(1);
-    carrier->display.setCursor(72, 209);
+    carrier->display.setCursor(51, 209);
     if (promptBlink) {
       carrier->display.setTextColor(color565(60, 240, 150)); // Bright emerald
     } else {
       carrier->display.setTextColor(color565(25, 75, 45));   // Dim green
     }
-    carrier->display.print("[OK] FOR NYT AEG");
+    carrier->display.print("[OK] NYT AEG | T4: MINDE");
     lastPromptBlink = promptBlink;
   }
 }

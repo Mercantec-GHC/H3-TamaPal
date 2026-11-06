@@ -7,8 +7,10 @@
 // Initialize menu starting on HOME screen with first icon (Food) selected
 MenuLogic::MenuLogic()
   : activeScreen(SCREEN_HOME),
+    memorialReturnScreen(SCREEN_HOME),
     selectedIcon(ICON_FOOD),
     selectedGame(0),
+    memorialIndex(0),
     playerId(1),
     cursorPositionX(0.0f),
     targetPositionX(0.0f),
@@ -147,10 +149,50 @@ void MenuLogic::openMazeGame() {
   pendingSound = SOUND_CONFIRM;
 }
 
+void MenuLogic::openMemorial(uint16_t totalCount, ScreenType returnScreen) {
+  memorialReturnScreen = returnScreen;
+  memorialIndex = (totalCount > 0) ? (totalCount - 1) : 0;
+  activeScreen = SCREEN_MEMORIAL;
+  pendingSound = SOUND_CONFIRM;
+}
+
+uint16_t MenuLogic::getMemorialIndex() const {
+  return memorialIndex;
+}
+
+void MenuLogic::setMemorialIndex(uint16_t index) {
+  memorialIndex = index;
+}
+
+void MenuLogic::memorialNext(uint16_t totalCount) {
+  if (totalCount == 0) return;
+  if (memorialIndex + 1 < totalCount) {
+    memorialIndex++;
+    pendingSound = SOUND_CLICK;
+  }
+}
+
+void MenuLogic::memorialPrev(uint16_t totalCount) {
+  if (totalCount == 0) return;
+  if (memorialIndex > 0) {
+    memorialIndex--;
+    pendingSound = SOUND_CLICK;
+  }
+}
+
+ScreenType MenuLogic::getMemorialReturnScreen() const {
+  return memorialReturnScreen;
+}
+
 // TOUCH3: Back button - return to HOME screen from any other view
 void MenuLogic::onButtonBack() {
   if (activeScreen == SCREEN_MINIGAME_PONG || activeScreen == SCREEN_MINIGAME_MAZE) {
     activeScreen = SCREEN_GAMES_MENU;
+    pendingSound = SOUND_BACK;
+    return;
+  }
+  if (activeScreen == SCREEN_MEMORIAL) {
+    activeScreen = memorialReturnScreen;
     pendingSound = SOUND_BACK;
     return;
   }
