@@ -629,5 +629,33 @@ Lumis **Teenager-stadie** har fået sit fulde swag-look med attitude og gaming/D
    - Hævet "swag" højre øjenbryn, når Lumi er tilfreds.
    - Skævt selvsikkert katte-smil mod højre (smug smirk), der oser af selvtillid.
 
+___
+
+### 💼 Opdatering 6/11 (Morgen): Voksen Lumi (Adult) med diplomatkuffert, slips og blomstrende krone
+**Branch:** `feature/arduino-stages`  
+**Ansvarlig:** Oleh
+
+Lumis **Voksen-stadie (Adult)** er nu fuldt implementeret med et stilet forretnings- og vogter-look som beskrevet i Game Design Doc:
+
+#### Hvad er tilføjet:
+1. **Diplomatkuffert i læder (attaché case):**
+   - Klassisk forretningskuffert i varmt brunt læder (`#915028`) med mørk kantliste, syninger og gyldne messing-hjørnebeskyttere.
+   - Central messinglås med glinsende nøglehuls-refleksion.
+   - **Interaktiv holdning:** Lumi holder kuffertens buede håndtag fast i sin højre pote. Ved jubel (`SUPER_HAPPY` / `PLAYING`) hæver Lumi kufferten triumferende i vejret med begge poter!
+   - Ved kulde (`FREEZING`) trykker Lumi kufferten tæt ind til kroppen, mens han ryster.
+2. **Klassisk mørkerødt slips med guld-slipsenål:**
+   - Slips i dyb karminrød (`#D2233C`) med knude ved kraven og spids, der falder elegant ned over mochi-maven.
+   - Guld slipsenål med lysrefleks tværs over slipset.
+3. **Blomstrende Kokiri-vogterkrone:**
+   - To elegante svungne vogterblade med lysende grønne nerver.
+   - Blomstrende gylden lotus/krystal-krone i midten med ravfarvet kerne.
+4. **Gentleman-smil og rolig mimik:**
+   - Værdigt, selvsikkert og venligt forretnings-smil, der signalerer en moden og velplejet Lumi.
+
+#### Instruktion til test (Serial Monitor):
+* Tryk `s` i Serial Monitor (115200 baud) for at skifte til **Adult** (`[STAGE] Skiftet stadie til: adult`).
+* Test handlinger (Foder, Leg, Skæld ud) for at se kufferten og slipset animere sømløst uden flimmer.
+
+
 
 

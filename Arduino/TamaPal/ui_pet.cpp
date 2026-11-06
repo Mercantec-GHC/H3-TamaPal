@@ -264,10 +264,10 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
   int dy = newCy - oldCy;
   if (dx == 0 && dy == 0) return;
 
-  // Character bounding box relative to (cx, cy): X in [-29..+29], Y in [-35..+22]
+  // Character bounding box relative to (cx, cy): X in [-31..+33], Y in [-35..+22]
   if (dy > 0) {
-    // Moved down: clear top strip exposed above sprout, ears, and Kokiri horns (tip at cy - 34)
-    carrier->display.fillRect(oldCx - 29, oldCy - 35, 59, dy + 2, bgColor);
+    // Moved down: clear top strip exposed above sprout, ears, horns, and briefcase
+    carrier->display.fillRect(oldCx - 31, oldCy - 35, 65, dy + 2, bgColor);
   } else if (dy < 0) {
     // Moved up: clear bottom strip above the mossy platform (Y < 153)
     int clearH = (-dy) + 2;
@@ -276,16 +276,16 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
       clearH = 153 - clearY;
     }
     if (clearH > 0) {
-      carrier->display.fillRect(oldCx - 29, clearY, 59, clearH, bgColor);
+      carrier->display.fillRect(oldCx - 31, clearY, 65, clearH, bgColor);
     }
   }
 
   if (dx > 0) {
     // Moved right: clear left margin strip (including headphones and side paws)
-    carrier->display.fillRect(oldCx - 29, oldCy - 35, dx + 4, 57, bgColor);
+    carrier->display.fillRect(oldCx - 31, oldCy - 35, dx + 4, 57, bgColor);
   } else if (dx < 0) {
-    // Moved left: clear right margin strip (including headphones and side paws)
-    carrier->display.fillRect(newCx + 25, oldCy - 35, (-dx) + 4, 57, bgColor);
+    // Moved left: clear right margin strip (including headphones and briefcase)
+    carrier->display.fillRect(newCx + 25, oldCy - 35, (-dx) + 8, 57, bgColor);
   }
 }
 
@@ -449,6 +449,13 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
         carrier->display.drawLine(cx - 3, mouthY + 1, cx, mouthY + 2, mouthDark);
         carrier->display.drawLine(cx, mouthY + 2, cx + 4, mouthY - 1, mouthDark);
         carrier->display.drawPixel(cx + 4, mouthY - 2, mouthDark);
+      } else if (stage == STAGE_ADULT) {
+        // Adult: distinguished gentle gentleman smile of a composed professional
+        carrier->display.drawLine(cx - 4, mouthY + 1, cx - 1, mouthY + 2, mouthDark);
+        carrier->display.drawLine(cx - 1, mouthY + 2, cx + 1, mouthY + 2, mouthDark);
+        carrier->display.drawLine(cx + 1, mouthY + 2, cx + 4, mouthY + 1, mouthDark);
+        carrier->display.drawPixel(cx - 4, mouthY, mouthDark);
+        carrier->display.drawPixel(cx + 4, mouthY, mouthDark);
       } else {
         // Classic Tamagotchi 'w' cat smile
         carrier->display.drawLine(cx - 4, mouthY, cx - 2, mouthY + 2, mouthDark);
@@ -559,8 +566,26 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
 
     // Center sharp crest sprout
     carrier->display.fillTriangle(cx - 2, cy - 22, cx, cy - 29, cx + 2, cy - 22, leafHighlight);
+  } else if (stage == STAGE_ADULT) {
+    // -------------------------------------------------------------
+    // ADULT STAGE: Stately Kokiri Spirit Blossom / Crown Crest
+    // -------------------------------------------------------------
+    uint16_t blossomGold  = color565(255, 215, 60);
+    uint16_t blossomAmber = color565(255, 140, 40);
+
+    // Stately central stem
+    carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
+    // Two elegant arching guardian leaves
+    carrier->display.fillTriangle(cx - 1, cy - 25, cx - 11, cy - 32, cx - 7, cy - 22, leafEmerald);
+    carrier->display.fillTriangle(cx + 1, cy - 25, cx + 11, cy - 32, cx + 7, cy - 22, leafEmerald);
+    carrier->display.drawLine(cx - 2, cy - 26, cx - 9, cy - 30, leafHighlight);
+    carrier->display.drawLine(cx + 2, cy - 26, cx + 9, cy - 30, leafHighlight);
+    // Golden blooming lotus/crest on top of crown
+    carrier->display.fillCircle(cx, cy - 27, 4, blossomGold);
+    carrier->display.fillCircle(cx, cy - 27, 2, blossomAmber);
+    carrier->display.drawPixel(cx - 1, cy - 28, 0xFFFF);
   } else {
-    // Adult / Default: Stem + Kokiri Leaves
+    // Default / Old: Stem + Kokiri Leaves
     carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
     carrier->display.fillTriangle(cx - 1, cy - 25, cx - 10, cy - 31, cx - 7, cy - 23, leafEmerald);
     carrier->display.fillTriangle(cx + 1, cy - 25, cx + 10, cy - 31, cx + 7, cy - 23, leafEmerald);
@@ -628,6 +653,25 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillRoundRect(cx - 13, cy + 7, 26, 9, 4, bellyPatch);
   }
 
+  // 4b. Crimson Business Tie with Gold Clip for ADULT stage
+  if (stage == STAGE_ADULT && expr != EXPR_DEAD) {
+    uint16_t tieRed      = color565(210, 35, 60);
+    uint16_t tieShadow   = color565(140, 20, 40);
+    uint16_t tieGoldClip = color565(255, 215, 60);
+
+    // Collar knot
+    carrier->display.fillRoundRect(cx - 3, cy + 1, 6, 4, 1, tieRed);
+    carrier->display.drawPixel(cx, cy + 2, color565(255, 120, 140));
+
+    // Pointed tie draping over belly
+    carrier->display.fillTriangle(cx - 3, cy + 4, cx + 3, cy + 4, cx, cy + 13, tieRed);
+    carrier->display.drawLine(cx, cy + 4, cx, cy + 12, tieShadow);
+
+    // Golden tie bar / clip
+    carrier->display.drawFastHLine(cx - 2, cy + 7, 5, tieGoldClip);
+    carrier->display.drawPixel(cx + 2, cy + 7, 0xFFFF);
+  }
+
   // 5. Stubby Arms / Paws (Raised in celebration when super happy/playing/eating!)
   if (stage == STAGE_BABY) {
     // Baby tiny cute flipper paws
@@ -641,6 +685,89 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
       carrier->display.fillCircle(cx - 20, cy + 1, 2, bodyMain);
       carrier->display.fillCircle(cx + 20, cy + 1, 3, bodyOutline);
       carrier->display.fillCircle(cx + 20, cy + 1, 2, bodyMain);
+    }
+  } else if (stage == STAGE_ADULT && expr != EXPR_DEAD) {
+    // -------------------------------------------------------------
+    // ADULT STAGE: Right paw holding Diplomat Briefcase!
+    // -------------------------------------------------------------
+    uint16_t caseBrown = color565(145, 80, 40);   // Rich leather briefcase body
+    uint16_t caseDark  = color565(75, 40, 20);    // Dark leather trim & handle
+    uint16_t caseGold  = color565(255, 215, 60);  // Brass lock & corner protectors
+
+    if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING || expr == EXPR_EATING) {
+      // Cheering: Left paw raised high
+      carrier->display.fillRoundRect(cx - 27, cy - 7, 6, 8, 3, bodyOutline);
+      carrier->display.fillRoundRect(cx - 26, cy - 6, 4, 6, 2, bodyMain);
+
+      // Right paw raised holding briefcase high in celebration!
+      int caseX = cx + 18;
+      int caseY = cy - 8;
+      int caseW = 13;
+      int caseH = 10;
+
+      // Leather briefcase body
+      carrier->display.fillRoundRect(caseX, caseY, caseW, caseH, 2, caseBrown);
+      carrier->display.drawRoundRect(caseX, caseY, caseW, caseH, 2, caseDark);
+      carrier->display.drawFastHLine(caseX + 1, caseY + 4, caseW - 2, caseDark);
+
+      // Brass latches and corner guards
+      carrier->display.fillRect(caseX + 5, caseY + 3, 3, 3, caseGold);
+      carrier->display.drawPixel(caseX + 6, caseY + 4, 0xFFFF);
+      carrier->display.drawPixel(caseX, caseY, caseGold);
+      carrier->display.drawPixel(caseX + caseW - 1, caseY, caseGold);
+      carrier->display.drawPixel(caseX, caseY + caseH - 1, caseGold);
+      carrier->display.drawPixel(caseX + caseW - 1, caseY + caseH - 1, caseGold);
+
+      // Handle & raised right paw
+      carrier->display.drawRoundRect(caseX + 4, caseY + caseH - 1, 5, 3, 1, caseDark);
+      carrier->display.fillRoundRect(cx + 21, cy - 6, 6, 7, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx + 22, cy - 5, 4, 5, 1, bodyMain);
+
+    } else if (expr == EXPR_FREEZING) {
+      // Cold: Shivering paws tucked against body, holding briefcase close
+      carrier->display.fillRoundRect(cx - 21, cy + 2, 6, 6, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx + 15, cy + 2, 6, 6, 2, bodyOutline);
+
+      int caseX = cx + 17;
+      int caseY = cy + 4;
+      int caseW = 13;
+      int caseH = 10;
+      carrier->display.fillRoundRect(caseX, caseY, caseW, caseH, 2, caseBrown);
+      carrier->display.drawRoundRect(caseX, caseY, caseW, caseH, 2, caseDark);
+      carrier->display.fillRect(caseX + 5, caseY + 3, 3, 3, caseGold);
+
+    } else {
+      // Composed adult: Left paw relaxed at side
+      carrier->display.fillRoundRect(cx - 26, cy - 1, 5, 8, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx - 25, cy,     3, 6, 1, bodyMain);
+
+      // Stately Diplomat Briefcase resting beside right paw
+      int caseX = cx + 18;
+      int caseY = cy + 4;
+      int caseW = 13;
+      int caseH = 10;
+
+      // Handle arched on top
+      carrier->display.drawRoundRect(caseX + 4, caseY - 3, 5, 4, 1, caseDark);
+
+      // Leather briefcase body
+      carrier->display.fillRoundRect(caseX, caseY, caseW, caseH, 2, caseBrown);
+      carrier->display.drawRoundRect(caseX, caseY, caseW, caseH, 2, caseDark);
+      carrier->display.drawFastHLine(caseX + 1, caseY + 4, caseW - 2, caseDark);
+
+      // Center brass lock with bright keyhole shine
+      carrier->display.fillRect(caseX + 5, caseY + 3, 3, 3, caseGold);
+      carrier->display.drawPixel(caseX + 6, caseY + 4, 0xFFFF);
+
+      // Brass corner protectors
+      carrier->display.drawPixel(caseX, caseY, caseGold);
+      carrier->display.drawPixel(caseX + caseW - 1, caseY, caseGold);
+      carrier->display.drawPixel(caseX, caseY + caseH - 1, caseGold);
+      carrier->display.drawPixel(caseX + caseW - 1, caseY + caseH - 1, caseGold);
+
+      // Right paw firmly gripping the handle
+      carrier->display.fillRoundRect(caseX + 3, caseY - 2, 7, 4, 2, bodyOutline);
+      carrier->display.fillRoundRect(caseX + 4, caseY - 1, 5, 2, 1, bodyMain);
     }
   } else {
     if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING || expr == EXPR_EATING) {
@@ -869,9 +996,9 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   // 3. Delta-update Lumi (zero-flicker partial redraw)
   if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression) {
     if (expr != lastExpression) {
-      // Expression changed: clear full character bounds (paws, ears, horns, halo)
-      // to avoid ghost pixels from changed ear droop or raised/tucked paws
-      carrier->display.fillRect(lastDrawnCx - 29, lastDrawnCy - 35, 59, 57, nativeBg);
+      // Expression changed: clear full character bounds (paws, ears, horns, briefcase, halo)
+      // to avoid ghost pixels from changed ear droop, raised/tucked paws, or briefcase
+      carrier->display.fillRect(lastDrawnCx - 31, lastDrawnCy - 35, 65, 57, nativeBg);
       carrier->display.fillRoundRect(96, 154, 48, 5, 2, color565(12, 42, 30)); // drop shadow
     } else {
       eraseOldCharacterRim(lastDrawnCx, lastDrawnCy, targetCx, targetCy, nativeBg);
