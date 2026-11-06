@@ -832,6 +832,97 @@ void testMarbleMazeLogic() {
   CHECK(pauseMaze.getElapsedSeconds(8020) == 2, "Elapsed seconds remained 2s right after resume");
   pauseMaze.update(9020); // 1s more of play
   CHECK(pauseMaze.getElapsedSeconds(9020) == 3, "Elapsed seconds advanced to 3s after active play resumed");
+
+  // 8. Test timer in READY state, pitfall penalty (+5s) and berry bonus (-2s)
+  MazeLogic readyMaze;
+  readyMaze.generateMaze(777, 40);
+  readyMaze.update(1000);
+  readyMaze.update(5000);
+  CHECK(readyMaze.getState() == MAZE_STATE_READY, "Maze remains in READY before tilting");
+  CHECK(readyMaze.getElapsedSeconds(5000) == 0, "Timer shows 0s while waiting in READY");
+
+  readyMaze.setTilt(0.5f, 0.0f);
+  readyMaze.update(6000); // Transitions to PLAYING, startTimeMs = 6000
+  readyMaze.update(10000); // 4 seconds elapsed
+  CHECK(readyMaze.getElapsedSeconds(10000) == 4, "4 seconds elapsed in active play");
+
+  // BFS pathfinding to find an reachable pitfall cell along open passages
+  int pCol[MAZE_ROWS][MAZE_COLS];
+  int pRow[MAZE_ROWS][MAZE_COLS];
+  memset(pCol, -1, sizeof(pCol));
+  memset(pRow, -1, sizeof(pRow));
+
+  uint8_t qC[49], qR[49];
+  int qH = 0, qT = 0;
+  qC[qT] = 0; qR[qT] = 0; qT++;
+  pCol[0][0] = 0; pRow[0][0] = 0;
+
+  int targetPitC = -1, targetPitR = -1;
+  while (qH < qT && targetPitC == -1) {
+    uint8_t c = qC[qH];
+    uint8_t r = qR[qH];
+    qH++;
+    if (readyMaze.getCell(c, r) & MAZE_ITEM_PITFALL) {
+      targetPitC = c; targetPitR = r;
+      break;
+    }
+    uint8_t cell = readyMaze.getCell(c, r);
+    if (!(cell & MAZE_WALL_NORTH) && r > 0 && pCol[r - 1][c] == -1) {
+      pCol[r - 1][c] = c; pRow[r - 1][c] = r; qC[qT] = c; qR[qT] = r - 1; qT++;
+    }
+    if (!(cell & MAZE_WALL_EAST) && c < MAZE_COLS - 1 && pCol[r][c + 1] == -1) {
+      pCol[r][c + 1] = c; pRow[r][c + 1] = r; qC[qT] = c + 1; qR[qT] = r; qT++;
+    }
+    if (!(cell & MAZE_WALL_SOUTH) && r < MAZE_ROWS - 1 && pCol[r + 1][c] == -1) {
+      pCol[r + 1][c] = c; pRow[r + 1][c] = r; qC[qT] = c; qR[qT] = r + 1; qT++;
+    }
+    if (!(cell & MAZE_WALL_WEST) && c > 0 && pCol[r][c - 1] == -1) {
+      pCol[r][c - 1] = c; pRow[r][c - 1] = r; qC[qT] = c - 1; qR[qT] = r; qT++;
+    }
+  }
+
+  uint8_t pathC[49], pathR[49];
+  int pathLen = 0;
+  int currC = targetPitC, currR = targetPitR;
+  while (!(currC == 0 && currR == 0) && pathLen < 49 && currC >= 0 && currR >= 0) {
+    pathC[pathLen] = currC;
+    pathR[pathLen] = currR;
+    pathLen++;
+    int prevC = pCol[currR][currC];
+    int prevR = pRow[currR][currC];
+    currC = prevC;
+    currR = prevR;
+  }
+  for (int i = 0; i < pathLen / 2; i++) {
+    uint8_t tc = pathC[i]; pathC[i] = pathC[pathLen - 1 - i]; pathC[pathLen - 1 - i] = tc;
+    uint8_t tr = pathR[i]; pathR[i] = pathR[pathLen - 1 - i]; pathR[pathLen - 1 - i] = tr;
+  }
+
+  unsigned long tSim = 10000;
+  bool hitPit = false;
+  for (int p = 0; p < pathLen && !hitPit; p++) {
+    float targetX = (float)(MazeLogic::ORIGIN_X + pathC[p] * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
+    float targetY = (float)(MazeLogic::ORIGIN_Y + pathR[p] * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
+    for (int step = 0; step < 50; step++) {
+      float dx = targetX - readyMaze.getBallX();
+      float dy = targetY - readyMaze.getBallY();
+      float tx = (dx > 2.0f) ? 0.9f : ((dx < -2.0f) ? -0.9f : 0.0f);
+      float ty = (dy > 2.0f) ? 0.9f : ((dy < -2.0f) ? -0.9f : 0.0f);
+      readyMaze.setTilt(tx, ty);
+      tSim += 20;
+      readyMaze.update(tSim);
+      if (readyMaze.popPitfallFall()) {
+        hitPit = true;
+        break;
+      }
+      if (fabs(dx) <= 5.0f && fabs(dy) <= 5.0f) {
+        break;
+      }
+    }
+  }
+
+  CHECK(hitPit, "Ball triggered pitfall collision");
+  CHECK(readyMaze.getElapsedSeconds(tSim) >= 9, "Pitfall adds +5s penalty to elapsed timer");
 }
 
 int main() {

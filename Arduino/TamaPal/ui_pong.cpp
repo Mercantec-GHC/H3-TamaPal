@@ -264,7 +264,28 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
   // 1. HUD updates
   drawHud(pong, false);
 
-  // 2. Paddle delta-rendering
+  // 2. Ball delta-erasure & rendering
+  if (currentState != PONG_STATE_BALL_LOST) {
+    int16_t newBallX = (int16_t)pong.getBallX();
+    int16_t newBallY = (int16_t)pong.getBallY();
+    if (newBallX != lastBallX || newBallY != lastBallY) {
+      if (lastBallX != -1 && lastBallY != -1) {
+        carrier->display.fillRect(lastBallX, lastBallY,
+                                  PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, nativeBg);
+        if (lastBallX <= PongLogic::PADDLE_X + PongLogic::PADDLE_WIDTH + 1) {
+          lastPaddleY = -1; // Force paddle redraw if erased ball touched paddle
+        }
+      }
+
+      carrier->display.fillRoundRect(newBallX, newBallY,
+                                    PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, 1, ballYellow);
+      carrier->display.drawPixel(newBallX + 1, newBallY + 1, 0xFFFF);
+      lastBallX = newBallX;
+      lastBallY = newBallY;
+    }
+  }
+
+  // 3. Paddle delta-rendering (rendered after ball erase so paddle is never clipped by ball)
   int16_t newPaddleY = (int16_t)pong.getPaddleY();
   if (newPaddleY != lastPaddleY) {
     if (lastPaddleY != -1) {
@@ -277,24 +298,6 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     carrier->display.drawFastVLine(PongLogic::PADDLE_X + 2, newPaddleY + 2,
                                   PongLogic::PADDLE_HEIGHT - 4, 0xFFFF);
     lastPaddleY = newPaddleY;
-  }
-
-  // 3. Ball delta-rendering (do not render ball during BALL_LOST delay)
-  if (currentState != PONG_STATE_BALL_LOST) {
-    int16_t newBallX = (int16_t)pong.getBallX();
-    int16_t newBallY = (int16_t)pong.getBallY();
-    if (newBallX != lastBallX || newBallY != lastBallY) {
-      if (lastBallX != -1 && lastBallY != -1) {
-        carrier->display.fillRect(lastBallX, lastBallY,
-                                  PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, nativeBg);
-      }
-
-      carrier->display.fillRoundRect(newBallX, newBallY,
-                                    PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, 1, ballYellow);
-      carrier->display.drawPixel(newBallX + 1, newBallY + 1, 0xFFFF);
-      lastBallX = newBallX;
-      lastBallY = newBallY;
-    }
   }
 
   // Restore left danger dotted line if ball was near left boundary

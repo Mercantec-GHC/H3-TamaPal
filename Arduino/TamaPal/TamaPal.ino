@@ -314,7 +314,7 @@ void loop() {
       }
       syncPetStateToBackend(true);
     } else if (c == 'f' || c == 'F') {
-      petLogic.setVitals(petLogic.getHunger(), 15.0f, petLogic.getHappiness(), petLogic.getEnergy(), petLogic.getDiscipline());
+      petLogic.setVitals(petLogic.getHunger(), 15.0f, petLogic.getEnergy(), petLogic.getHappiness(), petLogic.getDiscipline());
       petLogic.setAmbientTemperature(12.0f);
       soundLed.playSound(SOUND_MISS);
       Serial.println(F("[SIMULERING] Det er iskoldt! Lumi fryser (12 grader, varme 15%)."));
@@ -323,7 +323,7 @@ void loop() {
       }
       syncPetStateToBackend(true);
     } else if (c == 'h' || c == 'H') {
-      petLogic.setVitals(petLogic.getHunger(), 85.0f, petLogic.getHappiness(), petLogic.getEnergy(), petLogic.getDiscipline());
+      petLogic.setVitals(petLogic.getHunger(), 85.0f, petLogic.getEnergy(), petLogic.getHappiness(), petLogic.getDiscipline());
       petLogic.setAmbientTemperature(28.0f);
       soundLed.playSound(SOUND_MISS);
       Serial.println(F("[SIMULERING] Det er hedt! Lumi sveder (28 grader, varme 85%)."));
@@ -400,11 +400,11 @@ void loop() {
     if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
       if (carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.onButtonPrev();
-        uiMenu.drawGamesMenu(menuLogic.getSelectedGame(), petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
+        uiMenu.drawGamesMenu(menuLogic.getSelectedGame(), petLogic.getHighScorePong(), petLogic.getHighScoreMaze(), false);
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
         menuLogic.onButtonNext();
-        uiMenu.drawGamesMenu(menuLogic.getSelectedGame(), petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
+        uiMenu.drawGamesMenu(menuLogic.getSelectedGame(), petLogic.getHighScorePong(), petLogic.getHighScoreMaze(), false);
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
         menuLogic.onButtonOk(now);
@@ -438,12 +438,16 @@ void loop() {
         lastTouchTimeMs = now;
       }
     } else {
-      // In active play: optional button paddle movement (e.g. board lying on desk)
-      if (touch0) {
-        pongLogic.movePaddle(4.5f); // Down
-      }
-      if (touch1) {
-        pongLogic.movePaddle(-4.5f); // Up
+      // In active play: optional button paddle movement (rate-limited to 50 Hz / 20 ms)
+      static unsigned long lastPaddleBtnMs = 0;
+      if (now - lastPaddleBtnMs >= 20) {
+        lastPaddleBtnMs = now;
+        if (touch0) {
+          pongLogic.movePaddle(4.5f); // Down
+        }
+        if (touch1) {
+          pongLogic.movePaddle(-4.5f); // Up
+        }
       }
       if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
         if (pongLogic.getScore() > 0) {
@@ -466,13 +470,16 @@ void loop() {
           petLogic.setHighScoreMaze(elapsed);
           storagePet.savePet(petLogic);
         }
-        // Boost happiness & discipline, spend a little energy
-        float newHap = petLogic.getHappiness() + 35.0f;
+        // Boost happiness & discipline, feed berries, spend energy
+        uint8_t berries = mazeLogic.getBerriesCollected();
+        float newHap = petLogic.getHappiness() + 35.0f + (berries * 5.0f);
         if (newHap > 100.0f) newHap = 100.0f;
         float newDisc = petLogic.getDiscipline() + 15.0f;
         if (newDisc > 100.0f) newDisc = 100.0f;
+        float newHunger = petLogic.getHunger() + (berries * 8.0f);
+        if (newHunger > 100.0f) newHunger = 100.0f;
         float newEnergy = (petLogic.getEnergy() >= 10) ? (petLogic.getEnergy() - 10.0f) : 0.0f;
-        petLogic.setVitals(petLogic.getHunger(), petLogic.getWarmth(), newEnergy, newHap, newDisc);
+        petLogic.setVitals(newHunger, petLogic.getWarmth(), newEnergy, newHap, newDisc);
         syncPetStateToBackend(true);
 
         menuLogic.onButtonBack(); // Return to games menu

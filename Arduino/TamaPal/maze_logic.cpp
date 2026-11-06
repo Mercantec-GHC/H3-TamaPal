@@ -248,7 +248,9 @@ void MazeLogic::update(unsigned long currentTimeMs) {
 
   if (lastUpdateMs == 0) {
     lastUpdateMs = currentTimeMs;
-    startTimeMs = currentTimeMs;
+    if (state != MAZE_STATE_READY) {
+      startTimeMs = currentTimeMs;
+    }
     return;
   }
 
@@ -418,7 +420,7 @@ void MazeLogic::resolveWallCollisions() {
   }
 
   // 5. Corner pillars (intersections of grid walls)
-  const float pillarR = r + 1.0f;
+  const float pillarR = r + 0.4f;
   const float pillarRSq = pillarR * pillarR;
   const float cornerX[4] = { cellLeft, cellRight, cellLeft, cellRight };
   const float cornerY[4] = { cellTop, cellTop, cellBottom, cellBottom };
@@ -436,10 +438,8 @@ void MazeLogic::resolveWallCollisions() {
 
       float dot = ballVx * nx + ballVy * ny;
       if (dot < 0.0f) {
-        ballVx -= (1.3f * dot * nx);
-        ballVy -= (1.3f * dot * ny);
-        ballVx *= 0.5f;
-        ballVy *= 0.5f;
+        ballVx -= (1.2f * dot * nx);
+        ballVy -= (1.2f * dot * ny);
         wallCollidedFlag = true;
       }
     }
@@ -491,14 +491,25 @@ uint8_t MazeLogic::getTotalBerries() const {
 }
 
 uint16_t MazeLogic::getElapsedSeconds(unsigned long currentMs) const {
-  if (startTimeMs == 0) return 0;
+  if (state == MAZE_STATE_READY || startTimeMs == 0) return 0;
+  unsigned long endMs = currentMs;
   if (state == MAZE_STATE_PAUSED && pauseStartMs >= startTimeMs) {
-    return (uint16_t)((pauseStartMs - startTimeMs) / 1000UL);
+    endMs = pauseStartMs;
+  } else if (state == MAZE_STATE_VICTORY) {
+    endMs = lastUpdateMs;
+  } else if (endMs == 0) {
+    endMs = (lastUpdateMs >= startTimeMs) ? lastUpdateMs : startTimeMs;
   }
-  unsigned long now = (state == MAZE_STATE_VICTORY) ? lastUpdateMs :
-                      (currentMs > 0 ? currentMs : (lastUpdateMs == 0 ? startTimeMs : lastUpdateMs));
-  if (now < startTimeMs) return 0;
-  return (uint16_t)((now - startTimeMs) / 1000UL);
+  if (endMs < startTimeMs) return 0;
+
+  unsigned long rawMs = (endMs - startTimeMs) + totalPausedMs;
+  unsigned long berryBonusMs = (unsigned long)berriesCollected * 2000UL;
+  if (rawMs > berryBonusMs) {
+    rawMs -= berryBonusMs;
+  } else {
+    rawMs = 0;
+  }
+  return (uint16_t)(rawMs / 1000UL);
 }
 
 uint16_t MazeLogic::getBestSeconds() const {

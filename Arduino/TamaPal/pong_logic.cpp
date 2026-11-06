@@ -131,7 +131,7 @@ void PongLogic::update(unsigned long currentTimeMs) {
 
   // 3. Paddle collision (Left paddle - swept check using prevBallX to prevent high-speed tunneling)
   const float paddleRight = (float)(PADDLE_X + PADDLE_WIDTH);
-  if (ballVx < 0.0f && ballX <= paddleRight && (prevBallX + BALL_SIZE) >= (float)PADDLE_X) {
+  if (ballVx < 0.0f && ballX <= paddleRight && (prevBallX + BALL_SIZE) >= (float)PADDLE_X && prevBallX >= (float)PADDLE_X) {
     if ((ballY + BALL_SIZE) >= paddleY && ballY <= (paddleY + PADDLE_HEIGHT)) {
       ballX = (float)(PADDLE_X + PADDLE_WIDTH);
 

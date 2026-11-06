@@ -23,7 +23,7 @@ public:
   void drawMenuBar(const MenuLogic& menu, bool forceRedrawAll);
 
   // Games selection menu
-  void drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore);
+  void drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore, bool fullRedraw = true);
 
   // Helper screens
   void drawPlaceholderScreen(const char* title, const char* hint);

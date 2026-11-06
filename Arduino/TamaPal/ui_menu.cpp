@@ -351,7 +351,7 @@ void UiMenuRenderer::drawPlaceholderScreen(const char* title, const char* hint) 
 }
 
 // Display games selection menu (Solo Pong vs Labyrinth)
-void UiMenuRenderer::drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore) {
+void UiMenuRenderer::drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore, bool fullRedraw) {
   if (carrier == nullptr) return;
 
   uint16_t bgDark    = color565(8, 12, 26);
@@ -363,15 +363,25 @@ void UiMenuRenderer::drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore,
   uint16_t whiteText = 0xFFFF;
   uint16_t hintText  = color565(110, 150, 195);
 
-  carrier->display.fillScreen(bgDark);
+  if (fullRedraw) {
+    carrier->display.fillScreen(bgDark);
 
-  // 1. Header
-  carrier->display.setTextSize(2);
-  carrier->display.setTextColor(goldText, bgDark);
-  const char* title = "MINISPIL";
-  int tw = strlen(title) * 12;
-  carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 24);
-  carrier->display.print(title);
+    // 1. Header
+    carrier->display.setTextSize(2);
+    carrier->display.setTextColor(goldText, bgDark);
+    const char* title = "MINISPIL";
+    int tw = strlen(title) * 12;
+    carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 24);
+    carrier->display.print(title);
+
+    // 4. Bottom controls hint
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(hintText, bgDark);
+    const char* bottomHint = "T0/T1:Skift | OK | T3:Exit";
+    int bw = strlen(bottomHint) * 6;
+    carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
+    carrier->display.print(bottomHint);
+  }
 
   // 2. Card 0: SOLO PONG (Y = 56, H = 54, W = 196)
   bool isPong = (selectedGame == 0);
@@ -419,15 +429,11 @@ void UiMenuRenderer::drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore,
 
   carrier->display.setTextColor(goldText, c1Bg);
   carrier->display.setCursor(46, 156);
-  snprintf(buf, sizeof(buf), "Rekord: %u", mazeHighScore);
+  if (mazeHighScore > 0) {
+    snprintf(buf, sizeof(buf), "Rekord: %u sek", mazeHighScore);
+  } else {
+    snprintf(buf, sizeof(buf), "Rekord: --");
+  }
   carrier->display.print(buf);
-
-  // 4. Bottom controls hint
-  carrier->display.setTextSize(1);
-  carrier->display.setTextColor(hintText, bgDark);
-  const char* bottomHint = "T0/T1:Skift | OK | T3:Exit";
-  int bw = strlen(bottomHint) * 6;
-  carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
-  carrier->display.print(bottomHint);
 }
 
