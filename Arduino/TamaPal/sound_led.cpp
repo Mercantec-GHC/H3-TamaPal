@@ -66,6 +66,12 @@ void SoundLedController::playSound(SoundType sound) {
   } else if (sound == SOUND_CRACK) {
     applyLedColor(255, 220, 80);      // Golden crack sparkle
     ledResetTimeMs = now + 150;
+  } else if (sound == SOUND_BUBBLES) {
+    applyLedColor(0, 220, 255);       // Aqua-cyan soap foam glow
+    ledResetTimeMs = now + 400;
+  } else if (sound == SOUND_HEAL) {
+    applyLedColor(80, 255, 120);      // Emerald healing brilliance
+    ledResetTimeMs = now + 500;
   }
 
   if (soundMuted) return;
@@ -128,6 +134,18 @@ void SoundLedController::playSound(SoundType sound) {
     case SOUND_CRACK:
       carrier->Buzzer.sound(1600);   // Sharp crack snap
       toneEndTimeMs = now + 22;
+      isBuzzerPlaying = true;
+      break;
+
+    case SOUND_BUBBLES:
+      carrier->Buzzer.sound(1350);   // Splashy bubble chirp
+      toneEndTimeMs = now + 50;
+      isBuzzerPlaying = true;
+      break;
+
+    case SOUND_HEAL:
+      carrier->Buzzer.sound(2093);   // High C7 healing bell
+      toneEndTimeMs = now + 180;
       isBuzzerPlaying = true;
       break;
 

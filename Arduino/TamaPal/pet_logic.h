@@ -73,6 +73,22 @@ public:
   // Direct vital setter for test verification
   void setVitals(float hunger, float warmth, float energy, float happiness, float discipline);
 
+  // Care mechanics: Sickness, Poop & Berry bank
+  uint16_t getBerries() const;
+  void addBerries(uint16_t count);
+  bool spendBerries(uint16_t count);
+  void setBerries(uint16_t count);
+
+  bool isSick() const;
+  void setSick(bool isSick);
+  bool cureSickness(uint16_t berryCost = 3);
+  uint8_t getSickTicks() const;
+
+  bool getHasPoop() const;
+  void setHasPoop(bool poop, unsigned long nowMs = 0);
+  void cleanPoop();
+  unsigned long getPoopTimeMs() const;
+
   // Minigame records and character age (persisted to MicroSD)
   uint16_t getHighScorePong() const;
   void setHighScorePong(uint16_t score);
@@ -99,6 +115,11 @@ private:
   bool alive;
   DeathCause deathCause;
   uint16_t generation;
+  uint16_t berryCount;
+  bool sick;
+  uint8_t sickTicks;
+  bool hasPoop;
+  unsigned long poopTimeMs;
   bool hatchingActive;
   unsigned long hatchingStartTimeMs;
   unsigned long pettingActiveUntilMs;

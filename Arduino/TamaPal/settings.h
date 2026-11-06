@@ -18,7 +18,7 @@ const int SCREEN_HEIGHT = 240;
 // Spacing 30 px ensures the 5 icons span X=48..192 (144 px total), matching the circular cutout perfectly!
 const int MENU_BAR_CENTER_Y = 36;
 const int MENU_ICON_SIZE = 24;         // Width & height of each icon in pixels
-const int MENU_ICON_SPACING = 30;      // Distance between centers of neighboring icons (Centers: 60, 90, 120, 150, 180)
+const int MENU_ICON_SPACING = 24;      // Distance between centers of neighboring icons (Centers: 60, 84, 108, 132, 156, 180)
 const int MENU_TOTAL_WIDTH = 144;      // Fits safely within the round bezel
 
 // Sliding frame animation speed (Lerp factor: 0.25 = 25% closer to target each frame)
@@ -100,14 +100,15 @@ enum ScreenType : uint8_t {
   SCREEN_HATCHING          // Egg hatching newborn cinematic sequence
 };
 
-// The 5 icons in the top navigation menu
+// The 6 icons in the top navigation menu
 enum MenuIcon : uint8_t {
   ICON_FOOD = 0,           // 0: Mad (Feed berry to Lumi)
   ICON_PLAY,               // 1: Leg (Play minigame / pet)
-  ICON_SCOLD,              // 2: Skaeld ud (Discipline when complaining)
-  ICON_STATS,              // 3: Statistik (Open 5 vitals dashboard)
-  ICON_CONNECT,            // 4: Forbind (Connect to Pong multiplayer)
-  ICON_TOTAL_COUNT         // Helper constant = 5 total icons
+  ICON_MEDICIN,            // 2: Medicin (Heal sickness with berries)
+  ICON_SCOLD,              // 3: Skaeld ud (Discipline when complaining)
+  ICON_STATS,              // 4: Statistik (Open 5 vitals dashboard)
+  ICON_CONNECT,            // 5: Forbind (Connect to Pong multiplayer)
+  ICON_TOTAL_COUNT         // Helper constant = 6 total icons
 };
 
 // Hardware touch buttons on the Arduino Oplà MKR Carrier
@@ -131,7 +132,9 @@ enum SoundType : uint8_t {
   SOUND_DEATH,             // Somber descending requiem tone
   SOUND_REBIRTH,           // Joyful ascending rebirth fanfare
   SOUND_PURR,              // Gentle purring cuddle chime when petted (500 ms)
-  SOUND_CRACK              // Sharp eggshell cracking tick (25 ms)
+  SOUND_CRACK,             // Sharp eggshell cracking tick (25 ms)
+  SOUND_BUBBLES,           // Effervescent soap bubbles splash when shaking board
+  SOUND_HEAL               // Uplifting medicine healing chime
 };
 
 // Events received from backend over MQTT (tamapal/opla-1/event)

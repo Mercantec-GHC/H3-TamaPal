@@ -37,24 +37,26 @@ void testNavigationWrapping() {
   printf("\n--- Test: Navigation and Wrapping ---\n");
   MenuLogic menu;
 
-  // Move right: 0 -> 1 -> 2 -> 3 -> 4 -> 0 (wrap)
+  // Move right: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0 (wrap)
   menu.onButtonNext();
   CHECK(menu.getSelectedIcon() == ICON_PLAY, "Next moves from 0 to 1 (PLAY)");
 
-  menu.onButtonNext(); // 2
-  menu.onButtonNext(); // 3
-  menu.onButtonNext(); // 4
+  menu.onButtonNext(); // 2 (MEDICIN)
+  CHECK(menu.getSelectedIcon() == ICON_MEDICIN, "Next moves from 1 to 2 (MEDICIN)");
+  menu.onButtonNext(); // 3 (SCOLD)
+  menu.onButtonNext(); // 4 (STATS)
+  menu.onButtonNext(); // 5 (CONNECT)
   CHECK(menu.getSelectedIcon() == ICON_CONNECT, "Reached last icon (CONNECT)");
 
   menu.onButtonNext(); // Wrap to 0
-  CHECK(menu.getSelectedIcon() == ICON_FOOD, "Next from 4 wraps to 0 (FOOD)");
+  CHECK(menu.getSelectedIcon() == ICON_FOOD, "Next from 5 wraps to 0 (FOOD)");
 
-  // Move left: 0 -> 4 (wrap)
+  // Move left: 0 -> 5 (wrap)
   menu.onButtonPrev();
-  CHECK(menu.getSelectedIcon() == ICON_CONNECT, "Prev from 0 wraps to 4 (CONNECT)");
+  CHECK(menu.getSelectedIcon() == ICON_CONNECT, "Prev from 0 wraps to 5 (CONNECT)");
 
   menu.onButtonPrev();
-  CHECK(menu.getSelectedIcon() == ICON_STATS, "Prev from 4 moves to 3 (STATS)");
+  CHECK(menu.getSelectedIcon() == ICON_STATS, "Prev from 5 moves to 4 (STATS)");
 }
 
 void testScreenSwitching() {
@@ -68,9 +70,10 @@ void testScreenSwitching() {
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "Second TOUCH4 returns to SCREEN_HOME");
 
   // 2. Select STATS via icon + OK
-  menu.onButtonNext(); // 1
-  menu.onButtonNext(); // 2
-  menu.onButtonNext(); // 3 (STATS)
+  menu.onButtonNext(); // 1 (PLAY)
+  menu.onButtonNext(); // 2 (MEDICIN)
+  menu.onButtonNext(); // 3 (SCOLD)
+  menu.onButtonNext(); // 4 (STATS)
   menu.onButtonOk(1000);
   CHECK(menu.getActiveScreen() == SCREEN_STATS, "OK on STATS icon opens SCREEN_STATS");
 
@@ -79,7 +82,7 @@ void testScreenSwitching() {
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "TOUCH3 returns from STATS to HOME");
 
   // 4. Select CONNECT -> SCREEN_CHOOSE_PLAYER -> selectPlayer(1) -> CONTROLLER
-  menu.onButtonNext(); // 4 (CONNECT)
+  menu.onButtonNext(); // 5 (CONNECT)
   menu.onButtonOk(1500);
   CHECK(menu.getActiveScreen() == SCREEN_CHOOSE_PLAYER, "OK on CONNECT icon opens SCREEN_CHOOSE_PLAYER");
   menu.selectPlayer(1);
@@ -1364,6 +1367,118 @@ void testEggHatchingAndPettingLogic() {
   CHECK(!pet.pet(20000), "Cannot pet deceased pet");
 }
 
+void testBerryBankAndMedicineLogic() {
+  printf("\n--- Test: Berry Bank & Medicine Economics ---\n");
+  PetLogic pet;
+
+  CHECK(pet.getBerries() == 0, "Berry bank starts empty (0 berries)");
+
+  pet.addBerries(10);
+  CHECK(pet.getBerries() == 10, "Earned 10 berries in wallet");
+
+  CHECK(pet.spendBerries(4), "Spent 4 berries successfully");
+  CHECK(pet.getBerries() == 6, "Remaining balance is 6 berries");
+
+  CHECK(!pet.spendBerries(10), "Cannot spend more berries than balance");
+  CHECK(pet.getBerries() == 6, "Balance unchanged after failed spend");
+
+  // Preserved across rebirth
+  pet.rebirth();
+  CHECK(pet.getBerries() == 6, "Berry bank preserved across rebirth into next generation");
+}
+
+void testPoopAndBathCleaningLogic() {
+  printf("\n--- Test: Poop Generation & Bath Cleaning ---\n");
+  PetLogic pet;
+
+  CHECK(!pet.getHasPoop(), "No poop initially");
+
+  pet.setVitals(50.0f, 80.0f, 80.0f, 50.0f, 50.0f);
+  bool feedOk = pet.feed();
+  CHECK(feedOk, "Pet feeds successfully");
+  CHECK(pet.getHasPoop(), "Poop appears on glade after eating");
+  CHECK(strcmp(pet.getMoodStatusDanish(), "Poelse paa skaermen! Ryst!") == 0, "Mood warns about poop on screen");
+
+  // Clean poop via shaking bath
+  pet.cleanPoop();
+  CHECK(!pet.getHasPoop(), "Poop washed away by bath");
+  CHECK(pet.getHappiness() == 70.0f, "Cleaning poop boosts happiness by +15% (55 -> 70)");
+
+  // Neglect poop for >= 60 seconds -> infection / sickness
+  pet.setHasPoop(true, 1000);
+  pet.update(1000); // init decay timer
+  CHECK(!pet.isSick(), "Pet not sick immediately after poop appears");
+
+  pet.update(62000); // 61s later
+  CHECK(pet.isSick(), "Neglecting poop for > 60s triggers sickness/infection!");
+}
+
+void testSicknessProgressionAndCure() {
+  printf("\n--- Test: Sickness Progression & Apothecary Cure ---\n");
+  PetLogic pet;
+
+  CHECK(!pet.isSick(), "Pet is healthy initially");
+
+  pet.setSick(true);
+  CHECK(pet.isSick(), "Pet is now sick");
+  CHECK(strcmp(pet.getMoodStatusDanish(), "Lumi er syg! Giv medicin!") == 0, "Mood calls for medicine");
+
+  // Cannot cure with 0 berries
+  CHECK(pet.getBerries() == 0, "Starts with 0 berries");
+  CHECK(!pet.cureSickness(3), "Cannot buy medicine without sufficient berries");
+  CHECK(pet.isSick(), "Pet remains sick when untreated");
+
+  // Cure with 5 berries
+  pet.addBerries(5);
+  pet.setVitals(60.0f, 60.0f, 60.0f, 40.0f, 50.0f);
+  CHECK(pet.cureSickness(3), "Curing pet with 3 berries succeeds!");
+  CHECK(!pet.isSick(), "Pet is fully cured and healthy again!");
+  CHECK(pet.getBerries() == 2, "3 berries deducted from bank (5 - 3 = 2)");
+  CHECK(pet.getHappiness() == 60.0f, "Happiness boosted +20% on healing (40 -> 60)");
+
+  // Cannot cure an already healthy pet
+  CHECK(!pet.cureSickness(1), "Cannot cure a healthy pet");
+
+  // Sustained untreated sickness causes death
+  pet.setSick(true);
+  pet.update(100000); // init decay timer
+  for (int i = 0; i < 13; i++) {
+    pet.update(100000 + ((i + 1) * 10000));
+  }
+  CHECK(!pet.isAlive(), "Untreated sickness for 12 ticks causes death");
+  CHECK(pet.getDeathCause() == DEATH_EXHAUSTION, "Death cause is exhaustion / severe illness");
+}
+
+void testStorageCarePersistence() {
+  printf("\n--- Test: MicroSD Storage with Berries, Sickness & Poop ---\n");
+  PetLogic pet;
+  pet.setBerries(25);
+  pet.setSick(true);
+  pet.setHasPoop(true);
+
+  char buffer[320];
+  StoragePet::serializeState(buffer, sizeof(buffer), pet);
+
+  CHECK(strstr(buffer, "BERRIES=25") != nullptr, "Serialized text contains BERRIES=25");
+  CHECK(strstr(buffer, "SICK=1") != nullptr, "Serialized text contains SICK=1");
+  CHECK(strstr(buffer, "POOP=1") != nullptr, "Serialized text contains POOP=1");
+
+  float h = 0, w = 0, e = 0, hap = 0, d = 0;
+  bool asleep = false;
+  PetStage stage = STAGE_BABY;
+  PetOutfit outfit = OUTFIT_DEFAULT;
+  uint16_t pong = 0, maze = 0, gen = 1, berries = 0;
+  uint32_t age = 0;
+  bool alive = true, sick = false, poop = false;
+  DeathCause dc = DEATH_NONE;
+
+  bool ok = StoragePet::deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age, gen, alive, dc, berries, sick, poop);
+  CHECK(ok, "Deserialization succeeds");
+  CHECK(berries == 25, "Deserialized berries count is 25");
+  CHECK(sick == true, "Deserialized sick status is true");
+  CHECK(poop == true, "Deserialized poop status is true");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -1393,6 +1508,10 @@ int main() {
   testPetDeathAndRebirth();
   testMemorialGallery();
   testEggHatchingAndPettingLogic();
+  testBerryBankAndMedicineLogic();
+  testPoopAndBathCleaningLogic();
+  testSicknessProgressionAndCure();
+  testStorageCarePersistence();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

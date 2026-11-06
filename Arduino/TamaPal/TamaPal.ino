@@ -376,6 +376,40 @@ void loop() {
           syncPetStateToBackend(true);
         }
       }
+    } else if (c == 'i' || c == 'I') {
+      petLogic.setSick(!petLogic.isSick());
+      soundLed.playSound(petLogic.isSick() ? SOUND_MISS : SOUND_CONFIRM);
+      Serial.print(F("[SYGDOM] Lumi sygestatus skiftet til: "));
+      Serial.println(petLogic.isSick() ? F("SYG (Kraever medicin!)") : F("RASK"));
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
+    } else if (c == 'x' || c == 'X') {
+      petLogic.setHasPoop(true, now);
+      soundLed.playSound(SOUND_CLICK);
+      Serial.println(F("[RENGØRING] Lumi har lavet en poelse paa skaermen! Ryst braettet!"));
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
+    } else if (c == 'b' || c == 'B') {
+      petLogic.cleanPoop();
+      uiPet.triggerBath(now);
+      soundLed.playSound(SOUND_BUBBLES);
+      soundLed.flashColor(0, 220, 255, 500);
+      Serial.println(F("[RENGØRING] Bad og saebeskum udloest! Poelse vasket vaek!"));
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
+    } else if (c == 'g' || c == 'G') {
+      petLogic.addBerries(5);
+      soundLed.playSound(SOUND_CONFIRM);
+      soundLed.flashColor(255, 215, 60, 300);
+      Serial.print(F("[BAER-PUNG] +5 gyldne baer tilfoejet! Total i pungen: "));
+      Serial.println((unsigned int)petLogic.getBerries());
+      syncPetStateToBackend(true);
     }
   }
 
@@ -469,6 +503,13 @@ void loop() {
           storagePet.savePet(petLogic);
         }
         petLogic.applyGameReward(pongLogic.getScore());
+        uint16_t earnedBerries = pongLogic.getScore() / 5;
+        if (earnedBerries > 0) {
+          petLogic.addBerries(earnedBerries);
+          Serial.print(F("[BAER-PUNG] Pong sejr! +"));
+          Serial.print((unsigned int)earnedBerries);
+          Serial.println(F(" baer vundet til apoteket!"));
+        }
         syncPetStateToBackend(true);
 
         menuLogic.onButtonBack(); // Return to games menu
@@ -509,6 +550,12 @@ void loop() {
         }
         // Boost happiness & discipline, feed berries, spend energy
         uint8_t berries = mazeLogic.getBerriesCollected();
+        if (berries > 0) {
+          petLogic.addBerries(berries);
+          Serial.print(F("[BAER-PUNG] Labyrint gennemfoert! +"));
+          Serial.print((unsigned int)berries);
+          Serial.println(F(" Deku-baer samlet i pungen!"));
+        }
         float newHap = petLogic.getHappiness() + 35.0f + (berries * 5.0f);
         if (newHap > 100.0f) newHap = 100.0f;
         float newDisc = petLogic.getDiscipline() + 15.0f;
@@ -772,6 +819,20 @@ void loop() {
             uiPet.drawActionScene(petLogic, EXPR_EXHAUSTED, "FOR TRAET!", "Lumi mangler energi...", now);
             soundLed.setMoodColor(120, 120, 180);
           }
+        } else if (menuLogic.getSelectedIcon() == ICON_MEDICIN) {
+          if (!petLogic.isSick()) {
+            uiPet.drawActionScene(petLogic, EXPR_CONTENT, "IKKE SYG!", "Lumi har det godt!", now);
+            soundLed.setMoodColor(80, 200, 120);
+          } else if (petLogic.getBerries() < 3) {
+            uiPet.drawActionScene(petLogic, EXPR_SICK, "MANGLER BAER!", "Koster 3 baer i apoteket!", now);
+            soundLed.setMoodColor(255, 60, 40);
+            soundLed.playSound(SOUND_MISS);
+          } else {
+            petLogic.cureSickness(3);
+            uiPet.drawActionScene(petLogic, EXPR_SUPER_HAPPY, "LUMI RASK!", "-3 baer: Feberen faldt!", now);
+            soundLed.playSound(SOUND_HEAL);
+            soundLed.setMoodColor(80, 255, 120);
+          }
         } else if (menuLogic.getSelectedIcon() == ICON_SCOLD) {
           petLogic.scold();
           uiPet.drawActionScene(petLogic, EXPR_SCOLDED, "SKAELD UD!", "Disciplin stiger!", now);
@@ -907,6 +968,31 @@ void loop() {
 
     // Real-time 2.5D Lumi character animation on HOME screen (breathing, blinking, Navi, shivering, ghost cenotaph)
     if (currentScreen == SCREEN_HOME && muteMessageEndTimeMs == 0) {
+      // Shake detection via accelerometer to wash away poop with foamy soap bubbles:
+      if (carrier.IMUmodule.accelerationAvailable()) {
+        float ax = 0.0f, ay = 0.0f, az = 0.0f;
+        carrier.IMUmodule.readAcceleration(ax, ay, az);
+        static float lastShakeAx = 0.0f, lastShakeAy = 0.0f, lastShakeAz = 1.0f;
+        static unsigned long lastShakeCheckMs = 0;
+        if (now - lastShakeCheckMs >= 40) {
+          lastShakeCheckMs = now;
+          float jerk = fabs(ax - lastShakeAx) + fabs(ay - lastShakeAy) + fabs(az - lastShakeAz);
+          lastShakeAx = ax;
+          lastShakeAy = ay;
+          lastShakeAz = az;
+          static unsigned long lastBathTriggerMs = 0;
+          if (jerk > 2.0f && petLogic.isAlive() && !petLogic.isSleeping() && (now - lastBathTriggerMs > 2000)) {
+            lastBathTriggerMs = now;
+            petLogic.cleanPoop();
+            uiPet.triggerBath(now);
+            soundLed.playSound(SOUND_BUBBLES);
+            soundLed.flashColor(0, 220, 255, 600); // 600 ms aqua-foam glow
+            Serial.println(F("[RYST-BEVÆGELSE] Du rystede Oplà-kortet! Lumi bades i sæbeskum!"));
+            syncPetStateToBackend(true);
+          }
+        }
+      }
+
       uiPet.updateHomeDisplay(petLogic, now, false);
     }
   }

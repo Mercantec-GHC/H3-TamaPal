@@ -29,6 +29,11 @@ void PetLogic::reset() {
   alive = true;
   deathCause = DEATH_NONE;
   generation = 1;
+  berryCount = 0;
+  sick = false;
+  sickTicks = 0;
+  hasPoop = false;
+  poopTimeMs = 0;
   hatchingActive = false;
   hatchingStartTimeMs = 0;
   pettingActiveUntilMs = 0;
@@ -67,6 +72,8 @@ bool PetLogic::feed() {
 
   hungerVal = clamp0100(hungerVal + PET_FEED_RESTORE);
   happinessVal = clamp0100(happinessVal + 5.0f);
+  hasPoop = true;
+  poopTimeMs = 0;
   return true;
 }
 
@@ -235,6 +242,32 @@ void PetLogic::update(unsigned long currentTimeMs) {
       }
     }
 
+    // Poop neglect: if poop stays on screen >= 60 seconds, Lumi catches an infection
+    if (hasPoop) {
+      if (poopTimeMs == 0) {
+        poopTimeMs = currentTimeMs;
+      } else if (currentTimeMs - poopTimeMs >= 60000) {
+        sick = true;
+      }
+    }
+
+    // Critical vitals infection: prolonged hunger, cold or exhaustion triggers sickness
+    if (needsAttention()) {
+      if (criticalTicks >= 4) {
+        sick = true;
+      }
+    }
+
+    // Untreated sickness progression:
+    if (sick) {
+      sickTicks += (uint8_t)elapsedIntervals;
+      happinessVal = clamp0100(happinessVal - (1.0f * intervals));
+      if (sickTicks >= 12) { // ~2 minutes untreated -> death from illness / exhaustion
+        triggerDeath(DEATH_EXHAUSTION);
+        return;
+      }
+    }
+
     // Check critical death conditions (after sustained neglected status)
     if (hungerVal <= 0.0f) {
       criticalTicks += (uint8_t)elapsedIntervals;
@@ -314,6 +347,12 @@ bool PetLogic::needsAttention() const {
 const char* PetLogic::getMoodStatusDanish() const {
   if (isAsleep) {
     return "Sover zZz...";
+  }
+  if (sick) {
+    return "Lumi er syg! Giv medicin!";
+  }
+  if (hasPoop) {
+    return "Poelse paa skaermen! Ryst!";
   }
   if (isOverheating()) {
     return "Lumi sveder! Tag huen af!";
@@ -407,10 +446,12 @@ void PetLogic::rebirth() {
   uint16_t nextGen = generation + 1;
   uint16_t keepPong = highScorePong;
   uint16_t keepMaze = highScoreMaze;
+  uint16_t keepBerries = berryCount;
   reset();
   generation = nextGen;
   highScorePong = keepPong;
   highScoreMaze = keepMaze;
+  berryCount = keepBerries;
 }
 
 void PetLogic::startHatching(unsigned long nowMs) {
@@ -537,5 +578,80 @@ uint32_t PetLogic::getAgeMinutes() const {
 void PetLogic::setAgeMinutes(uint32_t mins) {
   ageMinutes = mins;
   ageTickCount = 0;
+}
+
+uint16_t PetLogic::getBerries() const {
+  return berryCount;
+}
+
+void PetLogic::addBerries(uint16_t count) {
+  if (berryCount + count > 65535) {
+    berryCount = 65535;
+  } else {
+    berryCount += count;
+  }
+}
+
+bool PetLogic::spendBerries(uint16_t count) {
+  if (berryCount >= count) {
+    berryCount -= count;
+    return true;
+  }
+  return false;
+}
+
+void PetLogic::setBerries(uint16_t count) {
+  berryCount = count;
+}
+
+bool PetLogic::isSick() const {
+  return sick;
+}
+
+void PetLogic::setSick(bool isSick) {
+  sick = isSick;
+  if (!sick) {
+    sickTicks = 0;
+  }
+}
+
+bool PetLogic::cureSickness(uint16_t berryCost) {
+  if (!alive || !sick) return false;
+  if (berryCount < berryCost) return false;
+
+  berryCount -= berryCost;
+  sick = false;
+  sickTicks = 0;
+  happinessVal = clamp0100(happinessVal + 20.0f);
+  return true;
+}
+
+uint8_t PetLogic::getSickTicks() const {
+  return sickTicks;
+}
+
+bool PetLogic::getHasPoop() const {
+  return hasPoop;
+}
+
+void PetLogic::setHasPoop(bool poop, unsigned long nowMs) {
+  hasPoop = poop;
+  if (hasPoop) {
+    poopTimeMs = (nowMs > 0) ? nowMs : 1;
+  } else {
+    poopTimeMs = 0;
+  }
+}
+
+void PetLogic::cleanPoop() {
+  if (hasPoop) {
+    hasPoop = false;
+    poopTimeMs = 0;
+    happinessVal = clamp0100(happinessVal + 15.0f);
+  }
+}
+
+unsigned long PetLogic::getPoopTimeMs() const {
+  return poopTimeMs;
 }
 

@@ -82,6 +82,24 @@ public:
                                uint16_t& generation,
                                bool& alive,
                                DeathCause& deathCause);
+  static bool deserializeState(const char* text,
+                               float& hunger,
+                               float& warmth,
+                               float& energy,
+                               float& happiness,
+                               float& discipline,
+                               bool& asleep,
+                               PetStage& stage,
+                               PetOutfit& outfit,
+                               uint16_t& pong,
+                               uint16_t& maze,
+                               uint32_t& age,
+                               uint16_t& generation,
+                               bool& alive,
+                               DeathCause& deathCause,
+                               uint16_t& berries,
+                               bool& sick,
+                               bool& poop);
 
   // Memorial ancestral log on MicroSD (appends to grave.txt)
   bool logGraveRecord(const PetLogic& pet);

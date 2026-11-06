@@ -107,7 +107,36 @@ void UiMenuRenderer::drawIconPlay(int centerX, int centerY, bool isSelected) {
   carrier->display.drawPixel(centerX - 3, centerY - 4, color565(255, 255, 255));
 }
 
-// Icon 2: Skæld ud (Cute angry mochi face with > < squint eyes, blush and 💢 anger mark)
+// Icon 2: Medicin (Apothecary medicine bottle with healing red cross +)
+void UiMenuRenderer::drawIconMedicin(int centerX, int centerY, bool isSelected) {
+  uint16_t capColor    = isSelected ? color565(200, 150, 90)  : color565(140, 100, 60); // Wood cork / cap
+  uint16_t liquidColor = isSelected ? color565(220, 245, 255) : color565(160, 190, 210); // Clear medical liquid
+  uint16_t outline     = isSelected ? color565(0, 210, 230)   : color565(50, 80, 100);
+  uint16_t crossRed    = isSelected ? color565(255, 40, 60)   : color565(200, 30, 45);   // Medical cross
+  uint16_t gleamWhite  = color565(255, 255, 255);
+
+  // 1. Cap / Cork (top)
+  carrier->display.fillRect(centerX - 2, centerY - 8, 5, 2, capColor);
+  carrier->display.drawPixel(centerX - 2, centerY - 8, color565(240, 190, 130)); // Cap highlight
+
+  // 2. Bottle neck
+  carrier->display.fillRect(centerX - 1, centerY - 6, 3, 2, liquidColor);
+
+  // 3. Bottle body (rounded rect)
+  carrier->display.fillRoundRect(centerX - 5, centerY - 4, 11, 12, 2, liquidColor);
+  carrier->display.drawRoundRect(centerX - 5, centerY - 4, 11, 12, 2, outline);
+
+  // 4. Specular glass highlight (left rim)
+  carrier->display.drawFastVLine(centerX - 4, centerY - 2, 7, gleamWhite);
+
+  // 5. Red medical cross (+)
+  // Horizontal bar
+  carrier->display.fillRect(centerX - 3, centerY + 1, 7, 3, crossRed);
+  // Vertical bar
+  carrier->display.fillRect(centerX - 1, centerY - 1, 3, 7, crossRed);
+}
+
+// Icon 3: Skæld ud (Cute angry mochi face with > < squint eyes, blush and 💢 anger mark)
 void UiMenuRenderer::drawIconScold(int centerX, int centerY, bool isSelected) {
   uint16_t faceColor   = isSelected ? color565(255, 80, 90)   : color565(190, 60, 70);
   uint16_t glossColor  = isSelected ? color565(255, 140, 150) : color565(210, 95, 105);
@@ -296,6 +325,7 @@ void UiMenuRenderer::drawMenuBar(const MenuLogic& menu, bool forceRedrawAll) {
     switch (icon) {
       case ICON_FOOD:    drawIconFood(iconCenterX, iconCenterY, isSelected); break;
       case ICON_PLAY:    drawIconPlay(iconCenterX, iconCenterY, isSelected); break;
+      case ICON_MEDICIN: drawIconMedicin(iconCenterX, iconCenterY, isSelected); break;
       case ICON_SCOLD:   drawIconScold(iconCenterX, iconCenterY, isSelected); break;
       case ICON_STATS:   drawIconStats(iconCenterX, iconCenterY, isSelected); break;
       case ICON_CONNECT: drawIconConnect(iconCenterX, iconCenterY, isSelected); break;

@@ -36,9 +36,10 @@ private:
   ScreenType lastDrawnScreen;
   bool isMenuInitialized;
 
-  // Vector drawing helpers for the 5 icons
+  // Vector drawing helpers for the 6 icons
   void drawIconFood(int centerX, int centerY, bool isSelected);
   void drawIconPlay(int centerX, int centerY, bool isSelected);
+  void drawIconMedicin(int centerX, int centerY, bool isSelected);
   void drawIconScold(int centerX, int centerY, bool isSelected);
   void drawIconStats(int centerX, int centerY, bool isSelected);
   void drawIconConnect(int centerX, int centerY, bool isSelected);

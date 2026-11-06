@@ -29,7 +29,9 @@ UiPetRenderer::UiPetRenderer()
     lastWeather(SKY_DAY_SUNNY),
     stageInitialized(false),
     lastBlinking(false),
-    lastPromptBlink(false) {}
+    lastPromptBlink(false),
+    lastHadPoop(false),
+    bathEndTimeMs(0) {}
 
 void UiPetRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
@@ -42,6 +44,9 @@ LumiExpression UiPetRenderer::determineExpression(const PetLogic& pet) {
   }
   if (pet.isSleeping()) {
     return EXPR_SLEEPING;
+  }
+  if (pet.isSick()) {
+    return EXPR_SICK;
   }
   if (pet.isOverheating()) {
     return EXPR_OVERHEATING;
@@ -520,8 +525,8 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
       carrier->display.drawPixel(rightEyeX + 1, eyeY - 2, pureWhite);
     }
 
-    // Half-closed droopy eyelids when EXHAUSTED
-    if (expr == EXPR_EXHAUSTED) {
+    // Half-closed droopy eyelids when EXHAUSTED or SICK
+    if (expr == EXPR_EXHAUSTED || expr == EXPR_SICK) {
       carrier->display.fillRect(leftEyeX - 4, eyeY - 5, 9, 4, bodyColor);
       carrier->display.drawFastHLine(leftEyeX - 4, eyeY - 1, 9, eyeDark);
       carrier->display.fillRect(rightEyeX - 4, eyeY - 5, 9, 4, bodyColor);
@@ -697,6 +702,20 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
       carrier->display.drawPixel(cx - 3, mouthY + 2, mouthDark);
       carrier->display.drawPixel(cx + 3, mouthY + 2, mouthDark);
       break;
+
+    case EXPR_SICK:
+      // Pouty mouth with glass thermometer sticking out to the right
+      carrier->display.drawFastHLine(cx - 3, mouthY + 1, 4, mouthDark);
+      // Thermometer glass tube
+      carrier->display.fillRect(cx - 1, mouthY, 11, 2, color565(230, 245, 255));
+      // Red mercury inside tube
+      carrier->display.drawFastHLine(cx + 4, mouthY, 6, color565(255, 40, 50));
+      // Red mercury bulb at tip
+      carrier->display.fillCircle(cx + 11, mouthY + 1, 2, color565(255, 30, 40));
+      // Floating red medical cross (+) over right ear
+      carrier->display.fillRect(cx + 17, cy - 17, 2, 6, color565(255, 40, 50));
+      carrier->display.fillRect(cx + 15, cy - 15, 6, 2, color565(255, 40, 50));
+      break;
   }
 }
 
@@ -734,6 +753,13 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   } else if (expr == EXPR_SCOLDED) {
     bodyMain    = color565(180, 240, 215);
     earInner    = color565(255, 110, 130);
+  } else if (expr == EXPR_SICK) {
+    bodyMain    = color565(190, 235, 205); // Pale sickly green-cream
+    bodyOutline = color565(75, 120, 95);
+    bodyShade   = color565(145, 195, 160);
+    bellyPatch  = color565(225, 245, 230);
+    footColor   = color565(120, 175, 135);
+    earInner    = color565(230, 140, 150); // Pale droopy ears
   } else if (expr == EXPR_DEAD) {
     bodyMain    = color565(210, 225, 235); // Ethereal Spirit White-Blue
     bodyOutline = color565(110, 140, 165);
@@ -1604,6 +1630,10 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
       const char* mood = beingPetted ? "LUMI ELSKER DIG! <3" : pet.getMoodStatusDanish();
       drawMoodBanner(mood, expr);
       lastMoodText = mood;
+      if (pet.getHasPoop()) {
+        drawPoop(168, 145, overlayPhase);
+        lastHadPoop = true;
+      }
     }
 
     lastDrawnCx      = targetCx;
@@ -1642,6 +1672,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     else if (expr == EXPR_FREEZING) bodyMain = color565(150, 215, 255);
     else if (expr == EXPR_SLEEPING) bodyMain = color565(130, 195, 225);
     else if (expr == EXPR_SCOLDED) bodyMain = color565(180, 240, 215);
+    else if (expr == EXPR_SICK) bodyMain = color565(190, 235, 205);
     else if (expr == EXPR_DEAD) bodyMain = color565(210, 225, 235);
 
     drawFaceFeatures(targetCx, targetCy, expr, isBlinking, stage, outfit, bodyMain);
@@ -1663,6 +1694,24 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     if (currentMood != lastMoodText) {
       drawMoodBanner(currentMood, expr);
       lastMoodText = currentMood;
+    }
+  }
+
+  // 6. Delta-update Poop and Soap Bubbles shower
+  if (expr != EXPR_DEAD) {
+    const int poopX = 168;
+    const int poopY = 145;
+    bool hasPoop = pet.getHasPoop();
+    if (hasPoop) {
+      drawPoop(poopX, poopY, overlayPhase);
+      lastHadPoop = true;
+    } else if (lastHadPoop) {
+      erasePoop(poopX, poopY, nativeBg);
+      lastHadPoop = false;
+    }
+
+    if (isBathing(nowMs)) {
+      drawSoapBubbles(nowMs);
     }
   }
 }
@@ -1875,4 +1924,68 @@ void UiPetRenderer::drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16
   }
 
   stageInitialized = false;
+}
+
+void UiPetRenderer::triggerBath(unsigned long nowMs) {
+  bathEndTimeMs = nowMs + 1500;
+}
+
+bool UiPetRenderer::isBathing(unsigned long nowMs) const {
+  return nowMs < bathEndTimeMs;
+}
+
+void UiPetRenderer::drawPoop(int x, int y, int phase) {
+  if (carrier == nullptr) return;
+  uint16_t poopDark  = color565(110, 60, 25);
+  uint16_t poopMid   = color565(145, 85, 35);
+  uint16_t poopLight = color565(185, 115, 50);
+  uint16_t flyColor  = color565(35, 35, 45);
+
+  // 1. Swirl poop body
+  carrier->display.fillRoundRect(x - 6, y + 2, 12, 5, 2, poopMid);
+  carrier->display.drawRoundRect(x - 6, y + 2, 12, 5, 2, poopDark);
+  carrier->display.fillCircle(x, y, 4, poopMid);
+  carrier->display.drawCircle(x, y, 4, poopDark);
+  carrier->display.drawPixel(x, y - 4, poopLight); // Tip swirl
+  carrier->display.drawPixel(x - 2, y - 1, poopLight); // Specular highlight
+
+  // 2. Tiny buzzing flies (alternating animation)
+  int f1Y = (phase % 2 == 0) ? (y - 7) : (y - 8);
+  int f2Y = (phase % 2 == 0) ? (y - 6) : (y - 5);
+  carrier->display.drawPixel(x - 5, f1Y, flyColor);
+  carrier->display.drawPixel(x + 5, f2Y, flyColor);
+}
+
+void UiPetRenderer::erasePoop(int x, int y, uint16_t bgColor) {
+  if (carrier == nullptr) return;
+  // Clear bounding box of poop + flies
+  carrier->display.fillRect(x - 8, y - 9, 17, 18, bgColor);
+  // Redraw underlying grass blades/flower
+  uint16_t grassGreen  = color565(80, 190, 100);
+  uint16_t petalBlue   = color565(150, 225, 255);
+  uint16_t flowerCore  = color565(255, 230, 80);
+  carrier->display.drawLine(171, 153, 169, 148, grassGreen);
+  carrier->display.drawLine(172, 153, 172, 147, grassGreen);
+  carrier->display.drawLine(173, 153, 176, 149, grassGreen);
+  carrier->display.fillCircle(172, 146, 3, petalBlue);
+  carrier->display.drawPixel(172, 146, flowerCore);
+}
+
+void UiPetRenderer::drawSoapBubbles(unsigned long nowMs) {
+  if (carrier == nullptr) return;
+  int step = (nowMs / 80) % 6;
+  uint16_t bubbleCyan  = color565(140, 230, 255);
+  uint16_t bubbleWhite = 0xFFFF;
+
+  // Clustered buoyant foam bubbles across the glade
+  const int bubblePos[6][2] = {
+    {85, 130}, {105, 115}, {135, 125}, {155, 110}, {168, 140}, {118, 95}
+  };
+  for (int i = 0; i < 6; i++) {
+    int bx = bubblePos[i][0] + ((step + i) % 3) - 1;
+    int by = bubblePos[i][1] - (step * 2);
+    int r = 3 + (i % 3);
+    carrier->display.drawCircle(bx, by, r, bubbleCyan);
+    carrier->display.drawPixel(bx - 1, by - 1, bubbleWhite);
+  }
 }

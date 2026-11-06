@@ -153,5 +153,14 @@ void UiStatsRenderer::updateDisplay(const PetLogic& pet, bool forceRedraw) {
 
     lastMoodText = currentMood;
   }
+
+  // 7. Berry Bank wallet display (Row Y = 192)
+  char berryBuffer[24];
+  snprintf(berryBuffer, sizeof(berryBuffer), "BAER-PUNG: %u", (unsigned int)pet.getBerries());
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(color565(255, 215, 60), bgColor);
+  int bWidth = strlen(berryBuffer) * 6;
+  carrier->display.setCursor((SCREEN_WIDTH - bWidth) / 2, 192);
+  carrier->display.print(berryBuffer);
 }
 

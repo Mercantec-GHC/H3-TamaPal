@@ -21,12 +21,12 @@ MenuLogic::MenuLogic()
   cursorPositionX = targetPositionX;
 }
 
-// Calculate the center X position on screen for any given icon index (0..4)
-// Formula: center of screen (120) + offset from middle icon (icon 2 is center)
+// Calculate the center X position on screen for any given icon index (0..5)
+// Formula: center of screen (120) + offset from visual middle (between icon 2 and 3: 2.5)
 float MenuLogic::calculateIconCenterX(MenuIcon icon) {
   const float screenCenterX = SCREEN_WIDTH / 2.0f; // 120.0f
-  const int offsetFromCenterIcon = (int)icon - 2;   // Icon 2 is at offset 0
-  return screenCenterX + (offsetFromCenterIcon * MENU_ICON_SPACING);
+  const float offsetFromCenter = (float)icon - 2.5f;
+  return screenCenterX + (offsetFromCenter * MENU_ICON_SPACING);
 }
 
 // Return Danish text label for the active icon (used under menu bar)
@@ -34,6 +34,7 @@ const char* MenuLogic::getIconLabelDanish(MenuIcon icon) {
   switch (icon) {
     case ICON_FOOD:     return "MAD";
     case ICON_PLAY:     return "LEG";
+    case ICON_MEDICIN:  return "MEDICIN";
     case ICON_SCOLD:    return "SKAELD UD";
     case ICON_STATS:    return "STATISTIK";
     case ICON_CONNECT:  return "FORBIND";

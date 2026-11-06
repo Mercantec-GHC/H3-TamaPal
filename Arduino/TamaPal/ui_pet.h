@@ -23,7 +23,8 @@ enum LumiExpression : uint8_t {
   EXPR_PLAYING,         // Action mode: Bouncing happily with stars & Navi spinning
   EXPR_SCOLDED,         // Action mode: Blushed pouty face with manga anger/sweat mark
   EXPR_OVERHEATING,     // Overheated in winter clothes: Sweating droplet, flushed cheeks, panting
-  EXPR_DEAD             // Health == 0: Peaceful spirit with glowing halo
+  EXPR_DEAD,            // Health == 0: Peaceful spirit with glowing halo
+  EXPR_SICK             // Fever / illness: Pale sickly hue, thermometer, droopy eyes
 };
 
 // Ambient sky weather / time-of-day visual state
@@ -59,6 +60,10 @@ public:
   // Render cinematic egg hatching sequence (SCREEN_HATCHING: 0=wobble, 1=crack, 2=breakout)
   void drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16_t generation);
 
+  // Trigger foamy soap bubble shower when shaking the board
+  void triggerBath(unsigned long nowMs);
+  bool isBathing(unsigned long nowMs) const;
+
 private:
   MKRIoTCarrier* carrier;
   const char* lastMoodText;
@@ -78,9 +83,18 @@ private:
   bool stageInitialized;
   bool lastBlinking;
   bool lastPromptBlink;
+  bool lastHadPoop;
+  unsigned long bathEndTimeMs;
 
   // Draw seamless Kokiri forest glade platform and flora (cenotaph gravestone when dead)
   void drawForestStage(SkyWeatherMode weather, bool isDead = false);
+
+  // Poop 💩 drawing and cleaning routines
+  void drawPoop(int x, int y, int phase);
+  void erasePoop(int x, int y, uint16_t bgColor);
+
+  // Foamy soap bubble shower animation during bath
+  void drawSoapBubbles(unsigned long nowMs);
 
   // Draw bottom memorial card when Lumi is deceased
   void drawMemorialCard(const PetLogic& pet, unsigned long nowMs, bool force);

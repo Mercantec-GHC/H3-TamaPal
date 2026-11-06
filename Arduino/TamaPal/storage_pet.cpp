@@ -56,7 +56,7 @@ uint32_t StoragePet::getLastSavedHash() const {
 void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pet) {
   if (buffer == nullptr || bufSize == 0) return;
   snprintf(buffer, bufSize,
-           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\nPONG=%u\nMAZE=%u\nAGE=%lu\nGEN=%u\nALIVE=%d\nDEATH=%d\n",
+           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\nPONG=%u\nMAZE=%u\nAGE=%lu\nGEN=%u\nALIVE=%d\nDEATH=%d\nBERRIES=%u\nSICK=%d\nPOOP=%d\n",
            pet.getHunger(),
            pet.getWarmth(),
            pet.getEnergy(),
@@ -70,7 +70,10 @@ void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pe
            (unsigned long)pet.getAgeMinutes(),
            (unsigned int)pet.getGeneration(),
            pet.isAlive() ? 1 : 0,
-           (int)pet.getDeathCause());
+           (int)pet.getDeathCause(),
+           (unsigned int)pet.getBerries(),
+           pet.isSick() ? 1 : 0,
+           pet.getHasPoop() ? 1 : 0);
 }
 
 bool StoragePet::deserializeState(const char* text,
@@ -126,7 +129,10 @@ bool StoragePet::deserializeState(const char* text,
                                  uint32_t& age,
                                  uint16_t& generation,
                                  bool& alive,
-                                 DeathCause& deathCause) {
+                                 DeathCause& deathCause,
+                                 uint16_t& berries,
+                                 bool& sick,
+                                 bool& poop) {
   if (text == nullptr || text[0] == '\0') return false;
 
   int h = -1, w = -1, e = -1, hap = -1, d = -1, s = -1;
@@ -138,6 +144,9 @@ bool StoragePet::deserializeState(const char* text,
   int gVal = 1;
   int alVal = 1;
   int dcVal = 0;
+  int bVal = 0;
+  int sickVal = 0;
+  int poopVal = 0;
   const char* p = text;
 
   // Robust line-by-line parser supporting arbitrary line order
@@ -170,6 +179,12 @@ bool StoragePet::deserializeState(const char* text,
       alVal = atoi(p + 6);
     } else if (strncmp(p, "DEATH=", 6) == 0) {
       dcVal = atoi(p + 6);
+    } else if (strncmp(p, "BERRIES=", 8) == 0) {
+      bVal = atoi(p + 8);
+    } else if (strncmp(p, "SICK=", 5) == 0) {
+      sickVal = atoi(p + 5);
+    } else if (strncmp(p, "POOP=", 5) == 0) {
+      poopVal = atoi(p + 5);
     }
 
     const char* nextLine = strchr(p, '\n');
@@ -187,7 +202,8 @@ bool StoragePet::deserializeState(const char* text,
       st < 0 || st > 3 ||
       outf < 0 || outf > 1 ||
       pVal < 0 || mVal < 0 || aVal < 0 ||
-      gVal < 1 || alVal < 0 || alVal > 1 || dcVal < 0 || dcVal > 6) {
+      gVal < 1 || alVal < 0 || alVal > 1 || dcVal < 0 || dcVal > 6 ||
+      bVal < 0 || sickVal < 0 || sickVal > 1 || poopVal < 0 || poopVal > 1) {
     return false;
   }
 
@@ -205,7 +221,31 @@ bool StoragePet::deserializeState(const char* text,
   generation = (uint16_t)gVal;
   alive = (alVal == 1);
   deathCause = (DeathCause)dcVal;
+  berries = (uint16_t)bVal;
+  sick = (sickVal == 1);
+  poop = (poopVal == 1);
   return true;
+}
+
+bool StoragePet::deserializeState(const char* text,
+                                 float& hunger,
+                                 float& warmth,
+                                 float& energy,
+                                 float& happiness,
+                                 float& discipline,
+                                 bool& asleep,
+                                 PetStage& stage,
+                                 PetOutfit& outfit,
+                                 uint16_t& pong,
+                                 uint16_t& maze,
+                                 uint32_t& age,
+                                 uint16_t& generation,
+                                 bool& alive,
+                                 DeathCause& deathCause) {
+  uint16_t dummyBerries = 0;
+  bool dummySick = false;
+  bool dummyPoop = false;
+  return deserializeState(text, hunger, warmth, energy, happiness, discipline, asleep, stage, outfit, pong, maze, age, generation, alive, deathCause, dummyBerries, dummySick, dummyPoop);
 }
 
 bool StoragePet::deserializeState(const char* text,
@@ -293,7 +333,10 @@ bool StoragePet::loadPet(PetLogic& pet) {
   uint16_t gen = 1;
   bool alive = true;
   DeathCause deathCause = DEATH_NONE;
-  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age, gen, alive, deathCause)) {
+  uint16_t berries = 0;
+  bool sick = false;
+  bool poop = false;
+  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age, gen, alive, deathCause, berries, sick, poop)) {
     pet.setVitals(h, w, e, hap, d);
     pet.setSleeping(asleep);
     pet.setStage(stage);
@@ -302,6 +345,9 @@ bool StoragePet::loadPet(PetLogic& pet) {
     pet.setHighScoreMaze(maze);
     pet.setAgeMinutes(age);
     pet.setGeneration(gen);
+    pet.setBerries(berries);
+    pet.setSick(sick);
+    pet.setHasPoop(poop);
     if (!alive) {
       pet.triggerDeath(deathCause);
     }
