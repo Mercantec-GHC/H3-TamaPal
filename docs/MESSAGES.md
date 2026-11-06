@@ -718,6 +718,42 @@ Lumis **Garderobe-system (`Garderobe`) og dynamiske termoregulerings-mekanik** e
    - Garderobevalg gemmes på MicroSD i `lumi.txt` som `OUTFIT=0` (Standard) eller `OUTFIT=1` (Vinter).
    - I `pet/state` MQTT JSON sendes `"outfit": "default"` eller `"outfit": "winter"`.
 
+___
+
+### 🥶 Opdatering 6/11 (Eftermiddag): Autentisk kropslig reaktion på kulde og varme (Sammenkrøbning, rystelser & udmattet hedeslag)
+**Branch:** `feature/arduino-wardrobe`  
+**Ansvarlig:** Oleh
+
+Vi har videreudviklet de fysiske reaktioner på ekstrem temperatur, så Lumi ikke blot viser en simpel ikon-effekt, men fysisk ændrer kropsholdning, positur og mikrobevægelser svarende til et rigtigt levende væsens ufrivillige spasmer og udmattelse.
+
+#### Hvad er tilføjet på tværs af alle 4 stadier:
+1. **Autentisk kulde-reaktion (Sammenkrøbet frysende kropsholdning & asymmetriske mikroryk):**
+   - **Kroppen kryber sammen:** Silhuetten trykkes 2–3 pixels fladere og trækkes ind mod maven for at holde på kropsvarmen (fosterstilling).
+   - **Trykkede ører:** Ørerne foldes helt fladt ind mod hovedet (`earTipOffsetY = -17`).
+   - **4-faset asymmetrisk kulde-krampe (~22 Hz / 45 ms):** I stedet for en kunstig sinusbølge ryster Lumi med en realistisk ufrivillig muskelspasme (`shiverX = {-2, 1, -1, 2}`, `shiverY = {2, 1, 2, 1}`).
+   - **Klakkende tænder:** Munden veksler lynhurtigt mellem en rystende bølge-mund og en hvid stribe af klakkende tænder.
+   - **Baby:** Sutten klakker og vibrerer i munden (`paciDx = -1..0`), og de små luffer er krydset stramt over brystet.
+   - **Adult:** Holder diplomatkufferten tæt ind til den rystende krop med begge poter.
+   - **Old:** Begge skælvende poter klynger sig krampagtigt til mahogni-stokken.
+   - **Teen:** Lufferne trykkes ind i siden.
+
+2. **Autentisk varme-reaktion (Hedeslag, slap positur & tung termisk stakåndethed):**
+   - **Slapt sammenfald:** Kroppen og lemmerne synker slapt sammen under hedebølgen.
+   - **Hængende ører:** Ørerne taber spændstigheden og hænger slapt ned ad kinderne (`earTipOffsetY = -13`).
+   - **Hæsblæsende stakåndethed (Panting heave, 90 ms):** Brystkassen hejser sig hurtigt op og ned (`pantingDy = {-1, 0, 1, 0}`), mens Lumi gisper efter luft.
+   - **Udhængende tunge med spytglans:** Munden åbnes vidt med en blød lyserød tunge, der hænger ud over underlæben (`😛`) med hvid spytrefleksion.
+   - **Løbende sveddråbe & pandesved:** En animeret sveddråbe glider løbende ned ad højre tinding, mens en perlesveddråbe glitrer på venstre bryn.
+   - **Baby:** Spytter sutten ud i heden for at kunne gispe med tungen ude, mens poterne ligger slapt ud til siderne på jorden.
+   - **Teen:** Cyber-høretelefonerne glider 5 pixels ned ad den svedige hals (`hpOffsetY = 5`), mens poterne hænger slapt ned.
+   - **Adult:** Det formelle slips er løsnet skævt op ved kraven, venstre pote tørrer sved af panden, diplomatkufferten er tabt fladt på jorden, og højre pote hænger udmattet.
+   - **Old:** Guldbrillerne glider ned over næseryggen (`glassesY + 2`), og vismanden læner sig tungt og udmattet fremover med begge poter slapt hvilende på stokkens håndtag.
+
+#### Ydeevne og hardware-budget på SAMD21 (MKR WiFi 1010):
+- **CPU:** 48 MHz 32-bit ARM Cortex-M0+ afvikler hele den procedurale rendering på blot **~4% CPU** tid.
+- **RAM:** Kun **8.468 bytes (25%)** brugt ud af 32 KB SRAM (24,3 KB fri til stak og lokale variable).
+- **Flash:** **171.644 bytes (65%)** ud af 256 KB Flash (90,5 KB fri plads til Pong og labyrint).
+- **Flimmerfri delta-rendering:** Ingen dynamisk RAM-allokering i `loop()`, opdateringsfrekvens skalerer dynamisk op til ~22 FPS ved kulde/varme for ekstremt flydende spasmer.
+
 
 
 
