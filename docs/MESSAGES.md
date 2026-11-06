@@ -754,6 +754,53 @@ Vi har videreudviklet de fysiske reaktioner på ekstrem temperatur, så Lumi ikk
 - **Flash:** **171.644 bytes (65%)** ud af 256 KB Flash (90,5 KB fri plads til Pong og labyrint).
 - **Flimmerfri delta-rendering:** Ingen dynamisk RAM-allokering i `loop()`, opdateringsfrekvens skalerer dynamisk op til ~22 FPS ved kulde/varme for ekstremt flydende spasmer.
 
+___
+
+### ⚡ Opdatering 6/11 (Eftermiddag): Hukommelsesoptimering, fjernelse af dynamisk heap i MQTT & MicroSD dirty-cache (Forberedelse til spil)
+**Branch:** `feature/arduino-wardrobe`  
+**Ansvarlig:** Oleh
+
+Før udviklingen af de to on-board minispil (Solo-Pong og labyrint-generatoren) blev hele kildekoden underkastet en dybdegående indlejret C++ hukommelses- og stabilitetsoptimering. På en ARM Cortex-M0+ mikrokontroller uden virtuel hukommelse er dynamisk hukommelsesallokering (`malloc`, `String`, eksterne biblioteker med dynamisk JSON-træ) den største kilde til **heap-fragmentering** og uforklarlige nedbrud (`HardFault`) over tid.
+
+#### Hvorfor denne optimering var nødvendig (Arkitektur & eksamensforsvar):
+1. **Forebyggelse af heap-fragmentering:** Når MQTT modtager beskeder over Wi-Fi, må der ikke allokeres og frigives små dynamiske hukommelsesblokke på heapen i `loop()`. Det fragmenterer den frie RAM og kan få programmet til at gå ned efter 10–30 minutters kørsel.
+2. **Beskyttelse af SPI-bussen og MicroSD-flash:** ST7789 displayet og MicroSD-kortet deler den samme SPI-bus på Carrier-printet. Hyppig skrivning til SD-kortet blokerer displayopdateringen og slider på kortets flash-blokke.
+3. **Fuldstændig offline-robusthed:** Hvis Wi-Fi forbindelsen mistes i lokalet, må mikrokontrollerens `loop()` aldrig blokere i 4–5 sekunder på TCP/DNS-timeouts. Spillene og Tamagotchi-animationerne skal køre uhindret videre med fuld FPS.
+
+#### Hvad er ændret i koden:
+1. **1-byte typede `enum` deklarationer (`uint8_t`) & struct-pakning:**
+   - Alle globale enums i `settings.h` (`ScreenType`, `MenuIcon`, `TouchPad`, `SoundType`, `GameEvent`, `PetStage`, `PetOutfit`) samt grafik-enums i `ui_pet.h` (`LumiExpression`, `SkyWeatherMode`) er eksplicit typet som `: uint8_t`.
+   - På en 32-bit Cortex-M0+ tildeler compileren standard 4 bytes pr. enum. Ved at tvinge dem til `uint8_t` spares 3 bytes pr. forekomst, og datastrukturer kan pakkes tæt uden unødig polstring (`padding bytes`).
+   - Medlemmerne i `UiPetRenderer` og `UiStatsRenderer` er omorganiseret efter faldende justering (pointere, `unsigned long`, `int16_t`, `char`-arrays, `bool`).
+
+2. **Fuldstændig fjernelse af `ArduinoJson` og dynamisk `String` i `net_mqtt`:**
+   - `#include <ArduinoJson.h>` er fjernet fra projektet.
+   - Indgående MQTT-beskeder parses nu af en nul-allokerings tokenizer direkte på CPU-stakken (`extractJsonStringValue`, `extractJsonIntValue`), der finder felter som `"type"` og `"amount"` uden en eneste byte på heapen.
+   - Statiske emne-buffere (`topicInput`, `topicEvent`, `topicReward`, `topicPetState`, `clientMqttId`) er optimeret i størrelse til faste længder.
+   - **Gevinst:** Flash-forbruget faldt med næsten **5 KB (4.992 bytes)** ved at slippe for `ArduinoJson`-templates, og heap-forbruget i `net_mqtt` er nu **0 bytes**.
+
+3. **Afkobling af netværks-blocking ved offline kørsel:**
+   - I `TamaPal.ino` kaldes `netMqtt.update(now)` kun, når Oplà er i `SCREEN_CONTROLLER` eller hvis forbindelsen allerede er aktiv.
+   - Når spilleren hygger sig med kæledyret offline, forsøges der ikke gentagne blokerende DNS/TCP-håndtryk, hvilket fjerner det berygtede 5-sekunders frys og sikrer konstant ~22–30 FPS.
+   - Under aktivt controller-spil pauses MicroSD-skrivning (`syncPetStateToBackend`), så boldens bevægelse på lærredet aldrig rammes af SPI-ventetid.
+
+4. **MicroSD Dirty-Checking Cache via FNV-1a Hash (`storage_pet`):**
+   - Hver gang tilstanden gemmes, beregner `storagePet` en lynhurtig 32-bit Fowler–Noll–Vo (FNV-1a) hash af serialiseringsstrengen.
+   - Hvis dataene ikke har ændret sig siden sidste skrivning (`currentHash == lastSavedHash`), afbrydes skrivningen øjeblikkeligt uden at røre MicroSD-kortet.
+   - Udvidet format: `lumi.txt` understøtter nu fremtidige spildata bagudkompatibelt: `PONG=<score>`, `MAZE=<score>` og `AGE=<minutter>`.
+
+5. **Eliminering af asynkron tidsforskydning og koordinat-rettelse (`ui_pet` & `ui_stats`):**
+   - Alle uafhængige `millis()`-kald inde i ansigtsanimationen (`freezing chatter`, `sweat drop`, `panting mouth`) er erstattet af ét fælles tidsstempel `lastAnimTickMs`, så animationens faser aldrig desynkroniserer.
+   - Sveddråbens startposition er rykket ned til `eyeY - 5`, så den forbliver 100% inde i ansigtets afgrænsede slette-boks.
+   - I `ui_stats` er `char lastMood[32]` erstattet med konstant pointer-sammenligning (`lastMoodText != currentMood`), hvilket fjerner unødige `strcmp` og `strncpy` i hvert frame.
+
+#### Verificerede kvalitets- og hukommelsestal (Arduino MKR WiFi 1010):
+- **Flash-forbrug:** **166.652 bytes (63%)** ud af 256 KB — **sparet 4.992 bytes** i forhold til tidligere build!
+- **SRAM-forbrug:** **8.324 bytes (25%)** ud af 32 KB — efterlader **24.444 bytes fri RAM** til stak og minispil!
+- **Unit tests:** **170 af 170 tests bestået (100% PASS, 0 advarsler)**.
+- **Kompilering:** 0 fejl, 0 advarsler (`--warnings all`).
+
+
 
 
 
