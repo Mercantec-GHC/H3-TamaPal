@@ -345,3 +345,4 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
     lastBallY = newY;
   }
 }
+
