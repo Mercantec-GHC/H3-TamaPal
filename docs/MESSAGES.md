@@ -132,8 +132,9 @@ Frekvens: Hvert 30. sekund (heartbeat) samt **øjeblikkeligt** ved spillerhandli
 
 ```json
 {
-  "name": "Lumi",
+  "name": "LUMI",
   "stage": "teen",
+  "outfit": "default",
   "hunger": 80,
   "warmth": 85,
   "energy": 90,
@@ -143,15 +144,16 @@ Frekvens: Hvert 30. sekund (heartbeat) samt **øjeblikkeligt** ved spillerhandli
 }
 ```
 
-**Feltbeskrivelse for de 5 behov (alle er heltal 0–100%):**
-* `name` (string): Kæledyrets navn (standard: `"Lumi"`).
-* `stage` (string): Livsstadie (`"baby"`, `"teen"`, `"adult"`).
-* `hunger` (int 0–100): Mæthed (100 = propmat, 0 = udsultet). Falder naturligt over tid. Stiger ved fodring i menuen (+25%).
-* `warmth` (int 0–100): Kropstemperatur (100 = optimal 20–25°C stuetemperatur). Falder hvis rummet er koldt (<14°C), stiger ved berøring/kropsvarme.
-* `energy` (int 0–100): Energi / Søvn (100 = udhvilet, 0 = udmattet). Genvindes når Lumi sover (+2% pr. 10 sek).
-* `happy` (int 0–100): Glæde (100 = super glad, 0 = trist). Stiger ved leg (+25%), falder ved skæld ud (-10%).
-* `discipline` (int 0–100): Opdragelse (100 = velopdragen). Stiger når man skælder Lumi ud (+20%), hvis den piber uberettiget.
-* `alive` (bool): `true` så længe samlet helbred > 0%. Hvis Lumi dør af sult/kulde, sendes `false`.
+**Feltbeskrivelse for tilstandspakken (alle behov er heltal 0–100%):**
+* `name` (string): Kæledyrets arkade-navn op til 4 tegn (fx `"LUMI"`, `"THOR"`, `"BOB"`).
+* `stage` (string): Livsstadie (`"baby"`, `"teen"`, `"adult"`, `"old"`).
+* `outfit` (string): Garderobe-tilstand (`"default"` eller `"winter"`).
+* `hunger` (int 0–100): Mæthed (100 = propmat, 0 = udsultet). Falder over tid, stiger ved mad (+25%).
+* `warmth` (int 0–100): Kropstemperatur (optimal 20–25°C). Falder ved kulde, stiger ved vintertøj eller kropsvarme.
+* `energy` (int 0–100): Energi / Søvn (100 = udhvilet, 0 = udmattet). Genvindes når Lumi sover.
+* `happy` (int 0–100): Glæde (100 = super glad, 0 = trist). Stiger ved leg, klap og vask.
+* `discipline` (int 0–100): Opdragelse (100 = velopdragen). Stiger ved skæld-ud ved uberettiget klynk.
+* `alive` (bool): `true` så længe Lumi lever. Hvis Lumi dør (af alderdom, sult, kulde, hedeslag eller sygdom), sendes `false`.
 
 #### Vejledning til Oliver (Backend / ASP.NET Core):
 Abonner på topic: `StormLamaerne/Tamapal/+/pet/state` (`+` fanger alle Oplàer).  
@@ -159,8 +161,9 @@ Brug denne C# DTO-klasse:
 ```csharp
 public class PetStateDto
 {
-    public string Name { get; set; } = "Lumi";
+    public string Name { get; set; } = "LUMI";
     public string Stage { get; set; } = "teen";
+    public string Outfit { get; set; } = "default";
     public int Hunger { get; set; }
     public int Warmth { get; set; }
     public int Energy { get; set; }
@@ -170,13 +173,14 @@ public class PetStateDto
 }
 ```
 * **Database (Neon PostgreSQL):** Gem seneste tilstand i tabellen `pets` / `pet_states`.
-* **Kirkegård:** Hvis `Alive == false`, opret en post i kirkegårdstabellen med tidspunkt og overlevet tid til Andrii.
+* **Kirkegård:** Hvis `Alive == false`, opret en post i kirkegårdstabellen med kæledyrets navn, generation, dødsårsag og opnået alder til Andrii.
 * **SignalR:** Udsend event `PetStateUpdated(dto)` til browserklienter.
 
 #### Vejledning til Andrii (Frontend):
 * Lyt på `PetStateUpdated` fra SignalR.
 * Tegn 5 vandrette bjælker (0–100%): Sult (Sulten $\to$ Mæt), Varme (Kold $\to$ Varm), Energi (Træt $\to$ Frisk), Glæde (Trist $\to$ Glad), Disciplin.
-* Hvis `alive === false`, vis en gravsten på kirkegården med teksten "Lumi hviler her".
+* Vis kæledyrets navn (`dto.Name`), livsstadie (`baby`/`teen`/`adult`/`old`) og hue/tørklæde hvis `outfit == "winter"`.
+* Hvis `alive === false`, vis gravstenen på kirkegården med teksten fx *"Her hviler THOR (GEN 2) - Døde af alderdom"*.
 
 ## Hvem laver hvad
 
@@ -873,32 +877,71 @@ Vi har implementeret det andet store on-board spil: **Procedural IMU Marmor-Laby
 
 ___
 
-### 🥚🩺 Opdatering 6/11 (Sen aften): Død/Genfødsel, Æg-klækning, Klap-sensor, Pleje-mekanikker og Hårdhed
+### 🎬 Opdatering 6/11 (Nat): Arkade Navneindtastning, 100-Dages Alderdom, Kirkegårds-galleri, Autonom Showcase Direktør & Fuldstændig Fejlretning
 **Branch:** `feature/arduino-death-rebirth`  
 **Ansvarlig:** Oleh
 
-Vi har fuldendt hele livscyklussen og udvidet Tamagotchi-spillet med klassiske plejemekanikker, sensor-interaktioner og robusthed mod strømafbrydelse og netværksforsinkelser:
+Vi har afsluttet den fulde implementering af Oplà-kæledyrets livscyklus, tilføjet et autonomt teater-showcase til optagelse af videopræsentation uden berøring af kortet, og gennemført en uafhængig dybdegående kodekvalitets-gennemgang med fuld udbedring af alle fundne logikfejl.
 
-#### 1. Livscyklus, Død og Genfødsel:
-- **Kirkegård & Genfødsel:** Ved død (af sult, kulde, varme, kedsomhed, udmattelse eller alderdom) gemmes forfædren i `grave.txt` på MicroSD. Spilleren kan genføde Lumi til næste generation via langt tryk (2 sek.) på Touch 2.
-- **Æggeklæknings-animation:** Efter genfødsel vises en 3-sekunders dramatisk æggeklækning: ægget vrikker med lyd, slår revner og klækker med guldstøv (`SOUND_LEVEL_UP`), hvorefter den nye baby-Lumi springer frem!
-- **Klap Lumi (APDS-9960 nærhedssensor):** Før hånden hen over Oplà-kortet (nærhed < 100). Lumi kniber øjnene sammen af velbehag, hjerter svæver op, og glæde stiger med +12% (`SOUND_PETTING`). Hvis Lumi sover, vækkes den blidt.
+#### 1. Arkade 4-bogstavers Navneindtastning (`NameEntryLogic`):
+* **Før et nyt kæledyr udklækkes**, åbner en retro 80'er arkade-skærm (`SCREEN_NAME_ENTRY`) med 4 tegnpladser (f.eks. `LUMI`, `THOR`, `BOB`).
+* **Styring:**
+  - `TOUCH 0` (<): Forrige bogstav (`A`..`Z`, `0`..`9`, mellemrum, med wrap-around).
+  - `TOUCH 1` (>): Næste bogstav.
+  - `TOUCH 2` (OK): Gå til næste plads. På plads 4 afsluttes og godkendes navnet.
+  - `TOUCH 4` (STATS): Lyn-godkend navnet på enhver plads (fjerner automatisk overskydende mellemrum).
+  - `TOUCH 3` (BACK): Gå en plads tilbage.
+* **Persistens:** Kæledyrets valgte navn gemmes sikkert på MicroSD som `NAME=<navn>` i `lumi.txt` og overlever uændret på tværs af fremtidige genfødsler (`rebirth()`).
 
-#### 2. Udvidede Plejemekanikker & Bær-økonomi:
-- **Ny Medicin-menu (`ICON_MEDICIN`):** Menuen er udvidet til 6 ikoner: Mad, Leg, Medicin, Søvn, Statistik, Forbind. Viser en fin medicinflaske med rød korskork.
-- **Sygdom & Helbredelse:** Bliver Lumi syg (eller efterlades snavset i > 60 sekunder), blegner den og kræver medicin. Ubehandlet sygdom i 12 ticks fører til død af udmattelse. Medicin koster 3 gyldne bær (`BERRIES`).
-- **Lort & Ryst-for-at-vaske (Bad):** Efter et måltid efterlades en lort 💩 i hjørnet. Rystes Oplà-kortet kraftigt (akselerations-ryk > 2.0g), vaskes skærmen ren med sæbeskum og boblelyde (`SOUND_BUBBLES`), og Lumi belønnes med +15% glæde.
-- **Bær-pung:** Gyldne bær opsamles i Pong og Labyrinten og overføres til Lumis pung. Bær beholdes på tværs af generationer og gemmes i `lumi.txt`.
+#### 2. 100-Dages Alderdomstærskel & Fredelig Død (`DEATH_OLD_AGE`):
+* Kæledyret akkumulerer levetid minut for minut (`ageMinutes`).
+* Når Lumi runder **100 dage** (100 minutter simulationstid), sover han fredeligt ind af alderdom.
+* **Visuel og lydlig effekt:** Bløde englevinger folder sig ud over skærmen, en himmelsk glød (`SOUND_REBIRTH`) og et roligt spirituelt lys (RGB `180, 220, 255`) ledsager overgangen til evigheden.
+* Epitaf på dansk: *"Levede et lykkeligt liv!"*.
 
-#### 3. Robusthed & Fejltolerance (Code Review Forbedringer):
-- **Sikker MicroSD-lagring (`lumi.bak`):** For at forhindre korruption eller tab af fremskridt ved pludseligt strømsvigt oprettes automatisk en sikkerhedskopi `lumi.bak`, før `lumi.txt` overskrives. Ved opstart, hvis `lumi.txt` er beskadiget eller mangler, gendannes kæledyrets tilstand automatisk fra `lumi.bak`.
-- **Hurtig MQTT Forbindelses-timeout (1,5 sek.):** MQTT-forbindelsestimeout er sænket fra 4000 ms til 1500 ms (`mqttClient.setConnectionTimeout(1500)`). Dette sikrer, at kortet og brugerfladen aldrig fryser unødigt, hvis brokeren er midlertidigt offline eller blokeret af en firewall.
+#### 3. Mindestatue- & Kirkegårdsgalleri på Oplà (`SCREEN_MEMORIAL`):
+* Trykkes der på `TOUCH 4` (STATS) fra startskærmen, når Lumi er gået bort, åbnes det interaktive forfædre-galleri.
+* Spilleren kan bladre bagud i generationer med `TOUCH 0` og `TOUCH 1` for at se mindesten for alle tidligere Lumi-generationer:
+  - Navn, generation (`GEN X`), opnået alder, dødsårsag, personlige rekorder i Mur-Pong og Labyrint samt personligt gravskrift.
+  - Tilbage til hjemmeskærmen med `TOUCH 3`.
 
-#### Verificerede kvalitets- og hukommelsestal (Arduino MKR WiFi 1010):
-- **Flash-forbrug:** **198.828 bytes (75%)** ud af 256 KB.
-- **SRAM-forbrug:** **8.844 bytes (26%)** ud af 32 KB — **23.924 bytes fri RAM** til stakken!
-- **Unit tests:** **379 af 379 tests bestået (100% PASS, 0 advarsler)**.
-- **Kompilering:** 0 fejl, 0 advarsler i projektkoden (`arduino-cli compile --warnings all`).
+#### 4. 🎭 Autonom Showcase Direktør (`ShowcaseDirector` - 70s Automatisk Teater):
+* **Formål:** Gør det muligt at optage en komplet 70-sekunders demovideo af Oplà-skærmen til lærerne eller åbent hus, **helt uden at røre kortet med hænderne**.
+* **Sådan startes det:**
+  - **Fysisk gestus på Oplà:** Hold **TOUCH 1 og TOUCH 3 nede samtidig i 800 ms** på startskærmen. (Kortet kvitterer med guldglimt og opstartsmelodi).
+  - **Via Serial Monitor (115200 baud):** Send bogstavet `'s'` eller `'S'`.
+  - **Afbrydelse undervejs:** Tryk på `TOUCH 3` for at afbryde showcasen før tid og vende tilbage til almindeligt spil.
+* **Den 70-sekunders dramatiske tidslinje (10 akter):**
+  1. *0.0–2.5s:* Arkade-navneindtastning (stiller navnet `LUMI` og godkender automatisk).
+  2. *2.5–7.0s:* Dramatisk æggeklækning (ægget vrikker, slår revner og klækker baby-Lumi i guldstøv).
+  3. *7.0–12.0s:* Baby-Lumi spiser et saftigt bær (`SCREEN_ACTION`, "MUMS: MAD!"), og efterlader en lort 💩.
+  4. *12.0–16.5s:* Sæbebad og boble-animation fjerner lorten og gør Lumi skinnende ren.
+  5. *16.5–23.5s:* Udvikling til sej Teenager med Kokiri-horn og DJ-høretelefoner; krammes og spinder tilfreds.
+  6. *23.5–35.0s:* Skifter til Mur-Pong; intelligent AI-autopilot rammer bolden præcist med battets midte og demonstrerer spillet, før bolden slipper forbi ved 33.5s.
+  7. *35.0–45.0s:* Stjerneklar nat og fredelig søvn i seng med dyne (sensorer holdes i dvale, så lyset i rummet ikke vækker Lumi).
+  8. *45.0–54.0s:* Vågner som 99-dages Vismand med hat, stok og briller; fanger en forkølelse og kureres af 3 gyldne bær (`SCREEN_ACTION`, "LUMI RASK!").
+  9. *54.0–62.0s:* Runder 100 dage og sover fredeligt ind med englevinger og himmelsk glød; forfædren logges i `grave.txt`.
+  10. *62.0–70.0s:* Teleporterer til Mindestatue-galleriet og fremviser forfædrens mindesten.
+  * *70.0s+:* Vender sikkert tilbage til startskærmen klar til ny genfødsel.
+
+#### 5. Udbedrede Kodefejl (Resultat af Uafhængigt Code Review):
+* **Navnebevarelse ved genfødsel:** `PetLogic::rebirth()` gemmer nu `petName` i en lokal buffer før nulstilling, og den overflødige dobbelte `rebirth()` ved navnegodkendelse er fjernet. Generationer stiger nu strengt med +1 (`GEN 1` $\to$ `GEN 2`), og det valgte navn overskrives aldrig af standardnavnet.
+* **Sensor-pause under showcase:** Miljøaflæsning (lys, temperatur), nærhedssensor (klap) og rystedetektion er beskyttet med `!showcaseDirector.isActive()`, så Lumi ikke vækkes af stuens lamper midt i nattescenen.
+* **Loop-rækkefølge og skærmflimmer:** `ShowcaseDirector::update()` kaldes nu inden skærmovergange (`SCREEN TRANSITIONS`), hvilket eliminerer en 1-frame grafikfejl, hvor Lumi blev tegnet ovenpå Mur-Pong feltet.
+* **Pong autopilot-sigte:** Autopiloten sigter nu mod battets midte (`paddleCenterY = paddleY + 16`) i stedet for toppen, hvilket giver perfekte, centrerede slag.
+* **Sikker touch-kombination:** Genvej for showcase er flyttet fra Touch 2 (som udløste mad i menuen) til `TOUCH 1 + TOUCH 3` (800 ms hold) med gensidig udelukkelse mod almindelige menuknap-klik.
+* **Test-genvej `'o'` i Serial:** Første tryk sætter alder til 99 dage (levende vismand); andet tryk sætter 100 dage og udløser den fredelige død.
+* **Netværksrobusthed & MQTTS-klar:** 
+  - Forbindelsestimeout sat til 1,5s (aldrig 4 sekunders UI-frys).
+  - Pålidelig tokenizer og buffergrænsekontrol ved parsing af serverbeskeder (`assign_p1`, `assign_p2`, `hit`, `miss`, `gameover`).
+  - TLS/MQTTS krypteringsforberedt via `USE_TLS_MQTT` i `settings.h` (port 8883 med `WiFiSSLClient`).
+* **MicroSD atomisk skrivning:** Sikkerhedskopi `lumi.bak` oprettes før overskrivning af `lumi.txt`, og data integritetsverificeres med FNV-1a kontrolsum.
+
+#### 6. Test og Kompileringsstatus:
+* **Unit tests:** **479 af 479 tests bestået (100% PASS)** i `Arduino/tests/run_tests.sh`.
+* **Kompilering:** 0 fejl, 0 advarsler i egen kildekode på SAMD21 (`arduino-cli compile --warnings all --fqbn arduino:samd:mkrwifi1010 Arduino/TamaPal`).
+* **Hukommelse på MKR WiFi 1010:** Flash: 78% (206 KB af 256 KB), RAM: 27% (8,9 KB af 32 KB). 23,8 KB fri RAM!
+
 
 
 

@@ -135,7 +135,7 @@ void syncPetStateToBackend(bool forceImmediate) {
   // 2. Publish to MQTT broker if connected
   if (netMqtt.isConnected()) {
     char petJson[160];
-    petLogic.formatStateJson(petJson, sizeof(petJson), "Lumi", petLogic.getStage());
+    petLogic.formatStateJson(petJson, sizeof(petJson), petLogic.getName(), petLogic.getStage());
     netMqtt.publishPetState(petJson);
   }
 }
