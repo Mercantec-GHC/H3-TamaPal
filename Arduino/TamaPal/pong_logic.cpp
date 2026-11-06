@@ -46,7 +46,11 @@ void PongLogic::resetBall() {
 
 void PongLogic::serveBall() {
   if (state == PONG_STATE_READY || state == PONG_STATE_BALL_LOST) {
+    if (state == PONG_STATE_BALL_LOST) {
+      resetBall();
+    }
     state = PONG_STATE_PLAYING;
+    stateTimerEndMs = 0;
     pendingSound = SOUND_CLICK;
   }
 }
@@ -179,7 +183,7 @@ void PongLogic::update(unsigned long currentTimeMs) {
 
     if (lives > 0) {
       state = PONG_STATE_BALL_LOST;
-      stateTimerEndMs = currentTimeMs + 800; // 800 ms respawn delay
+      stateTimerEndMs = currentTimeMs + RESPAWN_DELAY_MS; // 2.0s respawn delay
     } else {
       state = PONG_STATE_GAMEOVER;
       pendingSound = SOUND_GAMEOVER;

@@ -32,6 +32,7 @@ public:
 
   // Ball constants
   static constexpr int16_t BALL_SIZE = 5;
+  static constexpr unsigned long RESPAWN_DELAY_MS = 2000;
 
   PongLogic();
 

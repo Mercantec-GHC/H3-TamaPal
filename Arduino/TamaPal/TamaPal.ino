@@ -416,7 +416,7 @@ void loop() {
     }
   } else if (currentScreen == SCREEN_MINIGAME_PONG) {
     // Solo Wall-Pong game on Oplà:
-    if (pongLogic.getState() == PONG_STATE_READY) {
+    if (pongLogic.getState() == PONG_STATE_READY || pongLogic.getState() == PONG_STATE_BALL_LOST) {
       if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH2)) {
         pongLogic.serveBall();
         lastTouchTimeMs = now;

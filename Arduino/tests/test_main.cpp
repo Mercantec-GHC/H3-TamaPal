@@ -628,11 +628,11 @@ void testSoloPongLogic() {
   CHECK(ballLost, "State transitioned to PONG_STATE_BALL_LOST after missing ball");
   CHECK(pong.getLives() == 2, "Lives decremented to 2");
 
-  // 7. Auto-respawn after 800 ms
-  pong.update(t + 400);
-  CHECK(pong.getState() == PONG_STATE_BALL_LOST, "Still BALL_LOST before 800 ms timeout");
-  pong.update(t + 850);
-  CHECK(pong.getState() == PONG_STATE_PLAYING, "Auto-respawned and playing after 850 ms");
+  // 7. Auto-respawn after 2000 ms
+  pong.update(t + 500);
+  CHECK(pong.getState() == PONG_STATE_BALL_LOST, "Still BALL_LOST before 2000 ms timeout");
+  pong.update(t + 2050);
+  CHECK(pong.getState() == PONG_STATE_PLAYING, "Auto-respawned and playing after 2050 ms");
 
   // 8. Deplete remaining lives to reach Game Over
   // Miss life 2
@@ -643,8 +643,9 @@ void testSoloPongLogic() {
     if (pong.getState() == PONG_STATE_BALL_LOST) break;
   }
   CHECK(pong.getLives() == 1, "Lives decremented to 1");
-  t += 900;
-  pong.update(t); // Respawn
+  // Test early manual serve during BALL_LOST
+  pong.serveBall();
+  CHECK(pong.getState() == PONG_STATE_PLAYING, "Manual serve immediately resumes playing from BALL_LOST");
 
   // Miss life 3 -> Game Over
   pong.movePaddle(200.0f);
