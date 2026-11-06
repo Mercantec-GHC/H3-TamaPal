@@ -97,7 +97,8 @@ enum ScreenType : uint8_t {
   SCREEN_MINIGAME_PONG,    // Solo Wall-Pong minigame on Oplà display
   SCREEN_MINIGAME_MAZE,    // Procedural Marble Maze minigame on Oplà display
   SCREEN_MEMORIAL,         // Hall of Fame / Mindelund ancestral memorial gallery
-  SCREEN_HATCHING          // Egg hatching newborn cinematic sequence
+  SCREEN_HATCHING,         // Egg hatching newborn cinematic sequence
+  SCREEN_NAME_ENTRY        // Arcade 4-letter pet name entry screen
 };
 
 // The 6 icons in the top navigation menu
@@ -211,6 +212,7 @@ enum DeathCause : uint8_t {
 // MEMORIAL ANCESTRAL RECORD (Mindelund / Slægtsbog)
 // ============================================================================
 struct GraveRecord {
+  char name[8];
   uint16_t generation;
   uint32_t ageMinutes;
   DeathCause deathCause;

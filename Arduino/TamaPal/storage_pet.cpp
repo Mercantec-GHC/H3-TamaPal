@@ -56,7 +56,8 @@ uint32_t StoragePet::getLastSavedHash() const {
 void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pet) {
   if (buffer == nullptr || bufSize == 0) return;
   snprintf(buffer, bufSize,
-           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\nPONG=%u\nMAZE=%u\nAGE=%lu\nGEN=%u\nALIVE=%d\nDEATH=%d\nBERRIES=%u\nSICK=%d\nPOOP=%d\n",
+           "NAME=%s\nHUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\nPONG=%u\nMAZE=%u\nAGE=%lu\nGEN=%u\nALIVE=%d\nDEATH=%d\nBERRIES=%u\nSICK=%d\nPOOP=%d\n",
+           pet.getName(),
            pet.getHunger(),
            pet.getWarmth(),
            pet.getEnergy(),
@@ -227,6 +228,32 @@ bool StoragePet::deserializeState(const char* text,
   return true;
 }
 
+void StoragePet::extractName(const char* text, char* nameOut, size_t maxLen) {
+  if (nameOut == nullptr || maxLen == 0) return;
+  nameOut[0] = '\0';
+
+  if (text == nullptr) {
+    strncpy(nameOut, "LUMI", maxLen - 1);
+    nameOut[maxLen - 1] = '\0';
+    return;
+  }
+
+  const char* p = strstr(text, "NAME=");
+  if (p) {
+    p += 5;
+    size_t i = 0;
+    while (*p != '\0' && *p != '\r' && *p != '\n' && i < maxLen - 1) {
+      nameOut[i++] = *p++;
+    }
+    nameOut[i] = '\0';
+  }
+
+  if (nameOut[0] == '\0') {
+    strncpy(nameOut, "LUMI", maxLen - 1);
+    nameOut[maxLen - 1] = '\0';
+  }
+}
+
 bool StoragePet::deserializeState(const char* text,
                                  float& hunger,
                                  float& warmth,
@@ -330,6 +357,9 @@ static bool applyStateToPet(const char* buffer, PetLogic& pet, uint32_t& hashOut
     pet.setBerries(berries);
     pet.setSick(sick);
     pet.setHasPoop(poop);
+    char parsedName[8] = "LUMI";
+    StoragePet::extractName(buffer, parsedName, sizeof(parsedName));
+    pet.setName(parsedName);
     if (!alive) {
       pet.triggerDeath(deathCause);
     }
@@ -433,6 +463,8 @@ static uint8_t ramGraveCount = 0;
 bool StoragePet::logGraveRecord(const PetLogic& pet) {
   // Always update in-memory ring buffer (acts as fallback if no SD or during tests)
   GraveRecord rec;
+  strncpy(rec.name, pet.getName(), sizeof(rec.name) - 1);
+  rec.name[sizeof(rec.name) - 1] = '\0';
   rec.generation = pet.getGeneration();
   rec.ageMinutes = pet.getAgeMinutes();
   rec.deathCause = pet.getDeathCause();
@@ -461,7 +493,8 @@ bool StoragePet::logGraveRecord(const PetLogic& pet) {
 
   char record[220];
   snprintf(record, sizeof(record),
-           "GEN %u | Alder: %lu min | Doed: %s | Pong: %u | Labyrint: %u sek | \"%s\"\n",
+           "%s | GEN %u | Alder: %lu min | Doed: %s | Pong: %u | Labyrint: %u sek | \"%s\"\n",
+           pet.getName(),
            (unsigned int)pet.getGeneration(),
            (unsigned long)pet.getAgeMinutes(),
            pet.getDeathCauseName(),
@@ -471,8 +504,11 @@ bool StoragePet::logGraveRecord(const PetLogic& pet) {
   file.print(record);
   file.close();
 
-  Serial.print(F("[STORAGE] Mindeskrift tilfoejet til grave.txt for GEN "));
-  Serial.println((unsigned int)pet.getGeneration());
+  Serial.print(F("[STORAGE] Mindeskrift tilfoejet til grave.txt for "));
+  Serial.print(pet.getName());
+  Serial.print(F(" (GEN "));
+  Serial.print((unsigned int)pet.getGeneration());
+  Serial.println(F(")"));
   return true;
 #else
   return true;
@@ -481,6 +517,16 @@ bool StoragePet::logGraveRecord(const PetLogic& pet) {
 
 bool StoragePet::parseGraveLine(const char* line, GraveRecord& outRecord) {
   if (line == nullptr || line[0] == '\0') return false;
+
+  outRecord.name[0] = '\0';
+  const char* pSep = strstr(line, " | GEN ");
+  if (pSep && (pSep - line) < (int)sizeof(outRecord.name)) {
+    size_t nameLen = (size_t)(pSep - line);
+    strncpy(outRecord.name, line, nameLen);
+    outRecord.name[nameLen] = '\0';
+  } else {
+    strncpy(outRecord.name, "LUMI", sizeof(outRecord.name));
+  }
 
   const char* pGen = strstr(line, "GEN ");
   if (!pGen) return false;

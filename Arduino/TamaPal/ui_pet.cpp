@@ -318,9 +318,9 @@ void UiPetRenderer::drawMemorialCard(const PetLogic& pet, unsigned long nowMs, b
 
     carrier->display.setTextSize(1);
 
-    // Line 1: * LUMI HVILER * (GEN X)
+    // Line 1: * <NAME> HVILER * (GEN X)
     char titleBuf[32];
-    snprintf(titleBuf, sizeof(titleBuf), "* LUMI HVILER * (GEN %u)", (unsigned int)pet.getGeneration());
+    snprintf(titleBuf, sizeof(titleBuf), "* %s HVILER * (GEN %u)", pet.getName(), (unsigned int)pet.getGeneration());
     int tLen = (int)strlen(titleBuf);
     int tX = 120 - (tLen * 3);
     if (tX < 36) tX = 36;

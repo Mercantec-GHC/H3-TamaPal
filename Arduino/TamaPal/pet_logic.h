@@ -67,6 +67,10 @@ public:
   bool needsAttention() const;        // True if any vital is below PET_CRITICAL_THRESHOLD
   const char* getMoodStatusDanish() const;
 
+  // Pet Custom Name (up to 4 letters, default "LUMI")
+  const char* getName() const;
+  void setName(const char* name);
+
   // JSON serialization for MQTT syncing (docs/MESSAGES.md Del 1b Proposal 3A)
   void formatStateJson(char* buffer, unsigned int bufferSize, const char* petName = "Lumi", const char* petStage = nullptr) const;
 
@@ -115,6 +119,7 @@ private:
   bool alive;
   DeathCause deathCause;
   uint16_t generation;
+  char petName[8];
   uint16_t berryCount;
   bool sick;
   uint8_t sickTicks;

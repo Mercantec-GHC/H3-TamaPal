@@ -29,6 +29,8 @@ void PetLogic::reset() {
   alive = true;
   deathCause = DEATH_NONE;
   generation = 1;
+  strncpy(petName, "Lumi", sizeof(petName));
+  petName[sizeof(petName) - 1] = '\0';
   berryCount = 0;
   sick = false;
   sickTicks = 0;
@@ -397,6 +399,20 @@ void PetLogic::setGeneration(uint16_t gen) {
   generation = (gen == 0) ? 1 : gen;
 }
 
+const char* PetLogic::getName() const {
+  return petName;
+}
+
+void PetLogic::setName(const char* name) {
+  if (name != nullptr && name[0] != '\0') {
+    strncpy(petName, name, sizeof(petName) - 1);
+    petName[sizeof(petName) - 1] = '\0';
+  } else {
+    strncpy(petName, "Lumi", sizeof(petName));
+    petName[sizeof(petName) - 1] = '\0';
+  }
+}
+
 const char* PetLogic::getDeathCauseName() const {
   return getDeathCauseName(getDeathCause());
 }
@@ -535,7 +551,7 @@ void PetLogic::toggleOutfit() {
 void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char* petName, const char* petStage) const {
   if (buffer == nullptr || bufferSize == 0) return;
 
-  const char* name = (petName != nullptr && petName[0] != '\0') ? petName : "Lumi";
+  const char* name = (petName != nullptr && petName[0] != '\0' && strcmp(petName, "Lumi") != 0) ? petName : this->petName;
   const char* stage = (petStage != nullptr && petStage[0] != '\0') ? petStage : getStage();
 
   snprintf(buffer, bufferSize,

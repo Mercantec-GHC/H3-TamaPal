@@ -20,6 +20,8 @@
 #include "maze_logic.h"
 #include "ui_maze.h"
 #include "ui_memorial.h"
+#include "name_logic.h"
+#include "ui_name.h"
 
 // Hardware carrier instance
 MKRIoTCarrier carrier;
@@ -40,6 +42,8 @@ UiPongRenderer uiPong;
 MazeLogic mazeLogic;
 UiMazeRenderer uiMaze;
 UiMemorialRenderer uiMemorial;
+NameEntryLogic nameEntry;
+UiNameRenderer uiName;
 
 // Forward declarations
 void onGameEventReceived(GameEvent event);
@@ -257,6 +261,8 @@ void setup() {
   uiPet.begin(&carrier);
   uiPong.begin(&carrier);
   uiMaze.begin(&carrier);
+  uiMemorial.begin(&carrier);
+  uiName.begin(&carrier);
   netMqtt.begin(onGameEventReceived, onPetRewardReceived);
 
   // Initial full screen draw
@@ -361,12 +367,17 @@ void loop() {
       demoCause = (demoCause % 6) + 1; // Cycle next death cause (1..6)
     } else if (c == 'r' || c == 'R') {
       if (!petLogic.isAlive()) {
-        petLogic.startHatching(now);
-        menuLogic.setScreen(SCREEN_HATCHING, now);
-        soundLed.playSound(SOUND_CRACK);
-        Serial.print(F("[LIVSCYKLUS] Aegget begynder at klaekke for Generation: "));
+        nameEntry.reset("LUMI");
+        menuLogic.setScreen(SCREEN_NAME_ENTRY, now);
+        soundLed.playSound(SOUND_CLICK);
+        Serial.print(F("[LIVSCYKLUS] Aabner arkade-navngivning foer Generation: "));
         Serial.println((unsigned int)(petLogic.getGeneration() + 1));
       }
+    } else if (c == 'n' || c == 'N') {
+      nameEntry.reset(petLogic.getName());
+      menuLogic.setScreen(SCREEN_NAME_ENTRY, now);
+      soundLed.playSound(SOUND_CONFIRM);
+      Serial.println(F("[MENU] Aabner arkade-navngivningsskaerm direkte!"));
     } else if (c == 't' || c == 'T') {
       if (petLogic.isAlive()) {
         if (petLogic.pet(now)) {
@@ -585,6 +596,46 @@ void loop() {
         lastTouchTimeMs = now;
       }
     }
+  } else if (currentScreen == SCREEN_NAME_ENTRY) {
+    if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
+        nameEntry.prevLetter();
+        soundLed.playSound(SOUND_CLICK);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+        nameEntry.nextLetter();
+        soundLed.playSound(SOUND_CLICK);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+        nameEntry.nextSlot();
+        if (nameEntry.isCompleted()) {
+          petLogic.setName(nameEntry.getName());
+          petLogic.rebirth();
+          petLogic.startHatching(now);
+          menuLogic.setScreen(SCREEN_HATCHING, now);
+          soundLed.playSound(SOUND_REBIRTH);
+          storagePet.savePet(petLogic);
+          syncPetStateToBackend(true);
+        } else {
+          soundLed.playSound(SOUND_CONFIRM);
+        }
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+        nameEntry.prevSlot();
+        soundLed.playSound(SOUND_CLICK);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH4)) {
+        nameEntry.confirm();
+        petLogic.setName(nameEntry.getName());
+        petLogic.rebirth();
+        petLogic.startHatching(now);
+        menuLogic.setScreen(SCREEN_HATCHING, now);
+        soundLed.playSound(SOUND_REBIRTH);
+        storagePet.savePet(petLogic);
+        syncPetStateToBackend(true);
+        lastTouchTimeMs = now;
+      }
+    }
   } else if (currentScreen == SCREEN_CONTROLLER) {
     // In controller mode:
     // TOUCH0, TOUCH1, TOUCH2 are gameplay inputs (read continuously below).
@@ -599,14 +650,14 @@ void loop() {
 
     if (currentScreen == SCREEN_HOME && !petLogic.isAlive()) {
       // While Lumi is a ghost/cenotaph:
-      // TOUCH2: Egg Hatching & Rebirth
+      // TOUCH2: Name Entry -> Egg Hatching & Rebirth
       // TOUCH4: Open Mindelund (Ancestral Memorial)
       if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
         if (carrier.Buttons.onTouchDown(TOUCH2)) {
-          petLogic.startHatching(now);
-          menuLogic.setScreen(SCREEN_HATCHING, now);
-          soundLed.playSound(SOUND_CRACK);
-          Serial.print(F("[LIVSCYKLUS] Aegget begynder at klaekke for Generation: "));
+          nameEntry.reset("LUMI");
+          menuLogic.setScreen(SCREEN_NAME_ENTRY, now);
+          soundLed.playSound(SOUND_CONFIRM);
+          Serial.print(F("[LIVSCYKLUS] Aabner arkade-navngivning foer Generation: "));
           Serial.println((unsigned int)(petLogic.getGeneration() + 1));
           lastTouchTimeMs = now;
         } else if (carrier.Buttons.onTouchDown(TOUCH4)) {
@@ -719,7 +770,7 @@ void loop() {
   if (currentScreen != previousScreen) {
     muteMessageEndTimeMs = 0; // Cancel any active mute toast when switching screens
 
-    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE || previousScreen == SCREEN_MEMORIAL || previousScreen == SCREEN_HATCHING) {
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE || previousScreen == SCREEN_MEMORIAL || previousScreen == SCREEN_HATCHING || previousScreen == SCREEN_NAME_ENTRY) {
       // Exiting a fullscreen view: restore mood LEDs and redraw full home UI
       soundLed.setMoodColor(0, 150, 220);
       if (currentScreen == SCREEN_HOME) {
@@ -737,6 +788,12 @@ void loop() {
       case SCREEN_HOME:
         Serial.println(F("[UI] Skærm: HOME (Lumi Tamagotchi)"));
         uiPet.updateHomeDisplay(petLogic, now, true);
+        break;
+
+      case SCREEN_NAME_ENTRY:
+        Serial.println(F("[UI] Skærm: ARKADE NAVNGIVNING"));
+        soundLed.setMoodColor(60, 240, 150);
+        uiName.drawNameEntry(nameEntry, now, true);
         break;
 
       case SCREEN_STATS:
@@ -969,6 +1026,8 @@ void loop() {
       uiMenu.drawMenuBar(menuLogic, true);
       uiPet.updateHomeDisplay(petLogic, now, true);
     }
+  } else if (currentScreen == SCREEN_NAME_ENTRY) {
+    uiName.drawNameEntry(nameEntry, now, false);
   } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_MEMORIAL) {
     // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME)
     if (petLogic.isAlive() || currentScreen != SCREEN_HOME) {

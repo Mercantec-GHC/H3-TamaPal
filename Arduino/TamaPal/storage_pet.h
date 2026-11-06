@@ -112,6 +112,9 @@ public:
   // Pure logic parser for a single line from grave.txt (unit testable without SD)
   static bool parseGraveLine(const char* line, GraveRecord& outRecord);
 
+  // Extract pet name from serialized state (defaults to "LUMI" if missing)
+  static void extractName(const char* text, char* nameOut, size_t maxLen);
+
   // FNV-1a non-cryptographic hash for dirty checking before SPI writes
   static uint32_t computeHash(const char* str);
 

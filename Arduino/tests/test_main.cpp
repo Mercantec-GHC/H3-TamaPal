@@ -11,6 +11,7 @@
 #include "storage_pet.h"
 #include "pong_logic.h"
 #include "maze_logic.h"
+#include "name_logic.h"
 
 static int totalTestsRun = 0;
 static int totalTestsFailed = 0;
@@ -1479,6 +1480,92 @@ void testStorageCarePersistence() {
   CHECK(poop == true, "Deserialized poop status is true");
 }
 
+void testNameEntryLogic() {
+  printf("\n--- Test: Arcade 4-Letter Name Entry Logic ---\n");
+  NameEntryLogic entry;
+
+  // 1. Initial default state
+  CHECK(strcmp(entry.getName(), "LUMI") == 0, "Default pet name is LUMI");
+  CHECK(entry.getCursorSlot() == 0, "Cursor starts at slot 0");
+  CHECK(!entry.isCompleted(), "Entry not completed initially");
+  CHECK(entry.getChar(0) == 'L', "Slot 0 is 'L'");
+  CHECK(entry.getChar(1) == 'U', "Slot 1 is 'U'");
+  CHECK(entry.getChar(2) == 'M', "Slot 2 is 'M'");
+  CHECK(entry.getChar(3) == 'I', "Slot 3 is 'I'");
+
+  // 2. Cycling characters
+  entry.nextLetter(); // 'L' -> 'M'
+  CHECK(entry.getChar(0) == 'M', "nextLetter changes 'L' to 'M'");
+  entry.prevLetter(); // 'M' -> 'L'
+  CHECK(entry.getChar(0) == 'L', "prevLetter restores 'M' to 'L'");
+
+  // Test wrapping: 'A' -> prev -> ' ' -> prev -> '9'
+  entry.setChar(0, 'A');
+  entry.prevLetter();
+  CHECK(entry.getChar(0) == ' ', "'A' wraps backwards to ' '");
+  entry.prevLetter();
+  CHECK(entry.getChar(0) == '9', "' ' wraps backwards to '9'");
+  entry.nextLetter();
+  CHECK(entry.getChar(0) == ' ', "'9' wraps forward to ' '");
+  entry.nextLetter();
+  CHECK(entry.getChar(0) == 'A', "' ' wraps forward to 'A'");
+
+  // 3. Slot navigation and entering a shorter name "BOB"
+  entry.setChar(0, 'B');
+  entry.nextSlot();
+  CHECK(entry.getCursorSlot() == 1, "nextSlot advances cursor to 1");
+  entry.setChar(1, 'O');
+  entry.nextSlot();
+  CHECK(entry.getCursorSlot() == 2, "nextSlot advances cursor to 2");
+  entry.setChar(2, 'B');
+  entry.nextSlot();
+  CHECK(entry.getCursorSlot() == 3, "nextSlot advances cursor to 3");
+  entry.setChar(3, ' '); // Trailing space
+
+  CHECK(strcmp(entry.getName(), "BOB") == 0, "Trailing spaces are trimmed: name is BOB");
+
+  // Backspace / prevSlot
+  entry.prevSlot();
+  CHECK(entry.getCursorSlot() == 2, "prevSlot moves cursor back to 2");
+
+  // Confirming name
+  CHECK(!entry.isCompleted(), "Not completed before confirmation");
+  entry.confirm();
+  CHECK(entry.isCompleted(), "Completed after confirm()");
+
+  // 4. PetLogic custom name integration
+  PetLogic pet;
+  CHECK(strcmp(pet.getName(), "Lumi") == 0, "PetLogic default name is Lumi");
+  pet.setName("THOR");
+  CHECK(strcmp(pet.getName(), "THOR") == 0, "PetLogic custom name set to THOR");
+
+  char jsonBuf[256];
+  pet.formatStateJson(jsonBuf, sizeof(jsonBuf));
+  CHECK(strstr(jsonBuf, "\"name\":\"THOR\"") != nullptr, "JSON state contains custom name THOR");
+
+  // 5. Storage serialization with custom name
+  char storageBuf[256];
+  StoragePet::serializeState(storageBuf, sizeof(storageBuf), pet);
+  CHECK(strstr(storageBuf, "NAME=THOR\n") != nullptr, "Serialized state contains NAME=THOR");
+
+  char extracted[16];
+  StoragePet::extractName(storageBuf, extracted, sizeof(extracted));
+  CHECK(strcmp(extracted, "THOR") == 0, "extractName restores THOR from serialized text");
+
+  StoragePet::extractName("HUNGER=80\nWARMTH=85\n", extracted, sizeof(extracted));
+  CHECK(strcmp(extracted, "LUMI") == 0, "extractName safely defaults to LUMI on legacy text");
+
+  // 6. Ancestral memorial line parsing with name
+  GraveRecord rec;
+  const char* sampleGraveLine = "THOR | GEN 3 | Alder: 210 min | Doed: Doede af alderdom | Pong: 15 | Labyrint: 28 sek | \"En legende\"\n";
+  bool parsed = StoragePet::parseGraveLine(sampleGraveLine, rec);
+  CHECK(parsed, "parseGraveLine succeeds for named record");
+  CHECK(strcmp(rec.name, "THOR") == 0, "Parsed ancestor name is THOR");
+  CHECK(rec.generation == 3, "Parsed ancestor generation is 3");
+  CHECK(rec.ageMinutes == 210, "Parsed ancestor age is 210");
+  CHECK(rec.deathCause == DEATH_OLD_AGE, "Parsed ancestor cause is DEATH_OLD_AGE");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -1512,6 +1599,7 @@ int main() {
   testPoopAndBathCleaningLogic();
   testSicknessProgressionAndCure();
   testStorageCarePersistence();
+  testNameEntryLogic();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

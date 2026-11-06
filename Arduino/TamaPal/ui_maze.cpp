@@ -98,7 +98,6 @@ void UiMazeRenderer::drawAllWalls(const MazeLogic& maze) {
 void UiMazeRenderer::drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8_t r) {
   if (!carrier || c >= MAZE_COLS || r >= MAZE_ROWS) return;
 
-  uint16_t iceBg        = color565(18, 44, 82);
   uint16_t iceGlint     = color565(180, 225, 255);
   uint16_t berryRed     = color565(255, 60, 90);
   uint16_t berryYellow  = color565(255, 220, 60);
