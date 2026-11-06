@@ -22,6 +22,7 @@
 #include "ui_memorial.h"
 #include "name_logic.h"
 #include "ui_name.h"
+#include "showcase_logic.h"
 
 // Hardware carrier instance
 MKRIoTCarrier carrier;
@@ -44,6 +45,7 @@ UiMazeRenderer uiMaze;
 UiMemorialRenderer uiMemorial;
 NameEntryLogic nameEntry;
 UiNameRenderer uiName;
+ShowcaseDirector showcaseDirector;
 
 // Forward declarations
 void onGameEventReceived(GameEvent event);
@@ -236,6 +238,28 @@ void processWardrobeGestures(unsigned long now, bool touch0, bool touch1, Screen
   }
 }
 
+// Non-blocking Showcase trigger gesture processing (Hold TOUCH2 / center button for 2000ms on HOME)
+static unsigned long touch2HoldStartTime = 0;
+static bool touch2HoldFired = false;
+
+void processShowcaseGestures(unsigned long now, bool touch2, ScreenType currentScreen) {
+  if (currentScreen == SCREEN_HOME && touch2 && !showcaseDirector.isActive()) {
+    if (touch2HoldStartTime == 0) {
+      touch2HoldStartTime = now;
+    } else if (!touch2HoldFired && (now - touch2HoldStartTime >= 2000)) {
+      showcaseDirector.start(now);
+      touch2HoldFired = true;
+      soundLed.playSound(SOUND_REBIRTH);
+      soundLed.flashColor(255, 235, 90, 800);
+      Serial.println(F("[SHOWCASE] *** AUTONOMT SHOWCASE-TEATER STARTET VIA TOUCH2 (2s HOLD) ***"));
+      Serial.println(F("[SHOWCASE] Saet Opla i holderen og peg telefon-kameraet mod skaermen!"));
+    }
+  } else if (!touch2) {
+    touch2HoldFired = false;
+    touch2HoldStartTime = 0;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -295,6 +319,7 @@ void loop() {
   unsigned long now = millis();
 
   // Listen for commands in Serial Monitor:
+  // 'a' = Autonomous Showcase Director (~70s full cinematic theater for video recording!)
   // 'c' = toggle plastic case sensitivity
   // 's' = cycle through life stages (Baby -> Teen -> Adult -> Old) on-the-fly!
   // 'o' = Old age (1st: 100 days elder with beard & glasses, 2nd: peaceful passing with angel wings)
@@ -303,7 +328,19 @@ void loop() {
   // 'h' = simulate overheating heat wave (test sweating & hat removal)
   while (Serial.available() > 0) {
     char c = (char)Serial.read();
-    if (c == 'c' || c == 'C') {
+    if (c == 'a' || c == 'A') {
+      if (!showcaseDirector.isActive()) {
+        showcaseDirector.start(now);
+        Serial.println(F("[SHOWCASE] *** AUTONOMT SHOWCASE-TEATER STARTET (~70 SEK) ***"));
+        Serial.println(F("[SHOWCASE] Saet Opla i holderen og peg telefon-kameraet mod skaermen!"));
+      } else {
+        showcaseDirector.stop();
+        menuLogic.setScreen(SCREEN_HOME, now);
+        uiPet.updateHomeDisplay(petLogic, now, true);
+        soundLed.playSound(SOUND_CLICK);
+        Serial.println(F("[SHOWCASE] Showcase afbrudt manuelt via Serial."));
+      }
+    } else if (c == 'c' || c == 'C') {
       setCaseMode(!currentCaseMode, true);
     } else if (c == 's' || c == 'S') {
       int nextStage = ((int)petLogic.getStageEnum() + 1) % 4;
@@ -463,6 +500,7 @@ void loop() {
 
   bool touch0 = carrier.Buttons.getTouch(TOUCH0);
   bool touch1 = carrier.Buttons.getTouch(TOUCH1);
+  bool touch2 = carrier.Buttons.getTouch(TOUCH2);
   bool touch3 = carrier.Buttons.getTouch(TOUCH3);
   bool touch4 = carrier.Buttons.getTouch(TOUCH4);
 
@@ -472,6 +510,8 @@ void loop() {
   processMuteGestures(now, touch0, touch3, touch4, currentScreen);
   // Process Wardrobe gestures (TOUCH0+TOUCH1 combo: hold both arrows for 400ms)
   processWardrobeGestures(now, touch0, touch1, currentScreen);
+  // Process Showcase gesture (Hold TOUCH2 / center button for 2000ms on HOME)
+  processShowcaseGestures(now, touch2, currentScreen);
 
   // -------------------------------------------------------------
   // Restore screen automatically when mute banner notification expires
@@ -490,7 +530,18 @@ void loop() {
   // -------------------------------------------------------------
   // Button Navigation
   // -------------------------------------------------------------
-  if (currentScreen == SCREEN_CHOOSE_PLAYER) {
+  if (showcaseDirector.isActive()) {
+    // During autonomous showcase, human touch navigation is disabled.
+    // TOUCH3 allows graceful early exit back to normal interactive home screen:
+    if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+      showcaseDirector.stop();
+      menuLogic.setScreen(SCREEN_HOME, now);
+      uiPet.updateHomeDisplay(petLogic, now, true);
+      soundLed.playSound(SOUND_CLICK);
+      lastTouchTimeMs = now;
+      Serial.println(F("[SHOWCASE] Afbrudt af bruger via TOUCH3."));
+    }
+  } else if (currentScreen == SCREEN_CHOOSE_PLAYER) {
     // In player role selection screen:
     // TOUCH0: Choose Player 1 (Venstre)
     // TOUCH1 or TOUCH4: Choose Player 2 (Hoejre)
@@ -940,6 +991,29 @@ void loop() {
   }
   syncPetStateToBackend(false);
 
+  // 5b. AUTONOMOUS SHOWCASE DIRECTOR UPDATE (~70s full cinematic presentation)
+  if (showcaseDirector.isActive()) {
+    ShowcaseAction act = showcaseDirector.update(now, petLogic, menuLogic, nameEntry, pongLogic, storagePet.getGraveRecordCount());
+    if (act.soundToPlay != SOUND_NONE) {
+      soundLed.playSound(act.soundToPlay);
+    }
+    if (act.hasFlash) {
+      soundLed.flashColor(act.flashR, act.flashG, act.flashB, act.flashDurationMs);
+    }
+    if (act.triggerBath) {
+      uiPet.triggerBath(now);
+    }
+    if (act.saveGrave) {
+      storagePet.logGraveRecord(petLogic);
+      storagePet.savePet(petLogic);
+    }
+    if (act.forceRedraw) {
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+    }
+  }
+
   // 6. SCREEN-SPECIFIC RUNTIME LOOPS
   if (currentScreen == SCREEN_CONTROLLER) {
     // 6a. Read accelerometer from IMU (IMUmodule in Carrier v2.x)
@@ -975,8 +1049,15 @@ void loop() {
     // 6d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
     uiController.updateDisplay(tiltLogic, netMqtt.isConnected());
   } else if (currentScreen == SCREEN_MINIGAME_PONG) {
-    // 6a. Read accelerometer for paddle tilt
-    if (carrier.IMUmodule.accelerationAvailable()) {
+    if (showcaseDirector.isActive()) {
+      // In showcase mode: automatically serve ball when ready
+      if (pongLogic.getState() == PONG_STATE_READY || pongLogic.getState() == PONG_STATE_BALL_LOST) {
+        pongLogic.serveBall();
+      }
+    }
+
+    // 6a. Read accelerometer for paddle tilt (only when not in showcase autopilot)
+    if (!showcaseDirector.isActive() && carrier.IMUmodule.accelerationAvailable()) {
       float ax = 0.0f, ay = 0.0f, az = 0.0f;
       carrier.IMUmodule.readAcceleration(ax, ay, az);
       tiltLogic.updateAcceleration(ax, ay, az);

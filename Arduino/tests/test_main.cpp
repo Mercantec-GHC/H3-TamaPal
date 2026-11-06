@@ -12,6 +12,7 @@
 #include "pong_logic.h"
 #include "maze_logic.h"
 #include "name_logic.h"
+#include "showcase_logic.h"
 
 static int totalTestsRun = 0;
 static int totalTestsFailed = 0;
@@ -1582,6 +1583,116 @@ void testOldAgeThreshold() {
   CHECK(strcmp(pet.getDeathEpitaph(), "Levede et lykkeligt liv!") == 0, "Danish epitaph is 'Levede et lykkeligt liv!'");
 }
 
+void testShowcaseDirector() {
+  printf("\n--- Test: Autonomous Showcase Director Timeline ---\n");
+  ShowcaseDirector showcase;
+  PetLogic pet;
+  MenuLogic menu;
+  NameEntryLogic nameEntry;
+  PongLogic pong;
+
+  CHECK(!showcase.isActive(), "Showcase initially inactive");
+  CHECK(showcase.getPhase() == SHOWCASE_INACTIVE, "Initial phase is SHOWCASE_INACTIVE");
+
+  // 1. Start showcase at t = 1000
+  showcase.start(1000);
+  CHECK(showcase.isActive(), "Showcase is now active");
+  CHECK(showcase.getElapsedMs(1000) == 0, "0 ms elapsed at start");
+
+  // Act 1: Name entry (0 .. 2500 ms)
+  ShowcaseAction act1 = showcase.update(1050, pet, menu, nameEntry, pong);
+  CHECK(act1.active, "Action 1 is active");
+  CHECK(act1.phase == SHOWCASE_NAME_ENTRY, "Phase is SHOWCASE_NAME_ENTRY");
+  CHECK(menu.getActiveScreen() == SCREEN_NAME_ENTRY, "Switched to SCREEN_NAME_ENTRY");
+  CHECK(strcmp(nameEntry.getName(), "LUMI") == 0, "Default arcade name is LUMI");
+
+  ShowcaseAction act1b = showcase.update(2300, pet, menu, nameEntry, pong);
+  CHECK(nameEntry.isCompleted(), "Name entry confirmed at 1200ms elapsed");
+  CHECK(act1b.soundToPlay == SOUND_CLICK, "Click sound on confirm");
+
+  // Act 2: Egg hatching (2500 .. 7000 ms)
+  ShowcaseAction act2 = showcase.update(3600, pet, menu, nameEntry, pong); // elapsed 2600
+  CHECK(act2.phase == SHOWCASE_EGG_HATCH, "Phase is SHOWCASE_EGG_HATCH");
+  CHECK(menu.getActiveScreen() == SCREEN_HATCHING, "Switched to SCREEN_HATCHING");
+  CHECK(pet.isHatching(), "Pet is actively hatching");
+  CHECK(act2.soundToPlay == SOUND_REBIRTH, "Plays rebirth sound on egg start");
+
+  ShowcaseAction act2b = showcase.update(6500, pet, menu, nameEntry, pong); // elapsed 5500
+  CHECK(act2b.phase == SHOWCASE_EGG_HATCH, "Act 2b phase is SHOWCASE_EGG_HATCH");
+  CHECK(pet.isAlive(), "Pet finished hatching and is alive");
+  CHECK(pet.getStageEnum() == STAGE_BABY, "Hatched into cute Baby");
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "Switched to SCREEN_HOME");
+
+  // Act 3: Care - Feeding & poop (7000 .. 12000 ms)
+  ShowcaseAction act3 = showcase.update(8100, pet, menu, nameEntry, pong); // elapsed 7100
+  CHECK(act3.phase == SHOWCASE_BABY_FEED_POOP, "Phase is SHOWCASE_BABY_FEED_POOP");
+  CHECK(act3.soundToPlay == SOUND_CONFIRM, "Confirm sound on feeding berry");
+  CHECK(pet.getHunger() > 50.0f, "Hunger restored from feeding");
+
+  ShowcaseAction act3b = showcase.update(11000, pet, menu, nameEntry, pong); // elapsed 10000
+  CHECK(act3b.phase == SHOWCASE_BABY_FEED_POOP, "Act 3b phase is SHOWCASE_BABY_FEED_POOP");
+  CHECK(pet.getHasPoop(), "Poop dropped on screen after digestion");
+
+  // Act 4: Bath & bubbles (12000 .. 16500 ms)
+  ShowcaseAction act4 = showcase.update(13500, pet, menu, nameEntry, pong); // elapsed 12500
+  CHECK(act4.phase == SHOWCASE_BATH_CLEAN, "Phase is SHOWCASE_BATH_CLEAN");
+  CHECK(act4.triggerBath, "Triggers bath bubble animation");
+  CHECK(act4.soundToPlay == SOUND_BUBBLES, "Plays bubble sound");
+  CHECK(!pet.getHasPoop(), "Poop cleaned from screen");
+
+  // Act 5: Teen & cuddle pet (16500 .. 23500 ms)
+  ShowcaseAction act5 = showcase.update(18000, pet, menu, nameEntry, pong); // elapsed 17000
+  CHECK(act5.phase == SHOWCASE_GROW_TEEN_PET, "Phase is SHOWCASE_GROW_TEEN_PET");
+  CHECK(pet.getStageEnum() == STAGE_TEEN, "Evolved to Teenager");
+
+  ShowcaseAction act5b = showcase.update(20500, pet, menu, nameEntry, pong); // elapsed 19500
+  CHECK(act5b.soundToPlay == SOUND_PURR, "Plays purr sound on petting");
+  CHECK(pet.isBeingPetted(20500), "Petting reaction window active");
+
+  // Act 6: Solo Pong (23500 .. 35000 ms)
+  ShowcaseAction act6 = showcase.update(25000, pet, menu, nameEntry, pong); // elapsed 24000
+  CHECK(act6.phase == SHOWCASE_SOLO_PONG, "Phase is SHOWCASE_SOLO_PONG");
+  CHECK(menu.getActiveScreen() == SCREEN_MINIGAME_PONG, "Switched to SCREEN_MINIGAME_PONG");
+
+  // Act 7: Starry night sleep (35000 .. 45000 ms)
+  ShowcaseAction act7 = showcase.update(37000, pet, menu, nameEntry, pong); // elapsed 36000
+  CHECK(act7.phase == SHOWCASE_NIGHT_SLEEP, "Phase is SHOWCASE_NIGHT_SLEEP");
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "Switched back to SCREEN_HOME");
+  CHECK(pet.isSleeping(), "Pet is tucked in bed sleeping");
+
+  // Act 8: Elder Lumi & medicine (45000 .. 54000 ms)
+  ShowcaseAction act8 = showcase.update(47000, pet, menu, nameEntry, pong); // elapsed 46000
+  CHECK(act8.phase == SHOWCASE_OLD_MEDICINE, "Phase is SHOWCASE_OLD_MEDICINE");
+  CHECK(!pet.isSleeping(), "Awakened from sleep");
+  CHECK(pet.getStageEnum() == STAGE_OLD, "Became Elder Lumi");
+  CHECK(pet.getAgeMinutes() == 99, "Age set to 99 days");
+
+  showcase.update(48600, pet, menu, nameEntry, pong); // elapsed 47600
+  CHECK(pet.isSick(), "Elder Lumi catches cold at 47.5s");
+
+  ShowcaseAction act8b = showcase.update(51000, pet, menu, nameEntry, pong); // elapsed 50000
+  CHECK(!pet.isSick(), "Cured from illness with berries");
+  CHECK(act8b.soundToPlay == SOUND_HEAL, "Plays healing sound");
+
+  // Act 9: Peaceful death with angel wings (54000 .. 62000 ms)
+  ShowcaseAction act9 = showcase.update(56000, pet, menu, nameEntry, pong); // elapsed 55000
+  CHECK(act9.phase == SHOWCASE_PEACEFUL_DEATH, "Phase is SHOWCASE_PEACEFUL_DEATH");
+  CHECK(!pet.isAlive(), "Passed away peacefully at 100 days");
+  CHECK(pet.getDeathCause() == DEATH_OLD_AGE, "Cause is DEATH_OLD_AGE");
+  CHECK(act9.saveGrave, "Signals to save grave memorial");
+
+  // Act 10: Memorial stele (62000 .. 70000 ms)
+  ShowcaseAction act10 = showcase.update(64000, pet, menu, nameEntry, pong); // elapsed 63000
+  CHECK(act10.phase == SHOWCASE_MEMORIAL_STELE, "Phase is SHOWCASE_MEMORIAL_STELE");
+  CHECK(menu.getActiveScreen() == SCREEN_MEMORIAL, "Switched to SCREEN_MEMORIAL");
+
+  // Finale: Showcase completed (>= 70000 ms)
+  ShowcaseAction actEnd = showcase.update(72000, pet, menu, nameEntry, pong); // elapsed 71000
+  CHECK(!showcase.isActive(), "Showcase finished and inactive");
+  CHECK(actEnd.phase == SHOWCASE_COMPLETED, "Phase is SHOWCASE_COMPLETED");
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "Returned safely to SCREEN_HOME");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -1617,6 +1728,7 @@ int main() {
   testStorageCarePersistence();
   testNameEntryLogic();
   testOldAgeThreshold();
+  testShowcaseDirector();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

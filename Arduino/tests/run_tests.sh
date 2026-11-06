@@ -16,6 +16,7 @@ clang++ -std=c++17 -Wall -Wextra -I"$PROJECT_DIR" \
     "$PROJECT_DIR/pong_logic.cpp" \
     "$PROJECT_DIR/maze_logic.cpp" \
     "$PROJECT_DIR/name_logic.cpp" \
+    "$PROJECT_DIR/showcase_logic.cpp" \
     -o "$SCRIPT_DIR/test_runner"
 
 echo "Running tests..."
