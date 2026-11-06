@@ -463,11 +463,16 @@ void PetLogic::rebirth() {
   uint16_t keepPong = highScorePong;
   uint16_t keepMaze = highScoreMaze;
   uint16_t keepBerries = berryCount;
+  char keepName[16];
+  strncpy(keepName, petName, sizeof(keepName));
+  keepName[sizeof(keepName) - 1] = '\0';
   reset();
   generation = nextGen;
   highScorePong = keepPong;
   highScoreMaze = keepMaze;
   berryCount = keepBerries;
+  strncpy(petName, keepName, sizeof(petName));
+  petName[sizeof(petName) - 1] = '\0';
 }
 
 void PetLogic::startHatching(unsigned long nowMs) {

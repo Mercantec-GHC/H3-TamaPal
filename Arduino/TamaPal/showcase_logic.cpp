@@ -86,7 +86,6 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       currentPhase = SHOWCASE_EGG_HATCH;
       subPhaseStep = 0;
       pet.setName(nameEntry.getName());
-      pet.rebirth();
       pet.startHatching(nowMs);
       menu.setScreen(SCREEN_HATCHING, nowMs);
       action.soundToPlay = SOUND_REBIRTH;
@@ -109,9 +108,9 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
     if (currentPhase != SHOWCASE_BABY_FEED_POOP) {
       currentPhase = SHOWCASE_BABY_FEED_POOP;
       subPhaseStep = 0;
-      menu.setScreen(SCREEN_HOME, nowMs);
       pet.setVitals(35.0f, 85.0f, 90.0f, 75.0f, 50.0f);
       pet.feed();
+      menu.setScreen(SCREEN_ACTION, nowMs);
       action.soundToPlay = SOUND_CONFIRM;
       action.hasFlash = true;
       action.flashR = 80; action.flashG = 255; action.flashB = 80;
@@ -119,6 +118,7 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       action.forceRedraw = true;
     } else if (subPhaseStep == 0 && elapsed >= 9500) {
       subPhaseStep = 1;
+      menu.setScreen(SCREEN_HOME, nowMs);
       pet.setHasPoop(true, nowMs);
       action.soundToPlay = SOUND_CLICK;
       action.forceRedraw = true;
@@ -177,11 +177,11 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       action.soundToPlay = SOUND_CONFIRM;
       action.forceRedraw = true;
     } else {
-      // Pong Autopilot: smoothly track ball
+      // Pong Autopilot: smoothly track ball center
       if (elapsed < 33500) {
-        float targetY = pong.getBallY();
-        float currentY = pong.getPaddleY();
-        float diff = targetY - currentY;
+        float paddleCenterY = pong.getPaddleY() + 16.0f;
+        float ballCenterY = pong.getBallY() + 3.0f;
+        float diff = ballCenterY - paddleCenterY;
         pong.movePaddle(diff * 0.35f);
       } else if (subPhaseStep == 0) {
         // Ball slips past at 33.5s for clean game-over finish
@@ -225,6 +225,12 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
       }
       action.soundToPlay = SOUND_CONFIRM;
       action.forceRedraw = true;
+    } else if (elapsed >= 52000) {
+      if (subPhaseStep < 3) {
+        subPhaseStep = 3;
+        menu.setScreen(SCREEN_HOME, nowMs);
+        action.forceRedraw = true;
+      }
     } else if (elapsed >= 49500) {
       if (subPhaseStep < 2) {
         subPhaseStep = 2;
@@ -232,6 +238,7 @@ ShowcaseAction ShowcaseDirector::update(unsigned long nowMs,
           pet.addBerries(3);
         }
         pet.cureSickness(3);
+        menu.setScreen(SCREEN_ACTION, nowMs);
         action.soundToPlay = SOUND_HEAL;
         action.hasFlash = true;
         action.flashR = 80; action.flashG = 255; action.flashB = 120;

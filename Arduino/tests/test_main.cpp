@@ -1565,6 +1565,22 @@ void testNameEntryLogic() {
   CHECK(rec.generation == 3, "Parsed ancestor generation is 3");
   CHECK(rec.ageMinutes == 210, "Parsed ancestor age is 210");
   CHECK(rec.deathCause == DEATH_OLD_AGE, "Parsed ancestor cause is DEATH_OLD_AGE");
+
+  // 7. Rebirth & Hatching preserve custom name and increment generation strictly by +1
+  pet.triggerDeath(DEATH_OLD_AGE);
+  CHECK(!pet.isAlive(), "Pet died before rebirth");
+  pet.rebirth();
+  CHECK(pet.isAlive(), "Pet is alive after rebirth");
+  CHECK(strcmp(pet.getName(), "THOR") == 0, "Custom name THOR preserved across rebirth()");
+  CHECK(pet.getGeneration() == 2, "Generation incremented strictly once to GEN 2");
+
+  pet.triggerDeath(DEATH_COLD);
+  pet.startHatching(5000);
+  CHECK(pet.isHatching(), "Hatching active");
+  pet.update(5000 + 2850);
+  CHECK(!pet.isHatching(), "Hatching complete");
+  CHECK(strcmp(pet.getName(), "THOR") == 0, "Custom name THOR preserved across hatching rebirth");
+  CHECK(pet.getGeneration() == 3, "Generation incremented strictly once to GEN 3");
 }
 
 void testOldAgeThreshold() {
@@ -1628,10 +1644,12 @@ void testShowcaseDirector() {
   CHECK(act3.phase == SHOWCASE_BABY_FEED_POOP, "Phase is SHOWCASE_BABY_FEED_POOP");
   CHECK(act3.soundToPlay == SOUND_CONFIRM, "Confirm sound on feeding berry");
   CHECK(pet.getHunger() > 50.0f, "Hunger restored from feeding");
+  CHECK(menu.getActiveScreen() == SCREEN_ACTION, "Act 3 displays SCREEN_ACTION during berry feeding");
 
   ShowcaseAction act3b = showcase.update(11000, pet, menu, nameEntry, pong); // elapsed 10000
   CHECK(act3b.phase == SHOWCASE_BABY_FEED_POOP, "Act 3b phase is SHOWCASE_BABY_FEED_POOP");
   CHECK(pet.getHasPoop(), "Poop dropped on screen after digestion");
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "Act 3 returns to SCREEN_HOME with poop");
 
   // Act 4: Bath & bubbles (12000 .. 16500 ms)
   ShowcaseAction act4 = showcase.update(13500, pet, menu, nameEntry, pong); // elapsed 12500
@@ -1673,6 +1691,10 @@ void testShowcaseDirector() {
   ShowcaseAction act8b = showcase.update(51000, pet, menu, nameEntry, pong); // elapsed 50000
   CHECK(!pet.isSick(), "Cured from illness with berries");
   CHECK(act8b.soundToPlay == SOUND_HEAL, "Plays healing sound");
+  CHECK(menu.getActiveScreen() == SCREEN_ACTION, "Act 8 displays SCREEN_ACTION during medicine cure");
+
+  showcase.update(53000, pet, menu, nameEntry, pong); // elapsed 52000
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "Act 8 returns to SCREEN_HOME after medicine cure");
 
   // Act 9: Peaceful death with angel wings (54000 .. 62000 ms)
   ShowcaseAction act9 = showcase.update(56000, pet, menu, nameEntry, pong); // elapsed 55000

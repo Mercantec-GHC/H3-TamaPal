@@ -238,25 +238,25 @@ void processWardrobeGestures(unsigned long now, bool touch0, bool touch1, Screen
   }
 }
 
-// Non-blocking Showcase trigger gesture processing (Hold TOUCH2 / center button for 2000ms on HOME)
-static unsigned long touch2HoldStartTime = 0;
-static bool touch2HoldFired = false;
+// Non-blocking Showcase trigger gesture processing (Hold TOUCH1 + TOUCH3 for 800ms on HOME)
+static unsigned long combo13StartTime = 0;
+static bool combo13Fired = false;
 
-void processShowcaseGestures(unsigned long now, bool touch2, ScreenType currentScreen) {
-  if (currentScreen == SCREEN_HOME && touch2 && !showcaseDirector.isActive()) {
-    if (touch2HoldStartTime == 0) {
-      touch2HoldStartTime = now;
-    } else if (!touch2HoldFired && (now - touch2HoldStartTime >= 2000)) {
+void processShowcaseGestures(unsigned long now, bool touch1, bool touch3, ScreenType currentScreen) {
+  if (currentScreen == SCREEN_HOME && touch1 && touch3 && !showcaseDirector.isActive()) {
+    if (combo13StartTime == 0) {
+      combo13StartTime = now;
+    } else if (!combo13Fired && (now - combo13StartTime >= 800)) {
       showcaseDirector.start(now);
-      touch2HoldFired = true;
+      combo13Fired = true;
       soundLed.playSound(SOUND_REBIRTH);
       soundLed.flashColor(255, 235, 90, 800);
-      Serial.println(F("[SHOWCASE] *** AUTONOMT SHOWCASE-TEATER STARTET VIA TOUCH2 (2s HOLD) ***"));
+      Serial.println(F("[SHOWCASE] *** AUTONOMT SHOWCASE-TEATER STARTET VIA TOUCH1+TOUCH3 (800ms HOLD) ***"));
       Serial.println(F("[SHOWCASE] Saet Opla i holderen og peg telefon-kameraet mod skaermen!"));
     }
-  } else if (!touch2) {
-    touch2HoldFired = false;
-    touch2HoldStartTime = 0;
+  } else if (!touch1 && !touch3) {
+    combo13Fired = false;
+    combo13StartTime = 0;
   }
 }
 
@@ -471,15 +471,16 @@ void loop() {
     } else if (c == 'o' || c == 'O') {
       if (petLogic.getStageEnum() != STAGE_OLD || !petLogic.isAlive()) {
         petLogic.setStage(STAGE_OLD);
-        petLogic.setAgeMinutes(100);
+        petLogic.setAgeMinutes(99);
         soundLed.playSound(SOUND_CONFIRM);
-        Serial.println(F("[ALDERDOM] Lumi er nu 100 dage gammel! Vismand med hvidt skaeg og briller."));
+        Serial.println(F("[ALDERDOM] Lumi er nu 99 dage gammel! Vismand med hvidt skaeg og briller."));
         if (menuLogic.getActiveScreen() == SCREEN_HOME) {
           uiPet.updateHomeDisplay(petLogic, now, true);
         }
         syncPetStateToBackend(true);
       } else {
         // Already STAGE_OLD and alive -> trigger peaceful old age passing!
+        petLogic.setAgeMinutes(100);
         petLogic.triggerDeath(DEATH_OLD_AGE);
         soundLed.playSound(SOUND_REBIRTH);
         soundLed.flashColor(180, 220, 255, 600); // Serene spirit glow
@@ -500,7 +501,6 @@ void loop() {
 
   bool touch0 = carrier.Buttons.getTouch(TOUCH0);
   bool touch1 = carrier.Buttons.getTouch(TOUCH1);
-  bool touch2 = carrier.Buttons.getTouch(TOUCH2);
   bool touch3 = carrier.Buttons.getTouch(TOUCH3);
   bool touch4 = carrier.Buttons.getTouch(TOUCH4);
 
@@ -510,8 +510,8 @@ void loop() {
   processMuteGestures(now, touch0, touch3, touch4, currentScreen);
   // Process Wardrobe gestures (TOUCH0+TOUCH1 combo: hold both arrows for 400ms)
   processWardrobeGestures(now, touch0, touch1, currentScreen);
-  // Process Showcase gesture (Hold TOUCH2 / center button for 2000ms on HOME)
-  processShowcaseGestures(now, touch2, currentScreen);
+  // Process Showcase gesture (Hold TOUCH1 + TOUCH3 for 800ms on HOME)
+  processShowcaseGestures(now, touch1, touch3, currentScreen);
 
   // -------------------------------------------------------------
   // Restore screen automatically when mute banner notification expires
@@ -686,7 +686,6 @@ void loop() {
         nameEntry.nextSlot();
         if (nameEntry.isCompleted()) {
           petLogic.setName(nameEntry.getName());
-          petLogic.rebirth();
           petLogic.startHatching(now);
           menuLogic.setScreen(SCREEN_HATCHING, now);
           soundLed.playSound(SOUND_REBIRTH);
@@ -703,7 +702,6 @@ void loop() {
       } else if (carrier.Buttons.onTouchDown(TOUCH4)) {
         nameEntry.confirm();
         petLogic.setName(nameEntry.getName());
-        petLogic.rebirth();
         petLogic.startHatching(now);
         menuLogic.setScreen(SCREEN_HATCHING, now);
         soundLed.playSound(SOUND_REBIRTH);
@@ -722,7 +720,7 @@ void loop() {
     }
   } else {
     // Normal menu screens (HOME, STATS, ACTION):
-    bool inAnyCombo = (touch0 && touch4) || (touch0 && touch1) || combo04Fired || combo01Fired || touch3HoldFired;
+    bool inAnyCombo = (touch0 && touch4) || (touch0 && touch1) || (touch1 && touch3) || combo04Fired || combo01Fired || combo13Fired || touch3HoldFired;
 
     if (currentScreen == SCREEN_HOME && !petLogic.isAlive()) {
       // While Lumi is a ghost/cenotaph:
@@ -800,10 +798,33 @@ void loop() {
     syncPetStateToBackend(true);
   }
 
+  // 3b. AUTONOMOUS SHOWCASE DIRECTOR UPDATE (~70s full cinematic presentation)
+  if (showcaseDirector.isActive()) {
+    ShowcaseAction act = showcaseDirector.update(now, petLogic, menuLogic, nameEntry, pongLogic, storagePet.getGraveRecordCount());
+    if (act.soundToPlay != SOUND_NONE) {
+      soundLed.playSound(act.soundToPlay);
+    }
+    if (act.hasFlash) {
+      soundLed.flashColor(act.flashR, act.flashG, act.flashB, act.flashDurationMs);
+    }
+    if (act.triggerBath) {
+      uiPet.triggerBath(now);
+    }
+    if (act.saveGrave) {
+      storagePet.logGraveRecord(petLogic);
+      storagePet.savePet(petLogic);
+    }
+    if (act.forceRedraw) {
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+    }
+  }
+
   currentScreen = menuLogic.getActiveScreen();
 
-  // Non-blocking environmental sensor sampling (every 2.5s, paused in Controller and game modes to keep I2C free for IMU)
-  if (currentScreen != SCREEN_CONTROLLER && currentScreen != SCREEN_MINIGAME_PONG && currentScreen != SCREEN_MINIGAME_MAZE && (now - lastSensorReadTimeMs >= SENSOR_READ_INTERVAL_MS)) {
+  // Non-blocking environmental sensor sampling (every 2.5s, paused in Controller, game modes, and during showcase)
+  if (!showcaseDirector.isActive() && currentScreen != SCREEN_CONTROLLER && currentScreen != SCREEN_MINIGAME_PONG && currentScreen != SCREEN_MINIGAME_MAZE && (now - lastSensorReadTimeMs >= SENSOR_READ_INTERVAL_MS)) {
     lastSensorReadTimeMs = now;
     float ambientTemp = carrier.Env.readTemperature();
     petLogic.setAmbientTemperature(ambientTemp);
@@ -815,9 +836,9 @@ void loop() {
     }
   }
 
-  // Real-time hand petting detection via APDS-9960 proximity sensor (every 100 ms on SCREEN_HOME)
+  // Real-time hand petting detection via APDS-9960 proximity sensor (every 100 ms on SCREEN_HOME, paused during showcase)
   static unsigned long lastProximityCheckMs = 0;
-  if (currentScreen == SCREEN_HOME && petLogic.isAlive() && (now - lastProximityCheckMs >= 100)) {
+  if (!showcaseDirector.isActive() && currentScreen == SCREEN_HOME && petLogic.isAlive() && (now - lastProximityCheckMs >= 100)) {
     lastProximityCheckMs = now;
     if (carrier.Light.proximityAvailable()) {
       int prox = carrier.Light.readProximity();
@@ -942,7 +963,15 @@ void loop() {
 
       case SCREEN_ACTION:
         Serial.println(F("[UI] Skærm: HANDLING udføres"));
-        if (petLogic.isSleeping()) {
+        if (showcaseDirector.isActive()) {
+          if (showcaseDirector.getPhase() == SHOWCASE_BABY_FEED_POOP) {
+            uiPet.drawActionScene(petLogic, EXPR_EATING, "MUMS: MAD!", "Lumi spiser et baer!", now);
+            soundLed.setMoodColor(80, 255, 80);
+          } else if (showcaseDirector.getPhase() == SHOWCASE_OLD_MEDICINE) {
+            uiPet.drawActionScene(petLogic, EXPR_SUPER_HAPPY, "LUMI RASK!", "-3 baer: Feberen faldt!", now);
+            soundLed.setMoodColor(80, 255, 120);
+          }
+        } else if (petLogic.isSleeping()) {
           uiPet.drawActionScene(petLogic, EXPR_SLEEPING, "SOVER ZZZ!", "Lumi sover lige nu...", now);
           soundLed.setMoodColor(80, 140, 255); // Soft sleep blue
         } else if (menuLogic.getSelectedIcon() == ICON_FOOD) {
@@ -990,29 +1019,6 @@ void loop() {
     netMqtt.update(now);
   }
   syncPetStateToBackend(false);
-
-  // 5b. AUTONOMOUS SHOWCASE DIRECTOR UPDATE (~70s full cinematic presentation)
-  if (showcaseDirector.isActive()) {
-    ShowcaseAction act = showcaseDirector.update(now, petLogic, menuLogic, nameEntry, pongLogic, storagePet.getGraveRecordCount());
-    if (act.soundToPlay != SOUND_NONE) {
-      soundLed.playSound(act.soundToPlay);
-    }
-    if (act.hasFlash) {
-      soundLed.flashColor(act.flashR, act.flashG, act.flashB, act.flashDurationMs);
-    }
-    if (act.triggerBath) {
-      uiPet.triggerBath(now);
-    }
-    if (act.saveGrave) {
-      storagePet.logGraveRecord(petLogic);
-      storagePet.savePet(petLogic);
-    }
-    if (act.forceRedraw) {
-      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
-        uiPet.updateHomeDisplay(petLogic, now, true);
-      }
-    }
-  }
 
   // 6. SCREEN-SPECIFIC RUNTIME LOOPS
   if (currentScreen == SCREEN_CONTROLLER) {

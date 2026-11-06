@@ -67,3 +67,4 @@ private:
 };
 
 #endif // SHOWCASE_LOGIC_H
+
