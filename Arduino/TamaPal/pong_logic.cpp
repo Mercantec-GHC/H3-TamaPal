@@ -239,3 +239,4 @@ bool PongLogic::popWallHit() {
   wallHitFlag = false;
   return hit;
 }
+

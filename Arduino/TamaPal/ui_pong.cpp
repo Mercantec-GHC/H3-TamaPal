@@ -281,3 +281,4 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     lastBallY = newBallY;
   }
 }
+

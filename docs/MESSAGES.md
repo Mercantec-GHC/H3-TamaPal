@@ -835,6 +835,42 @@ Vi har implementeret det første fulde offline-minispil direkte på Oplà-kortet
 - **Unit tests:** **195 af 195 tests bestået (100% PASS, 0 advarsler)**.
 - **Kompilering:** 0 fejl, 0 advarsler i projektkoden.
 
+___
+
+### 🌀 Opdatering 6/11 (Aften): Procedural IMU Marmor-Labyrint på Oplà (100% Gennemførlig, Fælder & Bær)
+**Branch:** `feature/arduino-games`  
+**Ansvarlig:** Oleh
+
+Vi har implementeret det andet store on-board spil: **Procedural IMU Marmor-Labyrint**. Spillet udnytter 2D-akselerometret (IMU LSM6DS3) til ægte analog kugle-fysik, hvor Oplà-kortet vippes i hænderne som et klassisk labyrintspil i træ. Piletaster er bevidst frakoblet under spillet – styringen sker 100% via IMU!
+
+#### Hvad er tilføjet:
+1. **100% Garanteret Gennemførlighed (DFS Spanning Tree Algoritme):**
+   - Hver gang spillet startes, genereres en helt ny, unik $7 \times 7$ labyrint (49 felter) via en Depth-First Search (Recursive Backtracker) algoritme.
+   - Algoritmen bygger et matematisk spændetræ: enhver celle kan nås, ingen isolerede rum findes, og der er altid **100% garanti for en farbar rute** fra start $(0,0)$ til udgangsportalen $(6,6)$.
+2. **Karakter-kugle: Mini-Lumi i bevægelse (`UiMazeRenderer`):**
+   - Kuglen er udformet som en charmerende miniature-Lumi (9x9 px mochi-form i mintgrøn med gylden spire på toppen).
+   - **Levende øjne:** Lumis øjne kigger i den retning, kuglen ruller (fremad, nedad, sidelæns) for en levende karakter-følelse.
+   - **Hjørne-glidning (Corner Sliding):** Ved skråt træk mod en væg glider Lumi blødt langs gangen uden at sidde fast.
+3. **Fælder og Belønninger (Tricks & Traps i blindgyder):**
+   - 🕳️ **Faldgruber / Sorte huller (`ITEM_PITFALL`):** 2 lumske huller er placeret i fristende blindgyder. Ruller Lumi heri, suges han ned med et hvin (`SOUND_MISS`), og straffes med **+5 sekunder** på uret før genstart ved startpunktet.
+   - 🍓 **Deku-Bær (`ITEM_BERRY`):** 2–3 skinnende gyldne bær gemmer sig i andre blindgyder. At rulle ind og hente dem giver bonuspoint, spil-feedback (`SOUND_CONFIRM`) og genoplader Lumis energi.
+   - 🧊 **Is-zoner (`ITEM_ICE`):** Visse gange er belagt med glat is (nul friktion), hvor kuglen suser hurtigt afsted og kræver lynhurtig mod-hældning!
+4. **Mål, High Score og Kæledyrs-effekt:**
+   - Målet er en lysende guldportal i nederste højre hjørne.
+   - Top-HUD viser samlede bær (`* 2/3`) og et løbende stopur (`TID: 00:24`).
+   - Ved fuldførelse vises en sejrsmodal med tid, bær og eventuel ny rekord (`MAZE=<sekunder>`), der automatisk gemmes på MicroSD i `lumi.txt`.
+   - Sejr giver massivt humør-boost: `happiness += 35` og `discipline += 15`!
+5. **Genveje & Verifikation:**
+   - Tast `'l'` eller `'L'` i Serial Monitor for at starte Labyrinten direkte.
+   - 12 nye unit-tests verificerer DFS-spændetræ, 100% tilgængelighed af alle 49 felter, fælder, bær og IMU-fysik.
+   - Total: **207 af 207 unit-tests bestået (100% PASS)**.
+
+#### Verificerede kvalitets- og hukommelsestal (Arduino MKR WiFi 1010):
+- **Flash-forbrug:** **177.132 bytes (67%)** ud af 256 KB — 85 KB fri plads tilbage!
+- **SRAM-forbrug:** **8.508 bytes (25%)** ud af 32 KB — 24.260 bytes fri RAM til stak!
+- **Unit tests:** **207 af 207 tests bestået (100% PASS, 0 advarsler)**.
+- **Kompilering:** 0 fejl, 0 advarsler i projektkoden.
+
 
 
 

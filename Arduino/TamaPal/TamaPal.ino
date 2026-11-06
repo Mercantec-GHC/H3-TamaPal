@@ -17,6 +17,8 @@
 #include "ui_pet.h"
 #include "pong_logic.h"
 #include "ui_pong.h"
+#include "maze_logic.h"
+#include "ui_maze.h"
 
 // Hardware carrier instance
 MKRIoTCarrier carrier;
@@ -34,6 +36,8 @@ StoragePet storagePet;
 UiPetRenderer uiPet;
 PongLogic pongLogic;
 UiPongRenderer uiPong;
+MazeLogic mazeLogic;
+UiMazeRenderer uiMaze;
 
 // Forward declarations
 void onGameEventReceived(GameEvent event);
@@ -250,6 +254,7 @@ void setup() {
   uiStats.begin(&carrier);
   uiPet.begin(&carrier);
   uiPong.begin(&carrier);
+  uiMaze.begin(&carrier);
   netMqtt.begin(onGameEventReceived, onPetRewardReceived);
 
   // Initial full screen draw
@@ -330,6 +335,10 @@ void loop() {
       menuLogic.openPongGame();
       soundLed.playSound(SOUND_CONFIRM);
       Serial.println(F("[SPIL] Starter Solo Mur-Pong direkte via Serial Monitor!"));
+    } else if (c == 'l' || c == 'L') {
+      menuLogic.openMazeGame();
+      soundLed.playSound(SOUND_CONFIRM);
+      Serial.println(F("[SPIL] Starter Marmor-Labyrint direkte via Serial Monitor!"));
     }
   }
 
@@ -441,6 +450,35 @@ void loop() {
         lastTouchTimeMs = now;
       }
     }
+  } else if (currentScreen == SCREEN_MINIGAME_MAZE) {
+    // Procedural Marble Maze: Pure 2D physical IMU tilt control (no arrow buttons)
+    if (mazeLogic.getState() == MAZE_STATE_VICTORY) {
+      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && (carrier.Buttons.onTouchDown(TOUCH2) || carrier.Buttons.onTouchDown(TOUCH3))) {
+        // Save best completion time (least seconds) to pet logic and MicroSD
+        uint16_t elapsed = mazeLogic.getElapsedSeconds();
+        if (petLogic.getHighScoreMaze() == 0 || elapsed < petLogic.getHighScoreMaze()) {
+          petLogic.setHighScoreMaze(elapsed);
+          storagePet.savePet(petLogic);
+        }
+        // Boost happiness & discipline, spend a little energy
+        float newHap = petLogic.getHappiness() + 35.0f;
+        if (newHap > 100.0f) newHap = 100.0f;
+        float newDisc = petLogic.getDiscipline() + 15.0f;
+        if (newDisc > 100.0f) newDisc = 100.0f;
+        float newEnergy = (petLogic.getEnergy() >= 10) ? (petLogic.getEnergy() - 10.0f) : 0.0f;
+        petLogic.setVitals(petLogic.getHunger(), petLogic.getWarmth(), newEnergy, newHap, newDisc);
+        syncPetStateToBackend(true);
+
+        menuLogic.onButtonBack(); // Return to games menu
+        lastTouchTimeMs = now;
+      }
+    } else {
+      // During active play: only TOUCH3 allows early exit back to menu
+      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack();
+        lastTouchTimeMs = now;
+      }
+    }
   } else if (currentScreen == SCREEN_CONTROLLER) {
     // In controller mode:
     // TOUCH0, TOUCH1, TOUCH2 are gameplay inputs (read continuously below).
@@ -546,9 +584,10 @@ void loop() {
         break;
 
       case SCREEN_MINIGAME_MAZE:
-        Serial.println(F("[UI] Skærm: LABYRINT (Kommende feature)"));
-        uiMenu.drawPlaceholderScreen("LABYRINT", "Kommende spil!");
-        soundLed.setMoodColor(180, 100, 255);
+        Serial.println(F("[UI] Skærm: MARMOR-LABYRINT (Procedural IMU Maze) genereret!"));
+        mazeLogic.generateMaze((uint32_t)now, petLogic.getHighScoreMaze());
+        uiMaze.drawInitialScreen(mazeLogic);
+        soundLed.setMoodColor(0, 240, 180);
         break;
 
       case SCREEN_CHOOSE_PLAYER:
@@ -670,10 +709,36 @@ void loop() {
 
     // 6d. Update display (zero-flicker delta-rendering)
     uiPong.updateDisplay(pongLogic, false);
+  } else if (currentScreen == SCREEN_MINIGAME_MAZE) {
+    // 6a. Read 2D accelerometer for marble tilt physics
+    if (carrier.IMUmodule.accelerationAvailable()) {
+      float ax = 0.0f, ay = 0.0f, az = 0.0f;
+      carrier.IMUmodule.readAcceleration(ax, ay, az);
+      tiltLogic.updateAcceleration(ax, ay, az);
+      mazeLogic.setTilt(tiltLogic.getTiltX(), tiltLogic.getTiltY());
+    }
+
+    // 6b. Step physics simulation
+    mazeLogic.update(now);
+
+    // 6c. Handle audio effects and LED sparkles
+    SoundType mazeSnd = mazeLogic.popSoundEffect();
+    if (mazeSnd != SOUND_NONE) {
+      soundLed.playSound(mazeSnd);
+    }
+    if (mazeLogic.popBerryCollected()) {
+      soundLed.flashColor(255, 220, 60, 200); // 200 ms golden sparkle on berry pickup
+    }
+    if (mazeLogic.popPitfallFall()) {
+      soundLed.flashColor(180, 40, 220, 300); // 300 ms purple vortex splash
+    }
+
+    // 6d. Update display (zero-flicker delta-rendering)
+    uiMaze.updateDisplay(mazeLogic, false);
   } else if (currentScreen == SCREEN_STATS) {
     // Real-time stats dashboard update (dirty updates only when values decay or change)
     uiStats.updateDisplay(petLogic, false);
-  } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_MINIGAME_MAZE) {
+  } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU) {
     // Normal menu modes (HOME, ACTION): update sliding top menu bar
     uiMenu.drawMenuBar(menuLogic, false);
 
