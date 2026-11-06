@@ -264,10 +264,10 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
   int dy = newCy - oldCy;
   if (dx == 0 && dy == 0) return;
 
-  // Character bounding box relative to (cx, cy): X in [-29..+29], Y in [-33..+22]
+  // Character bounding box relative to (cx, cy): X in [-29..+29], Y in [-35..+22]
   if (dy > 0) {
-    // Moved down: clear top strip exposed above sprout and ears
-    carrier->display.fillRect(oldCx - 29, oldCy - 33, 59, dy + 3, bgColor);
+    // Moved down: clear top strip exposed above sprout, ears, and Kokiri horns (tip at cy - 34)
+    carrier->display.fillRect(oldCx - 29, oldCy - 35, 59, dy + 2, bgColor);
   } else if (dy < 0) {
     // Moved up: clear bottom strip above the mossy platform (Y < 153)
     int clearH = (-dy) + 2;
@@ -281,11 +281,11 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
   }
 
   if (dx > 0) {
-    // Moved right: clear left margin strip
-    carrier->display.fillRect(oldCx - 29, oldCy - 33, dx + 4, 54, bgColor);
+    // Moved right: clear left margin strip (including headphones and side paws)
+    carrier->display.fillRect(oldCx - 29, oldCy - 35, dx + 4, 57, bgColor);
   } else if (dx < 0) {
-    // Moved left: clear right margin strip
-    carrier->display.fillRect(newCx + 25, oldCy - 33, (-dx) + 4, 54, bgColor);
+    // Moved left: clear right margin strip (including headphones and side paws)
+    carrier->display.fillRect(newCx + 25, oldCy - 35, (-dx) + 4, 57, bgColor);
   }
 }
 
@@ -868,7 +868,14 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
 
   // 3. Delta-update Lumi (zero-flicker partial redraw)
   if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression) {
-    eraseOldCharacterRim(lastDrawnCx, lastDrawnCy, targetCx, targetCy, nativeBg);
+    if (expr != lastExpression) {
+      // Expression changed: clear full character bounds (paws, ears, horns, halo)
+      // to avoid ghost pixels from changed ear droop or raised/tucked paws
+      carrier->display.fillRect(lastDrawnCx - 29, lastDrawnCy - 35, 59, 57, nativeBg);
+      carrier->display.fillRoundRect(96, 154, 48, 5, 2, color565(12, 42, 30)); // drop shadow
+    } else {
+      eraseOldCharacterRim(lastDrawnCx, lastDrawnCy, targetCx, targetCy, nativeBg);
+    }
     drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, nativeBg);
     lastDrawnCx    = targetCx;
     lastDrawnCy    = targetCy;

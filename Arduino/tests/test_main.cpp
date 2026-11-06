@@ -372,10 +372,20 @@ void testPetSerialization() {
   CHECK(strcmp(pet.getStage(), "baby") == 0, "Default stage is baby");
   CHECK(pet.getStageEnum() == STAGE_BABY, "Default stage enum is STAGE_BABY");
 
-  // Stage transition
+  // Stage transition (all 4 lifecycle stages)
   pet.setStage(STAGE_TEEN);
   CHECK(strcmp(pet.getStage(), "teen") == 0, "Changed stage to teen");
   CHECK(pet.getStageEnum() == STAGE_TEEN, "Stage enum is STAGE_TEEN");
+
+  pet.setStage(STAGE_ADULT);
+  CHECK(strcmp(pet.getStage(), "adult") == 0, "Changed stage to adult");
+  CHECK(pet.getStageEnum() == STAGE_ADULT, "Stage enum is STAGE_ADULT");
+
+  pet.setStage(STAGE_OLD);
+  CHECK(strcmp(pet.getStage(), "old") == 0, "Changed stage to old");
+  CHECK(pet.getStageEnum() == STAGE_OLD, "Stage enum is STAGE_OLD");
+
+  pet.setStage(STAGE_TEEN); // Reset back to teen for json verification
 
   // Format state JSON
   pet.formatStateJson(buf, sizeof(buf));

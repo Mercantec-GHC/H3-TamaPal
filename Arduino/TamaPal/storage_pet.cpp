@@ -182,7 +182,8 @@ bool StoragePet::loadPet(PetLogic& pet) {
     Serial.print((int)h);
     Serial.print(F("%, Energi: "));
     Serial.print((int)e);
-    Serial.println(F("%"));
+    Serial.print(F("%, Stadie: "));
+    Serial.println(pet.getStage());
     return true;
   } else {
     Serial.println(F("[STORAGE] ADVARSEL: lumi.txt data var ugyldig, starter forfra."));
