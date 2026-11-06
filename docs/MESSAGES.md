@@ -687,6 +687,37 @@ Alle 4 livsstadier fra Game Design Doc er nu færdigudviklet:
 `Baby` (æg/sut) $\to$ `Teen` (swag/horn/DJ) $\to$ `Adult` (forretning/kuffert/slips) $\to$ `Old` (vismand/hat/briller/stok).  
 Skift frit imellem dem med `s` i Serial Monitor, og se MicroSD gemme og gendanne det automatisk!
 
+___
+
+### 🧣 Opdatering 6/11 (Middag): Garderobe-system & Termoregulering (Vinterhue, Halstørklæde & Hedebølge)
+**Branch:** `feature/arduino-wardrobe`  
+**Ansvarlig:** Oleh
+
+Lumis **Garderobe-system (`Garderobe`) og dynamiske termoregulerings-mekanik** er nu fuldt implementeret og testet på tværs af alle 4 livsstadier.
+
+#### Hvad er tilføjet:
+1. **Garderobe og vintertøj tilpasset alle 4 stadier:**
+   - 🐣 **Baby:** Varm rød strikhue med hvid stribekant og blød sne-pompon på toppen, hvor den lille spire stikker sødt ud ved siden af, samt et rød/hvidt stribet halstørklæde under hagen med frynser.
+   - 🎧 **Teen:** Mørk slouchy gamer-beanie, hvor de gyldne Kokiri-horn stikker sejt igennem i hver side, neonlysende cyan pompon bagtil, og et cyber-halstørklæde med cyan striber, der blafrer til højre.
+   - 💼 **Adult:** Foret jagtgrøn tweed-vinterhue med nedhængende varme øreklapper, den gyldne blomstrende lotus-krone som emblem foran, og et bordeaux cashmere-halstørklæde med guldbroderi over brystet.
+   - 🎩 **Old:** Den høje gentleman-hat udstyret med bløde hvide pels-ørekopper, der omfavner hovedet, frostet krystalsnefnug på hattebåndet og et tykt strikket jægergrønt bedstefar-tørklæde med kvaster.
+2. **Fysisk termoregulering (samspil med temperatursensor):**
+   - **Kulde ($T < 18^\circ\text{C}$ eller varme $< 45\%$):** Lumi fryser og ryster. Status viser *"Lumi fryser! Giv hue paa!"*. Tager spilleren vintertøj på, isoleres Lumi og varmen stiger til et lunt mål ($85\%$).
+   - **Hedebølge / Overophedning ($T \ge 23.5^\circ\text{C}$ og vintertøj på):**
+     Hvis Lumi har vinterhue på i et varmt klasselokale, overopheder han!
+     * **Visuel feedback:** Rødblussende kinder, ferskenfarvet overophedet krop, forpustet åben mund med hængende tunge (`😛`), sammenknebne øjne og en stor skinnende sveddråbe (`💧`), der løber ned af tindingen, samt faldende dråber på sideskærmen.
+     * **Mekanik:** Humøret (`happiness`) falder hurtigt under overophedning, og status advarer: *"Lumi sveder! Tag huen af!"*.
+     * **Løsning:** Spilleren tager huen af $\to$ Lumi køler straks af og smiler igen!
+3. **Styring og genveje:**
+   - **På Oplà:** Hold **TOUCH 0 (<)** og **TOUCH 1 (>)** nede samtidig i 400 ms på startskærmen for at tage tøj på/af (viser pop-up bekræftelse på displayet).
+   - **I Serial Monitor (115200 baud):**
+     * Skriv `'w'` (Wardrobe) for at skifte mellem standard og vintertøj on-the-fly.
+     * Skriv `'f'` (Frost) for at simulere 12 graders frostkulde og teste kulde-mekanikken.
+     * Skriv `'h'` (Heat) for at simulere 28 graders hedebølge og se Lumi svede og puste!
+4. **Persistens og MQTT:**
+   - Garderobevalg gemmes på MicroSD i `lumi.txt` som `OUTFIT=0` (Standard) eller `OUTFIT=1` (Vinter).
+   - I `pet/state` MQTT JSON sendes `"outfit": "default"` eller `"outfit": "winter"`.
+
 
 
 

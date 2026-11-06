@@ -174,5 +174,13 @@ enum PetStage {
   STAGE_OLD       // Wise elder with top hat, round glasses & cane
 };
 
+// ============================================================================
+// WARDROBE OUTFITS (Garderobe: standard sommer vs varm vinterpaaklaedning)
+// ============================================================================
+enum PetOutfit {
+  OUTFIT_DEFAULT = 0, // Natural mochi look (summer / standard)
+  OUTFIT_WINTER  = 1  // Winter beanie with pompom + cozy warm scarf
+};
+
 #endif // SETTINGS_H
 

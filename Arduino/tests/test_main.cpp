@@ -357,7 +357,7 @@ void testPetDecayAndStatus() {
   CHECK(strcmp(pet.getMoodStatusDanish(), "Lumi er sulten!") == 0, "Reports Danish mood: 'Lumi er sulten!'");
 
   pet.setVitals(80, 15, 80, 80, 80); // Warmth < 20%
-  CHECK(strcmp(pet.getMoodStatusDanish(), "Lumi fryser!") == 0, "Reports Danish mood: 'Lumi fryser!'");
+  CHECK(strcmp(pet.getMoodStatusDanish(), "Lumi fryser! Giv hue paa!") == 0, "Reports Danish mood: 'Lumi fryser! Giv hue paa!'");
 
   pet.setSleeping(true);
   CHECK(strcmp(pet.getMoodStatusDanish(), "Sover zZz...") == 0, "Reports Danish mood: 'Sover zZz...'");
@@ -391,12 +391,18 @@ void testPetSerialization() {
   pet.formatStateJson(buf, sizeof(buf));
   CHECK(strstr(buf, "\"name\":\"Lumi\"") != NULL, "JSON contains name Lumi");
   CHECK(strstr(buf, "\"stage\":\"teen\"") != NULL, "JSON contains stage teen");
+  CHECK(strstr(buf, "\"outfit\":\"default\"") != NULL, "JSON contains outfit default");
   CHECK(strstr(buf, "\"hunger\":80") != NULL, "JSON contains hunger 80");
   CHECK(strstr(buf, "\"warmth\":85") != NULL, "JSON contains warmth 85");
   CHECK(strstr(buf, "\"energy\":90") != NULL, "JSON contains energy 90");
   CHECK(strstr(buf, "\"happy\":75") != NULL, "JSON contains happy 75");
   CHECK(strstr(buf, "\"discipline\":50") != NULL, "JSON contains discipline 50");
   CHECK(strstr(buf, "\"alive\":true") != NULL, "JSON contains alive true");
+
+  pet.setOutfit(OUTFIT_WINTER);
+  pet.formatStateJson(buf, sizeof(buf));
+  CHECK(strstr(buf, "\"outfit\":\"winter\"") != NULL, "JSON contains outfit winter");
+  pet.setOutfit(OUTFIT_DEFAULT);
 
   // Format with custom name and baby stage
   pet.formatStateJson(buf, sizeof(buf), "Sparky", "baby");
@@ -426,12 +432,14 @@ void testPetStorageSerialization() {
   CHECK(strstr(buffer, "DISCIPLINE=44\n") != NULL, "Serialized text contains DISCIPLINE=44");
   CHECK(strstr(buffer, "ASLEEP=1\n") != NULL, "Serialized text contains ASLEEP=1");
   CHECK(strstr(buffer, "STAGE=0\n") != NULL, "Serialized text contains STAGE=0 (BABY)");
+  CHECK(strstr(buffer, "OUTFIT=0\n") != NULL, "Serialized text contains OUTFIT=0 (DEFAULT)");
 
   // Test deserialization into fresh variables
   float h = 0, w = 0, e = 0, hap = 0, d = 0;
   bool asleep = false;
   PetStage stage = STAGE_TEEN;
-  CHECK(StoragePet::deserializeState(buffer, h, w, e, hap, d, asleep, stage), "Deserialization succeeds on valid text");
+  PetOutfit outfit = OUTFIT_WINTER;
+  CHECK(StoragePet::deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit), "Deserialization succeeds on valid text with outfit");
   CHECK((int)h == 77, "Restored hunger is 77");
   CHECK((int)w == 88, "Restored warmth is 88");
   CHECK((int)e == 66, "Restored energy is 66");
@@ -439,12 +447,56 @@ void testPetStorageSerialization() {
   CHECK((int)d == 44, "Restored discipline is 44");
   CHECK(asleep == true, "Restored asleep state is true");
   CHECK(stage == STAGE_BABY, "Restored stage is STAGE_BABY");
+  CHECK(outfit == OUTFIT_DEFAULT, "Restored outfit is OUTFIT_DEFAULT");
+
+  // Test serializing winter outfit
+  pet.setOutfit(OUTFIT_WINTER);
+  StoragePet::serializeState(buffer, sizeof(buffer), pet);
+  CHECK(strstr(buffer, "OUTFIT=1\n") != NULL, "Serialized text contains OUTFIT=1 (WINTER)");
+  CHECK(StoragePet::deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit), "Deserializes winter outfit");
+  CHECK(outfit == OUTFIT_WINTER, "Restored outfit is OUTFIT_WINTER");
 
   // Test corrupt or truncated inputs
   CHECK(!StoragePet::deserializeState("HUNGER=50\n", h, w, e, hap, d, asleep), "Fails on incomplete file");
   CHECK(!StoragePet::deserializeState("HUNGER=999\nWARMTH=50\nENERGY=50\nHAPPINESS=50\nDISCIPLINE=50\nASLEEP=0\n", h, w, e, hap, d, asleep), "Fails on out-of-range value (999)");
   CHECK(!StoragePet::deserializeState(nullptr, h, w, e, hap, d, asleep), "Fails safely on nullptr");
   CHECK(!StoragePet::deserializeState("", h, w, e, hap, d, asleep), "Fails safely on empty string");
+}
+
+void testPetWardrobeAndThermoregulation() {
+  printf("\n--- Test: PetLogic Wardrobe & Thermoregulation ---\n");
+  PetLogic pet;
+
+  // 1. Initial outfit
+  CHECK(pet.getOutfitEnum() == OUTFIT_DEFAULT, "Initial outfit is OUTFIT_DEFAULT");
+  CHECK(strcmp(pet.getOutfit(), "default") == 0, "Initial outfit string is 'default'");
+  CHECK(!pet.isOverheating(), "Lumi is not overheating initially");
+
+  // 2. Toggle outfit
+  pet.toggleOutfit();
+  CHECK(pet.getOutfitEnum() == OUTFIT_WINTER, "Toggled outfit is OUTFIT_WINTER");
+  CHECK(strcmp(pet.getOutfit(), "winter") == 0, "Outfit string is 'winter'");
+
+  // 3. Overheating in warm room (T >= 23.5 C or warmth >= 75%)
+  pet.setAmbientTemperature(24.5f);
+  CHECK(pet.isOverheating(), "Lumi is overheating when wearing winter clothes in a warm room (24.5 C)");
+  CHECK(strcmp(pet.getMoodStatusDanish(), "Lumi sveder! Tag huen af!") == 0, "Danish status warns player to remove hat");
+
+  // Take off hat -> stops overheating immediately!
+  pet.setOutfit(OUTFIT_DEFAULT);
+  CHECK(!pet.isOverheating(), "Taking off winter clothes stops overheating");
+
+  // 4. Freezing cold in cold room
+  pet.setVitals(80, 20, 80, 80, 80); // Warmth 20%
+  CHECK(strcmp(pet.getMoodStatusDanish(), "Lumi fryser! Giv hue paa!") == 0, "Danish status prompts player to put winter clothes on");
+
+  // Put on winter outfit in cold room -> insulates Lumi
+  pet.setOutfit(OUTFIT_WINTER);
+  pet.setAmbientTemperature(12.0f); // cold room
+  for (int i = 0; i < 20; i++) {
+    pet.update(i * 1000);
+  }
+  CHECK(pet.getWarmth() >= 20, "Warmth does not freeze out when insulated in winter outfit");
 }
 
 int main() {
@@ -470,6 +522,7 @@ int main() {
   testPetDecayAndStatus();
   testPetSerialization();
   testPetStorageSerialization();
+  testPetWardrobeAndThermoregulation();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

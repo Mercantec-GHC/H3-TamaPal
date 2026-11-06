@@ -41,14 +41,15 @@ bool StoragePet::isCardReady() const {
 void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pet) {
   if (buffer == nullptr || bufSize == 0) return;
   snprintf(buffer, bufSize,
-           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\n",
+           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\n",
            pet.getHunger(),
            pet.getWarmth(),
            pet.getEnergy(),
            pet.getHappiness(),
            pet.getDiscipline(),
            pet.isSleeping() ? 1 : 0,
-           (int)pet.getStageEnum());
+           (int)pet.getStageEnum(),
+           (int)pet.getOutfitEnum());
 }
 
 bool StoragePet::deserializeState(const char* text,
@@ -59,7 +60,8 @@ bool StoragePet::deserializeState(const char* text,
                                  float& discipline,
                                  bool& asleep) {
   PetStage unusedStage = STAGE_BABY;
-  return deserializeState(text, hunger, warmth, energy, happiness, discipline, asleep, unusedStage);
+  PetOutfit unusedOutfit = OUTFIT_DEFAULT;
+  return deserializeState(text, hunger, warmth, energy, happiness, discipline, asleep, unusedStage, unusedOutfit);
 }
 
 bool StoragePet::deserializeState(const char* text,
@@ -70,10 +72,24 @@ bool StoragePet::deserializeState(const char* text,
                                  float& discipline,
                                  bool& asleep,
                                  PetStage& stage) {
+  PetOutfit unusedOutfit = OUTFIT_DEFAULT;
+  return deserializeState(text, hunger, warmth, energy, happiness, discipline, asleep, stage, unusedOutfit);
+}
+
+bool StoragePet::deserializeState(const char* text,
+                                 float& hunger,
+                                 float& warmth,
+                                 float& energy,
+                                 float& happiness,
+                                 float& discipline,
+                                 bool& asleep,
+                                 PetStage& stage,
+                                 PetOutfit& outfit) {
   if (text == nullptr || text[0] == '\0') return false;
 
   int h = -1, w = -1, e = -1, hap = -1, d = -1, s = -1;
-  int st = (int)STAGE_BABY; // Default to baby if not present in legacy file
+  int st = (int)STAGE_BABY;       // Default to baby if not present in legacy file
+  int outf = (int)OUTFIT_DEFAULT; // Default to natural fur if not present in legacy file
   const char* p = text;
 
   // Robust line-by-line parser supporting arbitrary line order
@@ -92,6 +108,8 @@ bool StoragePet::deserializeState(const char* text,
       s = atoi(p + 7);
     } else if (strncmp(p, "STAGE=", 6) == 0) {
       st = atoi(p + 6);
+    } else if (strncmp(p, "OUTFIT=", 7) == 0) {
+      outf = atoi(p + 7);
     }
 
     const char* nextLine = strchr(p, '\n');
@@ -99,14 +117,15 @@ bool StoragePet::deserializeState(const char* text,
     p = nextLine + 1;
   }
 
-  // Validate that all 6 required fields are within valid bounds (0..100)
+  // Validate that all fields are within valid bounds
   if (h < 0 || h > 100 ||
       w < 0 || w > 100 ||
       e < 0 || e > 100 ||
       hap < 0 || hap > 100 ||
       d < 0 || d > 100 ||
       s < 0 || s > 1 ||
-      st < 0 || st > 3) {
+      st < 0 || st > 3 ||
+      outf < 0 || outf > 1) {
     return false;
   }
 
@@ -117,6 +136,7 @@ bool StoragePet::deserializeState(const char* text,
   discipline = (float)d;
   asleep = (s == 1);
   stage = (PetStage)st;
+  outfit = (PetOutfit)outf;
   return true;
 }
 
@@ -174,16 +194,20 @@ bool StoragePet::loadPet(PetLogic& pet) {
   float h = 0, w = 0, e = 0, hap = 0, d = 0;
   bool asleep = false;
   PetStage stage = STAGE_BABY;
-  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage)) {
+  PetOutfit outfit = OUTFIT_DEFAULT;
+  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit)) {
     pet.setVitals(h, w, e, hap, d);
     pet.setSleeping(asleep);
     pet.setStage(stage);
+    pet.setOutfit(outfit);
     Serial.print(F("[STORAGE] SUCCES: Indlaeste Lumi fra MicroSD! Sult: "));
     Serial.print((int)h);
     Serial.print(F("%, Energi: "));
     Serial.print((int)e);
     Serial.print(F("%, Stadie: "));
-    Serial.println(pet.getStage());
+    Serial.print(pet.getStage());
+    Serial.print(F(", Toej: "));
+    Serial.println(pet.getOutfit());
     return true;
   } else {
     Serial.println(F("[STORAGE] ADVARSEL: lumi.txt data var ugyldig, starter forfra."));

@@ -45,6 +45,11 @@ public:
   const char* getStage() const;       // Lifecycle stage name: "baby", "teen", "adult", "old"
   PetStage getStageEnum() const;      // Current stage enum
   void setStage(PetStage stage);      // Set lifecycle stage
+  const char* getOutfit() const;      // Wardrobe outfit name: "default", "winter"
+  PetOutfit getOutfitEnum() const;    // Current wardrobe outfit enum
+  void setOutfit(PetOutfit outfit);   // Set wardrobe outfit
+  void toggleOutfit();                // Toggle between default and winter outfit
+  bool isOverheating() const;         // True if wearing winter clothes while warm (> 75% or > 23.5C)
   bool needsAttention() const;        // True if any vital is below PET_CRITICAL_THRESHOLD
   const char* getMoodStatusDanish() const;
 
@@ -62,6 +67,7 @@ private:
   float disciplineVal;
 
   PetStage currentStage;
+  PetOutfit currentOutfit;
   bool isAsleep;
   bool decayInitialized;
   unsigned long lastDecayTimeMs;

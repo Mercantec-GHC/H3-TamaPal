@@ -25,6 +25,7 @@ UiPetRenderer::UiPetRenderer()
     lastBlinking(false),
     lastExpression(EXPR_CONTENT),
     lastStage(STAGE_BABY),
+    lastOutfit(OUTFIT_DEFAULT),
     lastWeather(SKY_DAY_SUNNY),
     lastMoodText(nullptr),
     lastAnimTickMs(0) {}
@@ -40,6 +41,9 @@ LumiExpression UiPetRenderer::determineExpression(const PetLogic& pet) {
   }
   if (pet.isSleeping()) {
     return EXPR_SLEEPING;
+  }
+  if (pet.isOverheating()) {
+    return EXPR_OVERHEATING;
   }
   if (pet.getWarmth() < PET_CRITICAL_THRESHOLD) {
     return EXPR_FREEZING;
@@ -234,7 +238,10 @@ void UiPetRenderer::drawMoodBanner(const char* moodText, LumiExpression expr) {
   uint16_t pillBorder = color565(55, 130, 175);
   uint16_t textColor  = color565(225, 245, 255);
 
-  if (expr == EXPR_FREEZING || expr == EXPR_HUNGRY || expr == EXPR_EXHAUSTED || expr == EXPR_SAD) {
+  if (expr == EXPR_OVERHEATING) {
+    pillBorder = color565(255, 60, 60);
+    textColor  = color565(255, 180, 180);
+  } else if (expr == EXPR_FREEZING || expr == EXPR_HUNGRY || expr == EXPR_EXHAUSTED || expr == EXPR_SAD) {
     pillBorder = color565(255, 140, 60);
     textColor  = color565(255, 220, 150);
   } else if (expr == EXPR_SUPER_HAPPY || expr == EXPR_EATING || expr == EXPR_PLAYING) {
@@ -289,8 +296,9 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
   }
 }
 
-void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, uint16_t bodyColor) {
+void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bodyColor) {
   if (carrier == nullptr) return;
+  (void)outfit;
 
   // 1. Wipe interior face canvas with bodyColor so blinking/expression switches never leave ghost pixels
   carrier->display.fillRoundRect(cx - 19, cy - 11, 38, 18, 4, bodyColor);
@@ -302,6 +310,7 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   uint16_t cheekPink   = color565(255, 130, 155);
   uint16_t cheekCoral  = color565(255, 95, 120);
   uint16_t cheekIce    = color565(100, 185, 255);
+  uint16_t cheekHot    = color565(255, 60, 60);
   uint16_t mouthDark   = color565(28, 45, 58);
   uint16_t tonguePink  = color565(255, 115, 140);
 
@@ -311,6 +320,8 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
     activeCheek = cheekCoral;
   } else if (expr == EXPR_FREEZING) {
     activeCheek = cheekIce;
+  } else if (expr == EXPR_OVERHEATING) {
+    activeCheek = cheekHot;
   }
 
   if (stage == STAGE_BABY) {
@@ -325,6 +336,17 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   int rightEyeX = (stage == STAGE_BABY) ? (cx + 7) : (cx + 10);
   int eyeY      = (stage == STAGE_BABY) ? (cy - 3) : (cy - 4);
 
+  // Sweat drop for overheating
+  if (expr == EXPR_OVERHEATING) {
+    uint16_t dropCyan = color565(90, 220, 255);
+    uint16_t dropBlue = color565(25, 125, 215);
+    carrier->display.drawPixel(cx + 14, eyeY - 8, dropCyan);
+    carrier->display.fillRect(cx + 13, eyeY - 7, 3, 3, dropCyan);
+    carrier->display.fillRect(cx + 12, eyeY - 6, 5, 4, dropCyan);
+    carrier->display.drawPixel(cx + 13, eyeY - 6, pureWhite);
+    carrier->display.drawPixel(cx + 14, eyeY - 3, dropBlue);
+  }
+
   // 2. Render Eyes according to expression and blink state
   if (isBlinking || expr == EXPR_SLEEPING || expr == EXPR_DEAD) {
     // Peaceful closed sleeping/blinking eye arcs (-  -)
@@ -332,6 +354,12 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
     carrier->display.drawFastHLine(leftEyeX - 2, eyeY + 2, 5, eyeDark);
     carrier->display.drawFastHLine(rightEyeX - 3, eyeY + 1, 7, eyeDark);
     carrier->display.drawFastHLine(rightEyeX - 2, eyeY + 2, 5, eyeDark);
+  } else if (expr == EXPR_OVERHEATING) {
+    // Squinting exhausted panting eyes (>  <)
+    carrier->display.drawLine(leftEyeX - 3, eyeY - 2, leftEyeX + 2, eyeY + 1, eyeDark);
+    carrier->display.drawLine(leftEyeX + 2, eyeY + 1, leftEyeX - 3, eyeY + 3, eyeDark);
+    carrier->display.drawLine(rightEyeX + 3, eyeY - 2, rightEyeX - 2, eyeY + 1, eyeDark);
+    carrier->display.drawLine(rightEyeX - 2, eyeY + 1, rightEyeX + 3, eyeY + 3, eyeDark);
   } else if (expr == EXPR_EATING || expr == EXPR_PLAYING) {
     // Joyful Nintendo / Tamagotchi arch eyes (^  ^)
     carrier->display.drawLine(leftEyeX - 3, eyeY + 2, leftEyeX, eyeY - 2, eyeDark);
@@ -516,6 +544,12 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
       carrier->display.drawPixel(cx + 3, mouthY + 2, mouthDark);
       break;
 
+    case EXPR_OVERHEATING:
+      // Panting open mouth with tongue out
+      carrier->display.fillRoundRect(cx - 3, mouthY, 7, 6, 2, mouthDark);
+      carrier->display.fillRoundRect(cx - 2, mouthY + 3, 5, 4, 1, tonguePink);
+      break;
+
     case EXPR_SAD:
     case EXPR_SCOLDED:
       // Cute pouty frown arc
@@ -526,7 +560,7 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   }
 }
 
-void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, uint16_t bgColor) {
+void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bgColor) {
   if (carrier == nullptr) return;
   (void)bgColor;
 
@@ -538,7 +572,14 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   uint16_t earInner    = color565(255, 165, 185); // Warm Pink Ear Tuft
   uint16_t footColor   = color565(65, 175, 150);  // Jade Paws
 
-  if (expr == EXPR_FREEZING) {
+  if (expr == EXPR_OVERHEATING) {
+    bodyMain    = color565(255, 220, 195); // Warm flushed peach
+    bodyOutline = color565(190, 75, 55);   // Warm reddish outline
+    bodyShade   = color565(240, 175, 150);
+    bellyPatch  = color565(255, 240, 230);
+    footColor   = color565(210, 95, 75);
+    earInner    = color565(255, 80, 100);  // Very warm red ears
+  } else if (expr == EXPR_FREEZING) {
     bodyMain    = color565(150, 215, 255); // Frosty Ice Blue
     bodyOutline = color565(45, 105, 175);
     bodyShade   = color565(105, 175, 235);
@@ -561,7 +602,7 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     footColor   = color565(140, 170, 195);
   }
 
-  // 1. Kokiri Emerald Sprout on Head (Zelda Ocarina of Time forest spirit motif)
+  // 1. Headgear & Stage Head Props (Adapts to Wardrobe Outfit)
   uint16_t stemGreen     = color565(45, 165, 75);
   uint16_t leafEmerald   = color565(65, 225, 105);
   uint16_t leafHighlight = color565(175, 255, 165);
@@ -569,6 +610,103 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   if (expr == EXPR_DEAD) {
     // Golden Spirit Halo above head
     carrier->display.drawRoundRect(cx - 10, cy - 29, 20, 5, 2, color565(255, 235, 90));
+  } else if (outfit == OUTFIT_WINTER) {
+    // =============================================================
+    // WINTER WARDROBE: Stage-adapted winter headgear & beanies
+    // =============================================================
+    if (stage == STAGE_BABY) {
+      // BABY: Cozy knit red beanie with folded brim & fluffy white pompom!
+      uint16_t beanieRed   = color565(225, 45, 65);
+      uint16_t beanieDark  = color565(155, 25, 40);
+      uint16_t beanieWhite = 0xFFFF;
+
+      carrier->display.fillRoundRect(cx - 15, cy - 24, 30, 12, 6, beanieRed);
+      carrier->display.drawFastHLine(cx - 13, cy - 20, 26, beanieDark);
+
+      // Folded ribbed brim with white stripe
+      carrier->display.fillRoundRect(cx - 16, cy - 16, 32, 5, 2, beanieRed);
+      carrier->display.drawFastHLine(cx - 15, cy - 14, 30, beanieWhite);
+
+      // Fluffy snowy pompom on top
+      carrier->display.fillCircle(cx, cy - 26, 4, beanieWhite);
+      carrier->display.drawPixel(cx, cy - 26, color565(200, 220, 240));
+
+      // Tender sprout peeking out right next to the pompom
+      carrier->display.fillRect(cx + 4, cy - 25, 2, 4, stemGreen);
+      carrier->display.fillCircle(cx + 7, cy - 26, 3, leafEmerald);
+      carrier->display.drawPixel(cx + 7, cy - 27, leafHighlight);
+    } else if (stage == STAGE_TEEN) {
+      // TEEN: Slouchy cyber beanie with horns poking through & cyan pompom!
+      uint16_t beanieDark  = color565(28, 32, 52);
+      uint16_t beanieCyan  = color565(0, 230, 255);
+      uint16_t hornDark    = color565(30, 95, 65);
+      uint16_t hornGold    = color565(255, 220, 60);
+
+      carrier->display.fillRoundRect(cx - 17, cy - 25, 34, 12, 5, beanieDark);
+      carrier->display.fillRoundRect(cx - 18, cy - 17, 36, 5, 2, beanieCyan);
+      // Slouchy tail droop to the right with cyan pompom
+      carrier->display.fillRoundRect(cx + 12, cy - 28, 9, 8, 3, beanieDark);
+      carrier->display.fillCircle(cx + 22, cy - 26, 4, beanieCyan);
+      carrier->display.drawPixel(cx + 22, cy - 26, 0xFFFF);
+
+      // Left spirit horn poking through beanie
+      carrier->display.fillTriangle(cx - 5, cy - 24, cx - 11, cy - 34, cx - 8, cy - 21, hornDark);
+      carrier->display.fillTriangle(cx - 5, cy - 23, cx - 10, cy - 32, cx - 7, cy - 21, leafEmerald);
+      carrier->display.fillTriangle(cx - 8, cy - 30, cx - 11, cy - 34, cx - 10, cy - 28, hornGold);
+      carrier->display.drawPixel(cx - 10, cy - 33, 0xFFFF);
+
+      // Right spirit horn poking through beanie
+      carrier->display.fillTriangle(cx + 2, cy - 24, cx + 10, cy - 34, cx + 6, cy - 21, hornDark);
+      carrier->display.fillTriangle(cx + 2, cy - 23, cx + 9, cy - 32, cx + 5, cy - 21, leafEmerald);
+      carrier->display.fillTriangle(cx + 7, cy - 30, cx + 10, cy - 34, cx + 9, cy - 28, hornGold);
+      carrier->display.drawPixel(cx + 9, cy - 33, 0xFFFF);
+    } else if (stage == STAGE_ADULT) {
+      // ADULT: Insulated tweed winter cap with hanging warm earflaps & gold lotus emblem!
+      uint16_t capTweed = color565(35, 95, 75);
+      uint16_t capFur   = color565(240, 245, 250);
+      uint16_t capGold  = color565(255, 215, 60);
+
+      // Cap crown
+      carrier->display.fillRoundRect(cx - 15, cy - 26, 30, 13, 5, capTweed);
+      // Cozy white fleece/fur brim
+      carrier->display.fillRoundRect(cx - 17, cy - 18, 34, 6, 3, capFur);
+
+      // Hanging earflaps
+      carrier->display.fillRoundRect(cx - 19, cy - 14, 5, 9, 2, capFur);
+      carrier->display.fillRoundRect(cx + 14, cy - 14, 5, 9, 2, capFur);
+
+      // Golden blooming lotus crest pinned to front of cap
+      carrier->display.fillCircle(cx, cy - 23, 4, capGold);
+      carrier->display.fillCircle(cx, cy - 23, 2, color565(255, 140, 40));
+      carrier->display.drawPixel(cx - 1, cy - 24, 0xFFFF);
+    } else if (stage == STAGE_OLD) {
+      // OLD: Distinguished top hat with white fur earmuffs hugging the sides & frosted snowflake
+      uint16_t hatColor     = color565(35, 40, 55);
+      uint16_t hatBrim      = color565(25, 28, 40);
+      uint16_t hatRibbon    = color565(190, 45, 65);
+      uint16_t hatGold      = color565(255, 215, 60);
+      uint16_t furWhite     = color565(245, 250, 255);
+      uint16_t snowCrystal  = color565(180, 235, 255);
+
+      carrier->display.fillRoundRect(cx - 11, cy - 35, 22, 12, 2, hatColor);
+      carrier->display.drawFastVLine(cx - 9, cy - 34, 10, color565(60, 65, 85));
+      carrier->display.fillRoundRect(cx - 16, cy - 24, 32, 4, 1, hatBrim);
+      carrier->display.fillRect(cx - 11, cy - 26, 22, 3, hatRibbon);
+      carrier->display.drawRect(cx - 2, cy - 27, 5, 5, hatGold);
+      carrier->display.drawPixel(cx, cy - 25, 0xFFFF);
+
+      // Fluffy winter earmuffs hugging the head under the brim
+      carrier->display.fillCircle(cx - 18, cy - 16, 5, furWhite);
+      carrier->display.fillCircle(cx - 18, cy - 16, 3, color565(220, 230, 240));
+      carrier->display.fillCircle(cx + 18, cy - 16, 5, furWhite);
+      carrier->display.fillCircle(cx + 18, cy - 16, 3, color565(220, 230, 240));
+
+      // Frosted snowflake crystal pinned to the hat
+      carrier->display.drawPixel(cx + 10, cy - 29, snowCrystal);
+      carrier->display.drawPixel(cx + 10, cy - 27, snowCrystal);
+      carrier->display.drawPixel(cx + 9,  cy - 28, snowCrystal);
+      carrier->display.drawPixel(cx + 11, cy - 28, snowCrystal);
+    }
   } else if (stage == STAGE_BABY) {
     // Baby stage: A tiny, tender green sprout bud (only 1 single cute mini-leaf!)
     carrier->display.fillRect(cx - 1, cy - 23, 2, 5, stemGreen);
@@ -740,6 +878,63 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     // Little round gold pocket watch tucked into waist
     carrier->display.fillCircle(cx + 6, cy + 10, 2, watchGold);
     carrier->display.drawPixel(cx + 6, cy + 10, 0xFFFF);
+  }
+
+  // 4d. Winter Warmth Scarf (Adapts per stage when wearing OUTFIT_WINTER)
+  if (outfit == OUTFIT_WINTER && expr != EXPR_DEAD) {
+    if (stage == STAGE_BABY) {
+      // BABY: Candy-cane red & white striped cozy woolen scarf under the chin
+      uint16_t scarfRed   = color565(230, 45, 65);
+      uint16_t scarfWhite = 0xFFFF;
+      uint16_t scarfDark  = color565(160, 25, 40);
+
+      carrier->display.fillRoundRect(cx - 14, cy + 3, 28, 6, 3, scarfRed);
+      carrier->display.fillRect(cx - 8, cy + 3, 4, 6, scarfWhite);
+      carrier->display.fillRect(cx + 2, cy + 3, 4, 6, scarfWhite);
+      carrier->display.drawFastHLine(cx - 13, cy + 9, 26, scarfDark);
+
+      // Cute dangling tail on the right
+      carrier->display.fillRoundRect(cx + 7, cy + 7, 6, 9, 2, scarfRed);
+      carrier->display.fillRect(cx + 7, cy + 10, 6, 3, scarfWhite);
+      carrier->display.drawFastHLine(cx + 7, cy + 16, 6, scarfWhite);
+    } else if (stage == STAGE_TEEN) {
+      // TEEN: Gamer cyber-navy scarf with glowing neon cyan stripes & trailing tail
+      uint16_t scarfNavy = color565(25, 30, 50);
+      uint16_t scarfCyan = color565(0, 230, 255);
+
+      carrier->display.fillRoundRect(cx - 17, cy + 4, 34, 6, 3, scarfNavy);
+      carrier->display.fillRect(cx - 10, cy + 4, 4, 6, scarfCyan);
+      carrier->display.fillRect(cx + 4,  cy + 4, 4, 6, scarfCyan);
+
+      carrier->display.fillRoundRect(cx + 9, cy + 8, 7, 12, 2, scarfNavy);
+      carrier->display.fillRect(cx + 9, cy + 12, 7, 3, scarfCyan);
+      carrier->display.drawFastHLine(cx + 9, cy + 20, 7, scarfCyan);
+    } else if (stage == STAGE_ADULT) {
+      // ADULT: Stately burgundy cashmere scarf with gold embroidery over the chest
+      uint16_t scarfBurgundy = color565(180, 25, 45);
+      uint16_t scarfGold     = color565(255, 215, 60);
+      uint16_t scarfDark     = color565(110, 15, 30);
+
+      carrier->display.fillRoundRect(cx - 18, cy + 4, 36, 7, 3, scarfBurgundy);
+      carrier->display.drawFastHLine(cx - 17, cy + 6, 34, scarfGold);
+      carrier->display.drawFastHLine(cx - 17, cy + 11, 34, scarfDark);
+
+      carrier->display.fillRoundRect(cx - 5, cy + 9, 10, 9, 2, scarfBurgundy);
+      carrier->display.drawFastHLine(cx - 4, cy + 14, 8, scarfGold);
+      carrier->display.drawFastHLine(cx - 5, cy + 18, 10, scarfGold);
+    } else if (stage == STAGE_OLD) {
+      // OLD: Chunky knitted hunter-green & cream grandfather scarf with tassels
+      uint16_t scarfGreen = color565(55, 125, 80);
+      uint16_t scarfCream = color565(245, 240, 215);
+
+      carrier->display.fillRoundRect(cx - 18, cy + 4, 36, 7, 3, scarfGreen);
+      carrier->display.fillRect(cx - 11, cy + 4, 5, 7, scarfCream);
+      carrier->display.fillRect(cx + 3,  cy + 4, 5, 7, scarfCream);
+
+      carrier->display.fillRoundRect(cx - 13, cy + 9, 8, 11, 2, scarfGreen);
+      carrier->display.fillRect(cx - 13, cy + 13, 8, 3, scarfCream);
+      carrier->display.drawFastHLine(cx - 13, cy + 20, 8, scarfCream);
+    }
   }
 
   // 5. Stubby Arms / Paws (Raised in celebration when super happy/playing/eating!)
@@ -928,7 +1123,7 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   }
 
   // 6. Facial Features (Eyes, Cheeks, Mouth / Pacifier)
-  drawFaceFeatures(cx, cy, expr, isBlinking, stage, bodyMain);
+  drawFaceFeatures(cx, cy, expr, isBlinking, stage, outfit, bodyMain);
 
   // 7. Swag Gamer/DJ Headphones for TEEN stage!
   if (stage == STAGE_TEEN && expr != EXPR_DEAD) {
@@ -1036,6 +1231,13 @@ void UiPetRenderer::updateSideOverlay(int baseCx, int baseCy, LumiExpression exp
     // Extra floating snowflake on the right side when freezing
     int sy = boxY + 12 + (phase % 3) * 3;
     drawSnowflake(boxX + 14, sy, color565(165, 235, 255));
+  } else if (expr == EXPR_OVERHEATING) {
+    // Floating sweat droplets in the side overlay
+    uint16_t dropCyan = color565(80, 215, 255);
+    int sy = boxY + 12 + (phase % 3) * 4;
+    carrier->display.fillCircle(boxX + 16, sy, 3, dropCyan);
+    carrier->display.fillTriangle(boxX + 16, sy - 5, boxX + 13, sy, boxX + 19, sy, dropCyan);
+    carrier->display.drawPixel(boxX + 15, sy - 1, 0xFFFF);
   } else if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING) {
     // Twinkling Nintendo star / heart sparkles
     uint16_t starGold = color565(255, 235, 80);
@@ -1062,6 +1264,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
 
   LumiExpression expr    = determineExpression(pet);
   PetStage stage         = pet.getStageEnum();
+  PetOutfit outfit       = pet.getOutfitEnum();
   SkyWeatherMode weather = determineSkyWeather(pet, expr);
   bool isNight           = (weather == SKY_NIGHT_STARRY);
 
@@ -1106,13 +1309,14 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   // Weather & side overlay phase (0..3)
   int overlayPhase = (nowMs / 450) % 4;
 
-  // 2. Full stage initialization when entering SCREEN_HOME or when weather / stage changes
+  // 2. Full stage initialization when entering SCREEN_HOME or when weather / stage / outfit changes
   bool weatherChanged = (weather != lastWeather);
   bool stageChanged   = (stage != lastStage);
-  if (forceRedraw || !stageInitialized || weatherChanged || stageChanged) {
+  bool outfitChanged  = (outfit != lastOutfit);
+  if (forceRedraw || !stageInitialized || weatherChanged || stageChanged || outfitChanged) {
     drawForestStage(weather);
     updateSkyWeather(weather, overlayPhase, nativeBg, true);
-    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, nativeBg);
+    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, outfit, nativeBg);
     updateFairies(targetNaviX, targetNaviY, targetSmallY, isNight, nativeBg, true);
     updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, expr, overlayPhase, nativeBg, true);
 
@@ -1124,6 +1328,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     lastBlinking     = isBlinking;
     lastExpression   = expr;
     lastStage        = stage;
+    lastOutfit       = outfit;
     lastWeather      = weather;
     lastZzzPhase     = overlayPhase;
     lastMoodText     = mood;
@@ -1132,29 +1337,30 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   }
 
   // 3. Delta-update Lumi (zero-flicker partial redraw)
-  if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression) {
-    if (expr != lastExpression) {
-      // Expression changed: clear full character bounds (paws, ears, horns, briefcase, halo)
-      // to avoid ghost pixels from changed ear droop, raised/tucked paws, or briefcase
+  if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression || outfit != lastOutfit) {
+    if (expr != lastExpression || outfit != lastOutfit) {
+      // Expression or outfit changed: clear full character bounds (paws, ears, horns, briefcase, halo, beanie, scarf)
       carrier->display.fillRect(lastDrawnCx - 31, lastDrawnCy - 35, 65, 57, nativeBg);
       carrier->display.fillRoundRect(96, 154, 48, 5, 2, color565(12, 42, 30)); // drop shadow
     } else {
       eraseOldCharacterRim(lastDrawnCx, lastDrawnCy, targetCx, targetCy, nativeBg);
     }
-    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, nativeBg);
+    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, outfit, nativeBg);
     lastDrawnCx    = targetCx;
     lastDrawnCy    = targetCy;
     lastBlinking   = isBlinking;
     lastExpression = expr;
+    lastOutfit     = outfit;
   } else if (isBlinking != lastBlinking) {
     // Only the eyelids changed: redraw face interior directly without touching body!
     uint16_t bodyMain = color565(155, 248, 220);
-    if (expr == EXPR_FREEZING) bodyMain = color565(150, 215, 255);
+    if (expr == EXPR_OVERHEATING) bodyMain = color565(255, 220, 195);
+    else if (expr == EXPR_FREEZING) bodyMain = color565(150, 215, 255);
     else if (expr == EXPR_SLEEPING) bodyMain = color565(130, 195, 225);
     else if (expr == EXPR_SCOLDED) bodyMain = color565(180, 240, 215);
     else if (expr == EXPR_DEAD) bodyMain = color565(210, 225, 235);
 
-    drawFaceFeatures(targetCx, targetCy, expr, isBlinking, stage, bodyMain);
+    drawFaceFeatures(targetCx, targetCy, expr, isBlinking, stage, outfit, bodyMain);
     lastBlinking = isBlinking;
   }
 
@@ -1188,7 +1394,7 @@ void UiPetRenderer::drawActionScene(const PetLogic& pet,
   // 1. Draw the seamless stage with Lumi performing the action
   drawForestStage(weather);
   int actionCy = (actionExpr == EXPR_PLAYING || actionExpr == EXPR_EATING) ? (LUMI_BASE_CY - 3) : LUMI_BASE_CY;
-  drawLumiCharacter(LUMI_BASE_CX, actionCy, actionExpr, false, pet.getStageEnum(), nativeBg);
+  drawLumiCharacter(LUMI_BASE_CX, actionCy, actionExpr, false, pet.getStageEnum(), pet.getOutfitEnum(), nativeBg);
   updateFairies(74, 98, 123, isNight, nativeBg, true);
   updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, actionExpr, 2, nativeBg, true);
 

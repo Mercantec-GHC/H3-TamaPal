@@ -22,6 +22,7 @@ enum LumiExpression {
   EXPR_EATING,          // Action mode: Munching a red Kokiri berry with ^ ^ joyful eyes
   EXPR_PLAYING,         // Action mode: Bouncing happily with stars & Navi spinning
   EXPR_SCOLDED,         // Action mode: Blushed pouty face with manga anger/sweat mark
+  EXPR_OVERHEATING,     // Overheated in winter clothes: Sweating droplet, flushed cheeks, panting
   EXPR_DEAD             // Health == 0: Peaceful spirit with glowing halo
 };
 
@@ -68,6 +69,7 @@ private:
   bool lastBlinking;
   LumiExpression lastExpression;
   PetStage lastStage;
+  PetOutfit lastOutfit;
   SkyWeatherMode lastWeather;
   const char* lastMoodText;
   unsigned long lastAnimTickMs;
@@ -88,10 +90,10 @@ private:
   void eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int newCy, uint16_t bgColor);
 
   // Core 2.5D character drawing routine
-  void drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, uint16_t bgColor);
+  void drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bgColor);
 
   // Draw eyes & mouth based on expression and stage
-  void drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, uint16_t bodyColor);
+  void drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bodyColor);
 
   // Draw floating Navi fairy + secondary miniature forest fairy
   void updateFairies(int naviX, int naviY, int smallFairyY, bool isSleeping, uint16_t bgColor, bool force);

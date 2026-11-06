@@ -92,6 +92,10 @@ bool touch3HoldFired = false;
 unsigned long touch3StartTime = 0;
 unsigned long muteMessageEndTimeMs = 0;
 
+// Non-blocking Wardrobe toggle state (Hold TOUCH0 + TOUCH1 for 400ms on HOME)
+bool combo01Fired = false;
+unsigned long combo01StartTime = 0;
+
 // Controller button edge-trigger tracking (for instant low-latency publishing)
 bool lastCtrlUp = false;
 bool lastCtrlDown = false;
@@ -191,6 +195,31 @@ void processMuteGestures(unsigned long now, bool touch0, bool touch3, bool touch
   }
 }
 
+// Non-blocking Wardrobe toggle gesture processing (Hold TOUCH0 + TOUCH1 for 400ms on HOME)
+void processWardrobeGestures(unsigned long now, bool touch0, bool touch1, ScreenType currentScreen) {
+  if (currentScreen == SCREEN_HOME && touch0 && touch1) {
+    if (combo01StartTime == 0) {
+      combo01StartTime = now;
+    } else if (!combo01Fired && (now - combo01StartTime >= 400)) {
+      petLogic.toggleOutfit();
+      combo01Fired = true;
+      soundLed.playSound(SOUND_CONFIRM);
+      muteMessageEndTimeMs = now + 1400; // Toast visible for 1.4 seconds
+
+      if (petLogic.getOutfitEnum() == OUTFIT_WINTER) {
+        uiMenu.drawPlaceholderScreen("GARDEROBE", "Vinterhue & toerklaede PAA");
+      } else {
+        uiMenu.drawPlaceholderScreen("GARDEROBE", "Standard toej (hue AF)");
+      }
+      syncPetStateToBackend(true);
+    }
+  } else if (!touch0 && !touch1) {
+    // Reset ONLY when both fingers are lifted
+    combo01Fired = false;
+    combo01StartTime = 0;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -228,6 +257,10 @@ void setup() {
   Serial.println(currentCaseMode ? F("PLASTIK-CASE (Følsomhed 60)") : F("BARE BOARD (Følsomhed 200)"));
   Serial.println(F("Tip: Skriv 'c' i Serial Monitor for at skifte mellem case/bare board on-the-fly!"));
   Serial.println(F("Tip: Skriv 's' i Serial Monitor for at skifte stadie (Baby -> Teen -> Adult -> Old)!"));
+  Serial.println(F("Tip: Skriv 'w' for at aabne Garderoben (vinterhue & halstoerklaede)!"));
+  Serial.println(F("Tip: Skriv 'f' for at simulere frostkulde (12 grader -> Lumi fryser)!"));
+  Serial.println(F("Tip: Skriv 'h' for at simulere hedeboelge (28 grader -> Lumi sveder)!"));
+  Serial.println(F("Garderobe-genvej: Hold TOUCH 0 (<) og TOUCH 1 (>) i 400 ms!"));
   Serial.println(F("Naviger med TOUCH 0 (<) og TOUCH 1 (>)"));
   Serial.println(F("For at forbinde til Pong over MQTT:"));
   Serial.println(F(" 1. Gaa til CONNECT (antenne-ikonet helt til hoejre)"));
@@ -239,9 +272,12 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // Listen for 'c' or 's' in Serial Monitor:
+  // Listen for commands in Serial Monitor:
   // 'c' = toggle plastic case sensitivity
   // 's' = cycle through life stages (Baby -> Teen -> Adult -> Old) on-the-fly!
+  // 'w' = toggle wardrobe outfit (standard <-> vintertøj / beanie & scarf)
+  // 'f' = simulate freezing cold (test winter clothing warming effect)
+  // 'h' = simulate overheating heat wave (test sweating & hat removal)
   while (Serial.available() > 0) {
     char c = (char)Serial.read();
     if (c == 'c' || c == 'C') {
@@ -256,6 +292,33 @@ void loop() {
         uiPet.updateHomeDisplay(petLogic, now, true);
       }
       syncPetStateToBackend(true);
+    } else if (c == 'w' || c == 'W') {
+      petLogic.toggleOutfit();
+      soundLed.playSound(SOUND_CONFIRM);
+      Serial.print(F("[GARDEROBE] Toej skiftet til: "));
+      Serial.println(petLogic.getOutfit());
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
+    } else if (c == 'f' || c == 'F') {
+      petLogic.setVitals(petLogic.getHunger(), 15.0f, petLogic.getHappiness(), petLogic.getEnergy(), petLogic.getDiscipline());
+      petLogic.setAmbientTemperature(12.0f);
+      soundLed.playSound(SOUND_MISS);
+      Serial.println(F("[SIMULERING] Det er iskoldt! Lumi fryser (12 grader, varme 15%)."));
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
+    } else if (c == 'h' || c == 'H') {
+      petLogic.setVitals(petLogic.getHunger(), 85.0f, petLogic.getHappiness(), petLogic.getEnergy(), petLogic.getDiscipline());
+      petLogic.setAmbientTemperature(28.0f);
+      soundLed.playSound(SOUND_MISS);
+      Serial.println(F("[SIMULERING] Det er hedt! Lumi sveder (28 grader, varme 85%)."));
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
     }
   }
 
@@ -263,6 +326,7 @@ void loop() {
   carrier.Buttons.update();
 
   bool touch0 = carrier.Buttons.getTouch(TOUCH0);
+  bool touch1 = carrier.Buttons.getTouch(TOUCH1);
   bool touch3 = carrier.Buttons.getTouch(TOUCH3);
   bool touch4 = carrier.Buttons.getTouch(TOUCH4);
 
@@ -270,6 +334,8 @@ void loop() {
 
   // Process Mute gestures (TOUCH0+TOUCH4 combo or hold TOUCH3)
   processMuteGestures(now, touch0, touch3, touch4, currentScreen);
+  // Process Wardrobe gestures (TOUCH0+TOUCH1 combo: hold both arrows for 400ms)
+  processWardrobeGestures(now, touch0, touch1, currentScreen);
 
   // -------------------------------------------------------------
   // Restore screen automatically when mute banner notification expires
@@ -277,6 +343,8 @@ void loop() {
   if (muteMessageEndTimeMs > 0 && now >= muteMessageEndTimeMs) {
     muteMessageEndTimeMs = 0;
     if (currentScreen == SCREEN_HOME) {
+      uiMenu.drawInitialScreen();
+      uiMenu.drawMenuBar(menuLogic, true);
       uiPet.updateHomeDisplay(petLogic, now, true);
     } else if (currentScreen == SCREEN_CONTROLLER) {
       uiController.drawInitialScreen(menuLogic.getPlayerId());
@@ -317,7 +385,7 @@ void loop() {
     }
   } else {
     // Normal menu screens (HOME, STATS, ACTION):
-    bool inAnyCombo = (touch0 && touch4) || combo04Fired || touch3HoldFired;
+    bool inAnyCombo = (touch0 && touch4) || (touch0 && touch1) || combo04Fired || combo01Fired || touch3HoldFired;
 
     if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
       if (!touch4 && carrier.Buttons.onTouchDown(TOUCH0)) {

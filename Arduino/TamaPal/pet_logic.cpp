@@ -23,7 +23,8 @@ void PetLogic::reset() {
   happinessVal = 75.0f;   // Cheerful
   disciplineVal = 50.0f;  // Balanced
 
-  currentStage = STAGE_BABY; // Starts as cute egg baby
+  currentStage = STAGE_BABY;     // Starts as cute egg baby
+  currentOutfit = OUTFIT_DEFAULT; // Natural fur mode
   isAsleep = false;
   decayInitialized = false;
   lastDecayTimeMs = 0;
@@ -100,9 +101,22 @@ void PetLogic::setAmbientTemperature(float celsius) {
 
   ambientTemp = celsius;
 
-  // Ideal temperature is around 22.0 deg Celsius
-  float diff = (celsius >= 22.0f) ? (celsius - 22.0f) : (22.0f - celsius);
-  float targetWarmth = 100.0f - (diff * 7.0f);
+  float targetWarmth;
+  if (currentOutfit == OUTFIT_WINTER) {
+    // Winter clothes insulate Lumi against cold rooms!
+    if (celsius < 20.0f) {
+      // Keeps him warm and cozy (85%) even in the cold
+      targetWarmth = 85.0f;
+    } else {
+      // In a warm room (>20C), winter clothes cause heat buildup
+      float excess = celsius - 20.0f;
+      targetWarmth = 85.0f + (excess * 4.0f);
+    }
+  } else {
+    // Natural mochi fur: ideal temperature is around 22.0 deg Celsius
+    float diff = (celsius >= 22.0f) ? (celsius - 22.0f) : (22.0f - celsius);
+    targetWarmth = 100.0f - (diff * 7.0f);
+  }
   targetWarmth = clamp0100(targetWarmth);
 
   // Smooth adjustment towards the environmental target (EMA filter)
@@ -171,6 +185,11 @@ void PetLogic::update(unsigned long currentTimeMs) {
       hungerVal = clamp0100(hungerVal - (PET_DECAY_HUNGER * intervals));
       happinessVal = clamp0100(happinessVal - (PET_DECAY_HAPPINESS * intervals));
       disciplineVal = clamp0100(disciplineVal - (PET_DECAY_DISCIPLINE * intervals));
+
+      // Overheating discomfort: if wearing heavy winter clothes in a warm room
+      if (isOverheating()) {
+        happinessVal = clamp0100(happinessVal - (1.5f * intervals));
+      }
     }
   }
 }
@@ -215,11 +234,14 @@ const char* PetLogic::getMoodStatusDanish() const {
   if (isAsleep) {
     return "Sover zZz...";
   }
+  if (isOverheating()) {
+    return "Lumi sveder! Tag huen af!";
+  }
+  if (getWarmth() < 45) {
+    return "Lumi fryser! Giv hue paa!";
+  }
   if (getHunger() < PET_CRITICAL_THRESHOLD) {
     return "Lumi er sulten!";
-  }
-  if (getWarmth() < PET_CRITICAL_THRESHOLD) {
-    return "Lumi fryser!";
   }
   if (getEnergy() < PET_CRITICAL_THRESHOLD) {
     return "Lumi er udmattet!";
@@ -258,6 +280,32 @@ void PetLogic::setStage(PetStage stage) {
   currentStage = stage;
 }
 
+bool PetLogic::isOverheating() const {
+  if (currentOutfit != OUTFIT_WINTER) return false;
+  // Overheats when wearing winter clothes while warm/hot
+  return (warmthVal >= 75.0f || ambientTemp >= 23.5f);
+}
+
+const char* PetLogic::getOutfit() const {
+  return (currentOutfit == OUTFIT_WINTER) ? "winter" : "default";
+}
+
+PetOutfit PetLogic::getOutfitEnum() const {
+  return currentOutfit;
+}
+
+void PetLogic::setOutfit(PetOutfit outfit) {
+  currentOutfit = outfit;
+  if (currentOutfit == OUTFIT_WINTER && warmthVal < 60.0f) {
+    // Putting on warm winter clothes immediately provides a comforting warmth boost
+    warmthVal = clamp0100(warmthVal + 25.0f);
+  }
+}
+
+void PetLogic::toggleOutfit() {
+  setOutfit((currentOutfit == OUTFIT_DEFAULT) ? OUTFIT_WINTER : OUTFIT_DEFAULT);
+}
+
 void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char* petName, const char* petStage) const {
   if (buffer == nullptr || bufferSize == 0) return;
 
@@ -265,9 +313,10 @@ void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char
   const char* stage = (petStage != nullptr && petStage[0] != '\0') ? petStage : getStage();
 
   snprintf(buffer, bufferSize,
-           "{\"name\":\"%s\",\"stage\":\"%s\",\"hunger\":%d,\"warmth\":%d,\"energy\":%d,\"happy\":%d,\"discipline\":%d,\"alive\":%s}",
+           "{\"name\":\"%s\",\"stage\":\"%s\",\"outfit\":\"%s\",\"hunger\":%d,\"warmth\":%d,\"energy\":%d,\"happy\":%d,\"discipline\":%d,\"alive\":%s}",
            name,
            stage,
+           getOutfit(),
            getHunger(),
            getWarmth(),
            getEnergy(),
