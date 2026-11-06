@@ -386,10 +386,10 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
   int dy = newCy - oldCy;
   if (dx == 0 && dy == 0) return;
 
-  // Character bounding box relative to (cx, cy): X in [-31..+33], Y in [-35..+22]
+  // Character & bed bounding box relative to (cx, cy): X in [-36..+37], Y in [-35..+22]
   if (dy > 0) {
-    // Moved down: clear top strip exposed above sprout, ears, horns, and briefcase
-    carrier->display.fillRect(oldCx - 31, oldCy - 35, 65, dy + 2, bgColor);
+    // Moved down: clear top strip exposed above sprout, ears, horns, or bed headboard
+    carrier->display.fillRect(oldCx - 36, oldCy - 35, 74, dy + 2, bgColor);
   } else if (dy < 0) {
     // Moved up: clear bottom strip above the mossy platform (Y < 153)
     int clearH = (-dy) + 2;
@@ -398,16 +398,16 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
       clearH = 153 - clearY;
     }
     if (clearH > 0) {
-      carrier->display.fillRect(oldCx - 31, clearY, 65, clearH, bgColor);
+      carrier->display.fillRect(oldCx - 36, clearY, 74, clearH, bgColor);
     }
   }
 
   if (dx > 0) {
     // Moved right: clear left margin strip (including headphones and side paws)
-    carrier->display.fillRect(oldCx - 31, oldCy - 35, dx + 4, 57, bgColor);
+    carrier->display.fillRect(oldCx - 36, oldCy - 35, dx + 4, 57, bgColor);
   } else if (dx < 0) {
     // Moved left: clear right margin strip (including headphones and briefcase)
-    carrier->display.fillRect(newCx + 25, oldCy - 35, (-dx) + 8, 57, bgColor);
+    carrier->display.fillRect(newCx + 25, oldCy - 35, (-dx) + 12, 57, bgColor);
   }
 }
 
@@ -719,9 +719,176 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   }
 }
 
+void UiPetRenderer::drawSleepingBed(int cx, int cy, PetStage stage, PetOutfit outfit, uint16_t bgColor) {
+  if (carrier == nullptr) return;
+  (void)bgColor;
+  (void)outfit;
+
+  // Breathing offset calculation relative to base position (typically 0 or -1)
+  int dy = cy - LUMI_BASE_CY;
+
+  // Color palette for wooden bed:
+  uint16_t woodDark    = color565(55, 30, 15);    // Dark chestnut outline / shadow
+  uint16_t woodBody    = color565(135, 75, 35);   // Warm polished oak
+  uint16_t woodLight   = color565(180, 105, 55);  // Amber wood highlight
+  uint16_t goldKnob    = color565(255, 215, 60);  // Brass finials
+
+  // Color palette for pillow and bedding:
+  uint16_t pillowWhite = color565(248, 248, 255); // Fluffy plush white pillow
+  uint16_t pillowShade = color565(190, 205, 230); // Pillow depth shadow
+  uint16_t sheetTrim   = 0xFFFF;                  // Crisp folded sheet rim
+  uint16_t sheetShade  = color565(210, 225, 240);
+  uint16_t quiltBody   = color565(38, 65, 125);   // Cozy deep midnight indigo quilt
+  uint16_t quiltShadow = color565(22, 42, 85);    // Quilt side drape shadow
+  uint16_t starGold    = color565(255, 220, 80);  // Embroidered gold stars
+
+  // Color palette for sleeping Lumi:
+  uint16_t headMain    = color565(130, 195, 225); // Dreamy Night Teal
+  uint16_t headOutline = color565(35, 95, 130);
+  uint16_t blushPink   = color565(255, 145, 170); // Warm rosy sleeping cheeks
+  uint16_t eyeDark     = color565(20, 45, 70);
+
+  // 1. Wooden Bed Frame - Background Elements (Stationary, anchored to platform Y = 153)
+  // Left Headboard Post (X = cx - 35..cx - 31, Y = 114..153)
+  carrier->display.fillRoundRect(cx - 35, 116, 5, 37, 2, woodBody);
+  carrier->display.drawFastVLine(cx - 35, 116, 37, woodDark);
+  carrier->display.drawFastVLine(cx - 33, 117, 35, woodLight);
+  // Gold finial on headboard post
+  carrier->display.fillCircle(cx - 33, 113, 3, goldKnob);
+  carrier->display.drawPixel(cx - 34, 112, 0xFFFF);
+
+  // Headboard Slats Panel (X = cx - 31..cx - 15, Y = 118..148)
+  carrier->display.fillRoundRect(cx - 31, 118, 17, 32, 3, woodBody);
+  carrier->display.drawFastHLine(cx - 30, 118, 15, woodLight);
+  carrier->display.drawFastVLine(cx - 26, 120, 28, woodDark);
+  carrier->display.drawFastVLine(cx - 21, 120, 28, woodDark);
+
+  // Right Footboard Post (X = cx + 31..cx + 35, Y = 128..153)
+  carrier->display.fillRoundRect(cx + 31, 128, 5, 25, 2, woodBody);
+  carrier->display.drawFastVLine(cx + 31, 128, 25, woodDark);
+  carrier->display.drawFastVLine(cx + 33, 129, 23, woodLight);
+  // Gold finial on footboard post
+  carrier->display.fillCircle(cx + 33, 125, 2, goldKnob);
+  carrier->display.drawPixel(cx + 33, 124, 0xFFFF);
+
+  // Footboard End Panel
+  carrier->display.fillRoundRect(cx + 20, 134, 12, 18, 2, woodBody);
+  carrier->display.drawFastHLine(cx + 21, 134, 10, woodLight);
+
+  // 2. Plump Pillow (Nestled on left against headboard, heaves with breathing dy)
+  int pillowY = 123 + dy;
+  carrier->display.fillRoundRect(cx - 27, pillowY, 23, 16, 5, pillowWhite);
+  carrier->display.drawRoundRect(cx - 27, pillowY, 23, 16, 5, pillowShade);
+  carrier->display.drawFastHLine(cx - 23, pillowY + 11, 15, pillowShade);
+
+  // 3. Lumi's Sleeping Head (Resting sideways on pillow, breathing at headY)
+  int headX = cx - 9;
+  int headY = 127 + dy;
+
+  // Chubby cute sleeping head
+  carrier->display.fillCircle(headX, headY, 11, headOutline);
+  carrier->display.fillCircle(headX, headY, 10, headMain);
+
+  // Peaceful closed sleeping eyes: soft curved arcs (-  -)
+  carrier->display.drawFastHLine(headX - 6, headY - 1, 4, eyeDark);
+  carrier->display.drawPixel(headX - 4, headY, eyeDark);
+  carrier->display.drawFastHLine(headX + 2, headY - 1, 4, eyeDark);
+  carrier->display.drawPixel(headX + 4, headY, eyeDark);
+
+  // Rosy blushing cheeks
+  carrier->display.fillCircle(headX - 5, headY + 3, 2, blushPink);
+  carrier->display.fillCircle(headX + 4, headY + 3, 2, blushPink);
+
+  // Tiny snoring / breathing mouth
+  carrier->display.fillCircle(headX - 1, headY + 3, 1, eyeDark);
+
+  // Soft ear resting on pillow
+  carrier->display.fillCircle(headX - 11, headY - 3, 3, headOutline);
+  carrier->display.fillCircle(headX - 11, headY - 3, 2, headMain);
+  carrier->display.drawPixel(headX - 11, headY - 3, blushPink);
+
+  // Cozy Pointed Nightcap (Natsok) draped over head and pillow
+  uint16_t capNavy   = color565(32, 52, 110);
+  uint16_t capStripe = color565(225, 235, 255);
+  carrier->display.fillRoundRect(headX - 8, headY - 14, 16, 7, 3, capNavy);
+  carrier->display.drawFastHLine(headX - 8, headY - 8, 16, capStripe); // Folded rim
+  // Cone draped backwards towards headboard
+  carrier->display.fillTriangle(headX - 2, headY - 14, headX - 16, headY - 10, headX - 6, headY - 7, capNavy);
+  carrier->display.drawLine(headX - 4, headY - 13, headX - 13, headY - 9, capStripe);
+  // Fluffy white pompom at tip of nightcap
+  carrier->display.fillCircle(headX - 17, headY - 9, 3, 0xFFFF);
+  carrier->display.drawPixel(headX - 17, headY - 9, color565(190, 210, 235));
+
+  // Stage-specific cute accessories peeking out from the nightcap
+  if (stage == STAGE_BABY) {
+    carrier->display.fillRect(headX + 5, headY - 16, 2, 4, color565(45, 165, 75));
+    carrier->display.fillCircle(headX + 7, headY - 17, 2, color565(65, 225, 105));
+    carrier->display.drawPixel(headX + 7, headY - 18, color565(175, 255, 165));
+  } else if (stage == STAGE_TEEN) {
+    carrier->display.fillTriangle(headX + 3, headY - 14, headX + 7, headY - 21, headX + 5, headY - 12, color565(255, 220, 60));
+    carrier->display.drawPixel(headX + 6, headY - 20, 0xFFFF);
+  } else if (stage == STAGE_ADULT || stage == STAGE_OLD) {
+    carrier->display.fillCircle(headX + 5, headY - 15, 3, color565(255, 215, 60));
+    carrier->display.drawPixel(headX + 5, headY - 16, 0xFFFF);
+  }
+
+  // 4. Cozy Quilt / Blanket (Tucked right up to chin at quiltY, heaves with breathing)
+  int quiltY = 132 + dy;
+
+  // Folded sheet top trim (Crisp white border under chin)
+  carrier->display.fillRoundRect(cx - 15, quiltY, 44, 4, 2, sheetTrim);
+  carrier->display.drawFastHLine(cx - 14, quiltY + 3, 42, sheetShade);
+
+  // Two cute stubby paws clutching the blanket rim
+  carrier->display.fillCircle(cx - 6, quiltY + 1, 2, headOutline);
+  carrier->display.fillCircle(cx - 6, quiltY + 1, 1, headMain);
+  carrier->display.fillCircle(cx + 6, quiltY + 1, 2, headOutline);
+  carrier->display.fillCircle(cx + 6, quiltY + 1, 1, headMain);
+
+  // Main Quilt body
+  int quiltHeight = 149 - (quiltY + 3);
+  if (quiltHeight < 10) quiltHeight = 10;
+  carrier->display.fillRoundRect(cx - 17, quiltY + 3, 47, quiltHeight, 3, quiltBody);
+  carrier->display.drawFastVLine(cx + 29, quiltY + 4, quiltHeight - 1, quiltShadow); // side drape fold
+  carrier->display.drawFastHLine(cx - 16, quiltY + quiltHeight + 2, 45, quiltShadow);
+
+  // Embroidered Golden Stars on Blanket
+  // Star 1
+  carrier->display.drawPixel(cx - 5, quiltY + 7, starGold);
+  carrier->display.drawPixel(cx - 6, quiltY + 8, starGold);
+  carrier->display.drawPixel(cx - 5, quiltY + 8, 0xFFFF);
+  carrier->display.drawPixel(cx - 4, quiltY + 8, starGold);
+  carrier->display.drawPixel(cx - 5, quiltY + 9, starGold);
+  // Star 2
+  carrier->display.drawPixel(cx + 12, quiltY + 6, starGold);
+  carrier->display.drawPixel(cx + 11, quiltY + 7, starGold);
+  carrier->display.drawPixel(cx + 12, quiltY + 7, 0xFFFF);
+  carrier->display.drawPixel(cx + 13, quiltY + 7, starGold);
+  carrier->display.drawPixel(cx + 12, quiltY + 8, starGold);
+  // Star 3
+  carrier->display.drawPixel(cx + 4, quiltY + 12, starGold);
+  carrier->display.drawPixel(cx + 3, quiltY + 13, starGold);
+  carrier->display.drawPixel(cx + 4, quiltY + 13, 0xFFFF);
+  carrier->display.drawPixel(cx + 5, quiltY + 13, starGold);
+  carrier->display.drawPixel(cx + 4, quiltY + 14, starGold);
+
+  // 5. Wooden Bed Base Beam & Drop Shadow (Foreground elements for 2.5D depth)
+  carrier->display.fillRoundRect(cx - 33, 148, 64, 4, 1, woodBody);
+  carrier->display.drawFastHLine(cx - 32, 148, 62, woodLight);
+  carrier->display.drawFastHLine(cx - 32, 151, 62, woodDark);
+  // Bed drop shadow on mossy glade
+  carrier->display.fillRoundRect(cx - 34, 152, 66, 3, 1, color565(12, 35, 24));
+}
+
 void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bgColor) {
   if (carrier == nullptr) return;
   (void)bgColor;
+
+  // When sleeping: Lumi rests in a cozy wooden bed with pillow, blanket and nightcap!
+  if (expr == EXPR_SLEEPING) {
+    drawSleepingBed(cx, cy, stage, outfit, bgColor);
+    return;
+  }
 
   // Dynamic 2.5D Color Palette based on Lumi's physical/emotional state
   uint16_t bodyMain    = color565(155, 248, 220); // Glowing Kokiri Mint-Cream
@@ -1606,7 +1773,8 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   bool stageChanged   = (stage != lastStage);
   bool outfitChanged  = (outfit != lastOutfit);
   bool deathChanged   = ((expr == EXPR_DEAD) != (lastExpression == EXPR_DEAD));
-  if (forceRedraw || !stageInitialized || weatherChanged || stageChanged || outfitChanged || deathChanged) {
+  bool sleepChanged   = ((expr == EXPR_SLEEPING) != (lastExpression == EXPR_SLEEPING));
+  if (forceRedraw || !stageInitialized || weatherChanged || stageChanged || outfitChanged || deathChanged || sleepChanged) {
     if (expr == EXPR_DEAD) {
       // Clear top menu area for peaceful memorial starry sky
       carrier->display.fillRect(38, 14, 164, 50, nativeBg);

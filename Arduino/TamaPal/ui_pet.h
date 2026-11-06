@@ -114,6 +114,9 @@ private:
   // Core 2.5D character drawing routine
   void drawLumiCharacter(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bgColor);
 
+  // Draw cozy wooden crib, pillow, blanket and sleeping Lumi when EXPR_SLEEPING
+  void drawSleepingBed(int cx, int cy, PetStage stage, PetOutfit outfit, uint16_t bgColor);
+
   // Draw eyes & mouth based on expression and stage
   void drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bodyColor);
 

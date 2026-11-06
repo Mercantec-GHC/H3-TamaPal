@@ -410,6 +410,15 @@ void loop() {
       Serial.print(F("[BAER-PUNG] +5 gyldne baer tilfoejet! Total i pungen: "));
       Serial.println((unsigned int)petLogic.getBerries());
       syncPetStateToBackend(true);
+    } else if (c == 'z' || c == 'Z') {
+      petLogic.setSleeping(!petLogic.isSleeping());
+      soundLed.playSound(SOUND_CLICK);
+      Serial.print(F("[SOEVN] Lumi soevnstatus: "));
+      Serial.println(petLogic.isSleeping() ? F("Sover soedt i sin traeseng under dynen...") : F("Vaagnet og frisk!"));
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
     }
   }
 
