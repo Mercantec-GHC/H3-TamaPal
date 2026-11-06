@@ -1,3 +1,5 @@
+using BackendTamapal.Hubs;
+using BackendTamapal.Models;
 
 namespace BackendTamapal
 {
@@ -10,6 +12,20 @@ namespace BackendTamapal
             // Add services to the container.
 
             builder.Services.AddControllers();
+            builder.Services.AddSignalR();
+
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("Frontend", policy =>
+                {
+                    policy.WithOrigins("http://localhost:5500","http://127.0.0.1:5500")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+
+                });
+            });
+
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
@@ -22,11 +38,12 @@ namespace BackendTamapal
             }
 
             app.UseHttpsRedirection();
-
+            app.UseCors("Frontend");
             app.UseAuthorization();
 
 
             app.MapControllers();
+            app.MapHub<GameHub>("/gamehub");
 
             app.Run();
         }
