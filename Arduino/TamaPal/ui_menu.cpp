@@ -350,3 +350,84 @@ void UiMenuRenderer::drawPlaceholderScreen(const char* title, const char* hint) 
   carrier->display.print(hint);
 }
 
+// Display games selection menu (Solo Pong vs Labyrinth)
+void UiMenuRenderer::drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore) {
+  if (carrier == nullptr) return;
+
+  uint16_t bgDark    = color565(8, 12, 26);
+  uint16_t cardBg    = color565(14, 22, 44);
+  uint16_t selCardBg = color565(22, 36, 72);
+  uint16_t selBorder = color565(0, 240, 255);
+  uint16_t unselBrd  = color565(40, 60, 100);
+  uint16_t goldText  = color565(255, 215, 60);
+  uint16_t whiteText = 0xFFFF;
+  uint16_t hintText  = color565(110, 150, 195);
+
+  carrier->display.fillScreen(bgDark);
+
+  // 1. Header
+  carrier->display.setTextSize(2);
+  carrier->display.setTextColor(goldText, bgDark);
+  const char* title = "MINISPIL";
+  int tw = strlen(title) * 12;
+  carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 24);
+  carrier->display.print(title);
+
+  // 2. Card 0: SOLO PONG (Y = 56, H = 54, W = 196)
+  bool isPong = (selectedGame == 0);
+  uint16_t c0Bg = isPong ? selCardBg : cardBg;
+  uint16_t c0Br = isPong ? selBorder : unselBrd;
+  carrier->display.fillRoundRect(22, 56, 196, 54, 6, c0Bg);
+  carrier->display.drawRoundRect(22, 56, 196, 54, 6, c0Br);
+  if (isPong) {
+    carrier->display.drawRoundRect(21, 55, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(isPong ? color565(0, 240, 255) : whiteText, c0Bg);
+  carrier->display.setCursor(34, 66);
+  carrier->display.print(isPong ? "> 1. SOLO PONG" : "  1. SOLO PONG");
+
+  carrier->display.setTextColor(hintText, c0Bg);
+  carrier->display.setCursor(46, 80);
+  carrier->display.print("Mur-Pong bat & bold");
+
+  carrier->display.setTextColor(goldText, c0Bg);
+  carrier->display.setCursor(46, 94);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "Rekord: %u", pongHighScore);
+  carrier->display.print(buf);
+
+  // 3. Card 1: LABYRINT (Y = 118, H = 54, W = 196)
+  bool isMaze = (selectedGame == 1);
+  uint16_t c1Bg = isMaze ? selCardBg : cardBg;
+  uint16_t c1Br = isMaze ? selBorder : unselBrd;
+  carrier->display.fillRoundRect(22, 118, 196, 54, 6, c1Bg);
+  carrier->display.drawRoundRect(22, 118, 196, 54, 6, c1Br);
+  if (isMaze) {
+    carrier->display.drawRoundRect(21, 117, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(isMaze ? color565(0, 240, 255) : whiteText, c1Bg);
+  carrier->display.setCursor(34, 128);
+  carrier->display.print(isMaze ? "> 2. LABYRINT" : "  2. LABYRINT");
+
+  carrier->display.setTextColor(hintText, c1Bg);
+  carrier->display.setCursor(46, 142);
+  carrier->display.print("IMU marmor-kugle");
+
+  carrier->display.setTextColor(goldText, c1Bg);
+  carrier->display.setCursor(46, 156);
+  snprintf(buf, sizeof(buf), "Rekord: %u", mazeHighScore);
+  carrier->display.print(buf);
+
+  // 4. Bottom controls hint
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(hintText, bgDark);
+  const char* bottomHint = "T0/T1:Skift | OK | T3:Exit";
+  int bw = strlen(bottomHint) * 6;
+  carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
+  carrier->display.print(bottomHint);
+}
+

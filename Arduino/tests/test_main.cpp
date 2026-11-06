@@ -9,6 +9,7 @@
 #include "tilt_logic.h"
 #include "pet_logic.h"
 #include "storage_pet.h"
+#include "pong_logic.h"
 
 static int totalTestsRun = 0;
 static int totalTestsFailed = 0;
@@ -536,6 +537,133 @@ void testPetWardrobeAndThermoregulation() {
   CHECK(pet.getWarmth() >= 20, "Warmth does not freeze out when insulated in winter outfit");
 }
 
+void testSoloPongLogic() {
+  printf("\n--- Test: Solo Pong Game Logic & Physics ---\n");
+  PongLogic pong;
+  pong.startNewGame(10); // Start with existing high score 10
+
+  // 1. Initial State
+  CHECK(pong.getState() == PONG_STATE_READY, "Initial state is PONG_STATE_READY");
+  CHECK(pong.getLives() == 3, "Initial lives are 3");
+  CHECK(pong.getScore() == 0, "Initial score is 0");
+  CHECK(pong.getHighScore() == 10, "Existing high score is 10");
+  CHECK(!pong.isNewHighScore(), "Not a new high score initially");
+
+  // 2. Paddle movement and clamping
+  float midY = pong.getPaddleY();
+  pong.movePaddle(500.0f); // Try to move way past bottom
+  CHECK(pong.getPaddleY() == (float)(PongLogic::FIELD_BOTTOM - PongLogic::PADDLE_HEIGHT - 1), "Paddle clamped at bottom boundary");
+
+  pong.movePaddle(-1000.0f); // Try to move way past top
+  CHECK(pong.getPaddleY() == (float)(PongLogic::FIELD_TOP + 1), "Paddle clamped at top boundary");
+
+  // Reset paddle to center
+  pong.movePaddle(midY - (float)(PongLogic::FIELD_TOP + 1));
+
+  // 3. Serve ball
+  pong.serveBall();
+  CHECK(pong.getState() == PONG_STATE_PLAYING, "State is PONG_STATE_PLAYING after serve");
+  CHECK(pong.getBallVx() > 0.0f, "Ball moves towards right wall (Vx > 0)");
+
+  // 4. Simulate flight to right wall
+  unsigned long t = 1000;
+  bool hitRightWall = false;
+  for (int i = 0; i < 200; i++) {
+    t += 20;
+    pong.update(t);
+    if (pong.popWallHit()) {
+      hitRightWall = true;
+      break;
+    }
+  }
+  CHECK(hitRightWall, "Ball collided with solid right bounce wall");
+  CHECK(pong.getBallVx() < 0.0f, "Ball reflected back towards left paddle (Vx < 0)");
+
+  // 5. Intercept ball with paddle
+  // Place paddle at ball Y so it's guaranteed to hit
+  bool hitPaddle = false;
+  float speedBeforeHit = -pong.getBallVx();
+  for (int i = 0; i < 200; i++) {
+    t += 20;
+    // Keep paddle aligned with ball
+    pong.movePaddle(pong.getBallY() - pong.getPaddleY());
+    pong.update(t);
+    if (pong.popPaddleHit()) {
+      hitPaddle = true;
+      break;
+    }
+  }
+  CHECK(hitPaddle, "Paddle successfully hit the incoming ball");
+  CHECK(pong.getScore() == 1, "Score incremented to 1 after successful hit");
+  CHECK(pong.getBallVx() > 0.0f, "Ball bounced forward to the right (Vx > 0)");
+  CHECK(pong.getBallVx() > speedBeforeHit, "Ball accelerated after paddle hit");
+
+  // 6. Test ball miss (move paddle out of the way)
+  // Let ball hit right wall again
+  for (int i = 0; i < 200; i++) {
+    t += 20;
+    pong.update(t);
+    if (pong.popWallHit()) break;
+  }
+  // Move paddle to bottom while ball travels high
+  pong.movePaddle(200.0f);
+  bool ballLost = false;
+  for (int i = 0; i < 200; i++) {
+    t += 20;
+    pong.update(t);
+    if (pong.getState() == PONG_STATE_BALL_LOST) {
+      ballLost = true;
+      break;
+    }
+  }
+  CHECK(ballLost, "State transitioned to PONG_STATE_BALL_LOST after missing ball");
+  CHECK(pong.getLives() == 2, "Lives decremented to 2");
+
+  // 7. Auto-respawn after 800 ms
+  pong.update(t + 400);
+  CHECK(pong.getState() == PONG_STATE_BALL_LOST, "Still BALL_LOST before 800 ms timeout");
+  pong.update(t + 850);
+  CHECK(pong.getState() == PONG_STATE_PLAYING, "Auto-respawned and playing after 850 ms");
+
+  // 8. Deplete remaining lives to reach Game Over
+  // Miss life 2
+  pong.movePaddle(200.0f);
+  for (int i = 0; i < 400; i++) {
+    t += 20;
+    pong.update(t);
+    if (pong.getState() == PONG_STATE_BALL_LOST) break;
+  }
+  CHECK(pong.getLives() == 1, "Lives decremented to 1");
+  t += 900;
+  pong.update(t); // Respawn
+
+  // Miss life 3 -> Game Over
+  pong.movePaddle(200.0f);
+  for (int i = 0; i < 400; i++) {
+    t += 20;
+    pong.update(t);
+    if (pong.getState() == PONG_STATE_GAMEOVER) break;
+  }
+  CHECK(pong.getState() == PONG_STATE_GAMEOVER, "State is PONG_STATE_GAMEOVER when all lives lost");
+  CHECK(pong.getLives() == 0, "Lives is 0 on game over");
+
+  // 9. New High Score achievement
+  PongLogic hiPong;
+  hiPong.startNewGame(2);
+  // Cheat-simulate score higher than high score
+  hiPong.serveBall();
+  for (int s = 0; s < 3; s++) {
+    // Manually trigger paddle hits
+    t += 20;
+    hiPong.update(t);
+  }
+  // Test startNewGame resets score but keeps high score
+  hiPong.startNewGame(15);
+  CHECK(hiPong.getScore() == 0, "New game score reset to 0");
+  CHECK(hiPong.getHighScore() == 15, "New game high score set to 15");
+  CHECK(hiPong.getLives() == 3, "New game lives reset to 3");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -560,6 +688,7 @@ int main() {
   testPetSerialization();
   testPetStorageSerialization();
   testPetWardrobeAndThermoregulation();
+  testSoloPongLogic();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

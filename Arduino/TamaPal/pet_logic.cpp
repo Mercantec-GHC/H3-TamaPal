@@ -88,6 +88,16 @@ bool PetLogic::applyReward(const char* rewardType, int amount) {
   return false;
 }
 
+void PetLogic::applyGameReward(uint16_t score) {
+  float happyGain = (score >= 10) ? 30.0f : (float)(score * 3);
+  happinessVal = clamp0100(happinessVal + happyGain);
+  if (energyVal >= 8.0f) {
+    energyVal -= 8.0f;
+  } else {
+    energyVal = 0.0f;
+  }
+}
+
 void PetLogic::toggleSleep() {
   setSleeping(!isAsleep);
 }

@@ -15,6 +15,8 @@
 #include "ui_stats.h"
 #include "storage_pet.h"
 #include "ui_pet.h"
+#include "pong_logic.h"
+#include "ui_pong.h"
 
 // Hardware carrier instance
 MKRIoTCarrier carrier;
@@ -30,6 +32,8 @@ PetLogic petLogic;
 UiStatsRenderer uiStats;
 StoragePet storagePet;
 UiPetRenderer uiPet;
+PongLogic pongLogic;
+UiPongRenderer uiPong;
 
 // Forward declarations
 void onGameEventReceived(GameEvent event);
@@ -245,6 +249,7 @@ void setup() {
   uiController.begin(&carrier);
   uiStats.begin(&carrier);
   uiPet.begin(&carrier);
+  uiPong.begin(&carrier);
   netMqtt.begin(onGameEventReceived, onPetRewardReceived);
 
   // Initial full screen draw
@@ -321,6 +326,10 @@ void loop() {
         uiPet.updateHomeDisplay(petLogic, now, true);
       }
       syncPetStateToBackend(true);
+    } else if (c == 'p' || c == 'P') {
+      menuLogic.openPongGame();
+      soundLed.playSound(SOUND_CONFIRM);
+      Serial.println(F("[SPIL] Starter Solo Mur-Pong direkte via Serial Monitor!"));
     }
   }
 
@@ -377,6 +386,61 @@ void loop() {
         lastTouchTimeMs = now;
       }
     }
+  } else if (currentScreen == SCREEN_GAMES_MENU) {
+    // Minigames selection screen (Pong vs Labyrinth):
+    if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
+        menuLogic.onButtonPrev();
+        uiMenu.drawGamesMenu(menuLogic.getSelectedGame(), petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+        menuLogic.onButtonNext();
+        uiMenu.drawGamesMenu(menuLogic.getSelectedGame(), petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+        menuLogic.onButtonOk(now);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack();
+        lastTouchTimeMs = now;
+      }
+    }
+  } else if (currentScreen == SCREEN_MINIGAME_PONG) {
+    // Solo Wall-Pong game on Oplà:
+    if (pongLogic.getState() == PONG_STATE_READY) {
+      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH2)) {
+        pongLogic.serveBall();
+        lastTouchTimeMs = now;
+      } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack();
+        lastTouchTimeMs = now;
+      }
+    } else if (pongLogic.getState() == PONG_STATE_GAMEOVER) {
+      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && (carrier.Buttons.onTouchDown(TOUCH2) || carrier.Buttons.onTouchDown(TOUCH3))) {
+        // Save high score and apply pet effects
+        if (pongLogic.getScore() > petLogic.getHighScorePong()) {
+          petLogic.setHighScorePong(pongLogic.getScore());
+          storagePet.savePet(petLogic);
+        }
+        petLogic.applyGameReward(pongLogic.getScore());
+        syncPetStateToBackend(true);
+
+        menuLogic.onButtonBack(); // Return to games menu
+        lastTouchTimeMs = now;
+      }
+    } else {
+      // In active play: optional button paddle movement (e.g. board lying on desk)
+      if (touch0) {
+        pongLogic.movePaddle(4.5f); // Down
+      }
+      if (touch1) {
+        pongLogic.movePaddle(-4.5f); // Up
+      }
+      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack(); // Exit game early
+        lastTouchTimeMs = now;
+      }
+    }
   } else if (currentScreen == SCREEN_CONTROLLER) {
     // In controller mode:
     // TOUCH0, TOUCH1, TOUCH2 are gameplay inputs (read continuously below).
@@ -426,8 +490,8 @@ void loop() {
 
   currentScreen = menuLogic.getActiveScreen();
 
-  // Non-blocking environmental sensor sampling (every 2.5s, paused in Controller mode to keep I2C free for IMU)
-  if (currentScreen != SCREEN_CONTROLLER && (now - lastSensorReadTimeMs >= SENSOR_READ_INTERVAL_MS)) {
+  // Non-blocking environmental sensor sampling (every 2.5s, paused in Controller and game modes to keep I2C free for IMU)
+  if (currentScreen != SCREEN_CONTROLLER && currentScreen != SCREEN_MINIGAME_PONG && currentScreen != SCREEN_MINIGAME_MAZE && (now - lastSensorReadTimeMs >= SENSOR_READ_INTERVAL_MS)) {
     lastSensorReadTimeMs = now;
     float ambientTemp = carrier.Env.readTemperature();
     petLogic.setAmbientTemperature(ambientTemp);
@@ -439,15 +503,17 @@ void loop() {
     }
   }
 
-  // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller, stats, or action mode)
+  // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller, stats, games, or action mode)
   if (currentScreen != previousScreen) {
     muteMessageEndTimeMs = 0; // Cancel any active mute toast when switching screens
 
-    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS) {
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE) {
       // Exiting a fullscreen view: restore mood LEDs and redraw full home UI
       soundLed.setMoodColor(0, 150, 220);
-      uiMenu.drawInitialScreen();
-      uiMenu.drawMenuBar(menuLogic, true);
+      if (currentScreen == SCREEN_HOME) {
+        uiMenu.drawInitialScreen();
+        uiMenu.drawMenuBar(menuLogic, true);
+      }
     } else if (previousScreen == SCREEN_ACTION) {
       // Exiting temporary center overlay: top menu bar is still intact, only restore LED glow
       soundLed.setMoodColor(0, 150, 220);
@@ -464,6 +530,25 @@ void loop() {
       case SCREEN_STATS:
         Serial.println(F("[UI] Skærm: STATISTIK (5 parametre)"));
         uiStats.updateDisplay(petLogic, true);
+        break;
+
+      case SCREEN_GAMES_MENU:
+        Serial.println(F("[UI] Skærm: MINISPIL MENU (1. Solo Pong, 2. Labyrint)"));
+        uiMenu.drawGamesMenu(menuLogic.getSelectedGame(), petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
+        soundLed.setMoodColor(0, 160, 220);
+        break;
+
+      case SCREEN_MINIGAME_PONG:
+        Serial.println(F("[UI] Skærm: SOLO PONG (Mur-Pong) startet!"));
+        pongLogic.startNewGame(petLogic.getHighScorePong());
+        uiPong.drawInitialScreen(pongLogic);
+        soundLed.setMoodColor(0, 220, 255);
+        break;
+
+      case SCREEN_MINIGAME_MAZE:
+        Serial.println(F("[UI] Skærm: LABYRINT (Kommende feature)"));
+        uiMenu.drawPlaceholderScreen("LABYRINT", "Kommende spil!");
+        soundLed.setMoodColor(180, 100, 255);
         break;
 
       case SCREEN_CHOOSE_PLAYER:
@@ -562,10 +647,33 @@ void loop() {
 
     // 6d. Real-time controller display update (smooth 2D tilt arena + buttons + connection badge)
     uiController.updateDisplay(tiltLogic, netMqtt.isConnected());
+  } else if (currentScreen == SCREEN_MINIGAME_PONG) {
+    // 6a. Read accelerometer for paddle tilt
+    if (carrier.IMUmodule.accelerationAvailable()) {
+      float ax = 0.0f, ay = 0.0f, az = 0.0f;
+      carrier.IMUmodule.readAcceleration(ax, ay, az);
+      tiltLogic.updateAcceleration(ax, ay, az);
+      pongLogic.setPaddleTilt(tiltLogic.getTiltY());
+    }
+
+    // 6b. Step physics
+    pongLogic.update(now);
+
+    // 6c. Handle sound & LEDs
+    SoundType pongSnd = pongLogic.popSoundEffect();
+    if (pongSnd != SOUND_NONE) {
+      soundLed.playSound(pongSnd);
+    }
+    if (pongLogic.popPaddleHit()) {
+      soundLed.flashColor(0, 255, 220, 100); // 100 ms cyan flash on paddle hit
+    }
+
+    // 6d. Update display (zero-flicker delta-rendering)
+    uiPong.updateDisplay(pongLogic, false);
   } else if (currentScreen == SCREEN_STATS) {
     // Real-time stats dashboard update (dirty updates only when values decay or change)
     uiStats.updateDisplay(petLogic, false);
-  } else if (currentScreen != SCREEN_CHOOSE_PLAYER) {
+  } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_MINIGAME_MAZE) {
     // Normal menu modes (HOME, ACTION): update sliding top menu bar
     uiMenu.drawMenuBar(menuLogic, false);
 

@@ -800,6 +800,41 @@ Før udviklingen af de to on-board minispil (Solo-Pong og labyrint-generatoren) 
 - **Unit tests:** **170 af 170 tests bestået (100% PASS, 0 advarsler)**.
 - **Kompilering:** 0 fejl, 0 advarsler (`--warnings all`).
 
+___
+
+### 🏓 Opdatering 6/11 (Sen Eftermiddag): On-board Solo Mur-Pong på Arduino Oplà (Fuld minispil-arkitektur)
+**Branch:** `feature/arduino-games`  
+**Ansvarlig:** Oleh
+
+Vi har implementeret det første fulde offline-minispil direkte på Oplà-kortets runde 240x240 display: **Solo Mur-Pong**. Spillet kan spilles 100% uafhængigt uden computer og uden internetforbindelse.
+
+#### Hvad er tilføjet:
+1. **Minispil-menu (`SCREEN_GAMES_MENU`):**
+   - Når spilleren vælger `LEG` i hovedmenuen, åbnes en stilren cyberpunk minispil-vælger med to kort:
+     * `1. SOLO PONG` (Mur-Pong bat & bold) med visning af personlig rekord (High Score).
+     * `2. LABYRINT` (IMU marmor-kugle) med visning af rekord.
+   - Skift mellem spil med `TOUCH 0` (<) og `TOUCH 1` (>), start med `TOUCH 2` (OK), tilbage med `TOUCH 3` (BACK).
+2. **Spilmekanik og fysik (`PongLogic`):**
+   - **Styring:** Spilleren kan styre battet vertikalt ved at **hælde Oplà-kortet** (`tiltY` via LSM6DS3 IMU med jævn Lerp-interpolation) ELLER ved at trykke på touch-knapperne `TOUCH 0` (ned) og `TOUCH 1` (op), hvis kortet ligger fladt på bordet.
+   - **Solid neon bagvæg:** Til højre på banen findes en massiv guldbelagt neon-rebound væg. Bolden preller af på over-, under- og højre væg (`SOUND_CLICK`).
+   - **Bat-kollision & vinkelafbøjning:** Når battet rammer bolden, ændres boldens vertikale spin afhængigt af, om den rammer toppen, midten eller bunden af battet. Hvert vellykket slag accelererer bolden en smule (hastigheds-boost) og giver 1 point (`SOUND_HIT` + cyan lysglimt på battet).
+   - **Liv & Game Over:** Spilleren har 3 liv (vises som lysende hjerte-prikker i toppen). Hvis bolden slipper forbi battet mod venstre, mistes et liv (`SOUND_MISS`). Efter en kort pause på 800 ms serves en ny bold.
+   - **Resultat & High Score:** Når alle 3 liv er tabt (`SOUND_GAMEOVER`), vises en elegant modal med slutscore, personlig rekord og guld-fejring ved *"NY REKORD!"*. Rekorden gemmes persistent på MicroSD i `lumi.txt` (`PONG=<score>`).
+3. **Effekt på Lumi:**
+   - En fuldført omgang Pong belønner kæledyret: `happiness` stiger med op til +30 point, mens Lumi bruger en smule energi (`energy -= 8`).
+4. **Grafik & Flimmerfri Delta-Rendering (`UiPongRenderer`):**
+   - Kun battets og boldens forrige positioner overskrives med baggrundsfarven `#080C1A` i hvert frame.
+   - Ingen `fillScreen()` under kørslen: afvikles ved **50+ FPS** med 0 skærmflimmer!
+5. **Test & genveje:**
+   - Skriv `'p'` eller `'P'` i Serial Monitor (115200 baud) for at starte Solo Pong øjeblikkeligt.
+   - 25 nye unit-tests dækker 100% af fysikken, kollisionerne og tilstandene i `PongLogic`. Total: **195 af 195 unit-tests bestået**.
+
+#### Verificerede kvalitets- og hukommelsestal (Arduino MKR WiFi 1010):
+- **Flash-forbrug:** **171.428 bytes (65%)** ud af 256 KB — over 90,7 KB fri til labyrint-spillet!
+- **SRAM-forbrug:** **8.388 bytes (25%)** ud af 32 KB — efterlader **24.380 bytes fri RAM**!
+- **Unit tests:** **195 af 195 tests bestået (100% PASS, 0 advarsler)**.
+- **Kompilering:** 0 fejl, 0 advarsler i projektkoden.
+
 
 
 

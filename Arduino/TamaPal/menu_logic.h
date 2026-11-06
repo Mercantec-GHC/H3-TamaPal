@@ -24,6 +24,13 @@ public:
   void selectPlayer(int playerId);
   int getPlayerId() const;
 
+  // Games menu helpers
+  uint8_t getSelectedGame() const;
+  void selectGame(uint8_t gameIndex);
+  void openGamesMenu();
+  void openPongGame();
+  void openMazeGame();
+
   // Periodic update for animation interpolation and auto-close timers
   void update(unsigned long currentTimeMs);
 
@@ -46,6 +53,7 @@ public:
 private:
   ScreenType activeScreen;
   MenuIcon selectedIcon;
+  uint8_t selectedGame;
   int playerId;
 
   float cursorPositionX;

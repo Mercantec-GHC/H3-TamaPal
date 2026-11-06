@@ -92,7 +92,10 @@ enum ScreenType : uint8_t {
   SCREEN_STATS,            // Fullscreen statistics dashboard (5 vital bars)
   SCREEN_CHOOSE_PLAYER,    // Select Player 1 (Venstre) vs Player 2 (Hoejre)
   SCREEN_CONTROLLER,       // Pong controller mode (sends tilt & button to backend)
-  SCREEN_ACTION            // Temporary action banner (e.g., feeding food animation)
+  SCREEN_ACTION,           // Temporary action banner (e.g., feeding food animation)
+  SCREEN_GAMES_MENU,       // On-board minigames selection menu (Pong / Maze)
+  SCREEN_MINIGAME_PONG,    // Solo Wall-Pong minigame on Oplà display
+  SCREEN_MINIGAME_MAZE     // Procedural Marble Maze minigame on Oplà display
 };
 
 // The 5 icons in the top navigation menu

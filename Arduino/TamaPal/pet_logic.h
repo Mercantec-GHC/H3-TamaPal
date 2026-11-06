@@ -21,6 +21,7 @@ public:
   bool play();     // Increases Happiness, consumes Energy and Hunger
   bool scold();    // Increases Discipline, slightly reduces Happiness
   bool applyReward(const char* rewardType, int amount); // Backend reward (e.g. "happy_boost")
+  void applyGameReward(uint16_t score);                 // Minigame completion reward (happiness up, slight energy burn)
   void toggleSleep();
   void setSleeping(bool sleep);
 

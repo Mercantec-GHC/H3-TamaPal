@@ -8,6 +8,7 @@
 MenuLogic::MenuLogic()
   : activeScreen(SCREEN_HOME),
     selectedIcon(ICON_FOOD),
+    selectedGame(0),
     playerId(1),
     cursorPositionX(0.0f),
     targetPositionX(0.0f),
@@ -40,6 +41,11 @@ const char* MenuLogic::getIconLabelDanish(MenuIcon icon) {
 
 // TOUCH0: Move cursor to the previous icon (wrap around 0 -> 4)
 void MenuLogic::onButtonPrev() {
+  if (activeScreen == SCREEN_GAMES_MENU) {
+    selectedGame = (selectedGame == 0) ? 1 : 0;
+    pendingSound = SOUND_CLICK;
+    return;
+  }
   if (activeScreen != SCREEN_HOME) return;
 
   if (selectedIcon == 0) {
@@ -54,6 +60,11 @@ void MenuLogic::onButtonPrev() {
 
 // TOUCH1: Move cursor to the next icon (wrap around 4 -> 0)
 void MenuLogic::onButtonNext() {
+  if (activeScreen == SCREEN_GAMES_MENU) {
+    selectedGame = (selectedGame == 0) ? 1 : 0;
+    pendingSound = SOUND_CLICK;
+    return;
+  }
   if (activeScreen != SCREEN_HOME) return;
 
   if (selectedIcon >= ICON_TOTAL_COUNT - 1) {
@@ -68,6 +79,16 @@ void MenuLogic::onButtonNext() {
 
 // TOUCH2: OK / Select button - activate chosen icon
 void MenuLogic::onButtonOk(unsigned long currentTimeMs) {
+  if (activeScreen == SCREEN_GAMES_MENU) {
+    pendingSound = SOUND_CONFIRM;
+    if (selectedGame == 0) {
+      activeScreen = SCREEN_MINIGAME_PONG;
+    } else {
+      activeScreen = SCREEN_MINIGAME_MAZE;
+    }
+    return;
+  }
+
   if (activeScreen == SCREEN_HOME) {
     pendingSound = SOUND_CONFIRM;
 
@@ -75,8 +96,10 @@ void MenuLogic::onButtonOk(unsigned long currentTimeMs) {
       activeScreen = SCREEN_STATS;
     } else if (selectedIcon == ICON_CONNECT) {
       activeScreen = SCREEN_CHOOSE_PLAYER;
+    } else if (selectedIcon == ICON_PLAY) {
+      activeScreen = SCREEN_GAMES_MENU;
     } else {
-      // Food, Play, or Scold opens temporary action overlay
+      // Food or Scold opens temporary action overlay
       activeScreen = SCREEN_ACTION;
       actionStartTimeMs = currentTimeMs;
     }
@@ -94,8 +117,36 @@ int MenuLogic::getPlayerId() const {
   return playerId;
 }
 
+uint8_t MenuLogic::getSelectedGame() const {
+  return selectedGame;
+}
+
+void MenuLogic::selectGame(uint8_t gameIndex) {
+  selectedGame = (gameIndex > 1) ? 1 : gameIndex;
+}
+
+void MenuLogic::openGamesMenu() {
+  activeScreen = SCREEN_GAMES_MENU;
+  pendingSound = SOUND_CONFIRM;
+}
+
+void MenuLogic::openPongGame() {
+  activeScreen = SCREEN_MINIGAME_PONG;
+  pendingSound = SOUND_CONFIRM;
+}
+
+void MenuLogic::openMazeGame() {
+  activeScreen = SCREEN_MINIGAME_MAZE;
+  pendingSound = SOUND_CONFIRM;
+}
+
 // TOUCH3: Back button - return to HOME screen from any other view
 void MenuLogic::onButtonBack() {
+  if (activeScreen == SCREEN_MINIGAME_PONG || activeScreen == SCREEN_MINIGAME_MAZE) {
+    activeScreen = SCREEN_GAMES_MENU;
+    pendingSound = SOUND_BACK;
+    return;
+  }
   if (activeScreen != SCREEN_HOME) {
     activeScreen = SCREEN_HOME;
     pendingSound = SOUND_BACK;

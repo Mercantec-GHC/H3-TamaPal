@@ -22,6 +22,9 @@ public:
   // Draw or update the top menu bar (flicker-free dirty updates)
   void drawMenuBar(const MenuLogic& menu, bool forceRedrawAll);
 
+  // Games selection menu
+  void drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore);
+
   // Helper screens
   void drawPlaceholderScreen(const char* title, const char* hint);
 

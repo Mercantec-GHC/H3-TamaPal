@@ -15,20 +15,20 @@ static const int LUMI_BASE_CY = 131;
 
 UiPetRenderer::UiPetRenderer()
   : carrier(nullptr),
-    stageInitialized(false),
+    lastMoodText(nullptr),
+    lastAnimTickMs(0),
     lastDrawnCx(LUMI_BASE_CX),
     lastDrawnCy(LUMI_BASE_CY),
     lastNaviX(-1),
     lastNaviY(-1),
     lastSmallFairyY(-1),
     lastZzzPhase(-1),
-    lastBlinking(false),
     lastExpression(EXPR_CONTENT),
     lastStage(STAGE_BABY),
     lastOutfit(OUTFIT_DEFAULT),
     lastWeather(SKY_DAY_SUNNY),
-    lastMoodText(nullptr),
-    lastAnimTickMs(0) {}
+    stageInitialized(false),
+    lastBlinking(false) {}
 
 void UiPetRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
