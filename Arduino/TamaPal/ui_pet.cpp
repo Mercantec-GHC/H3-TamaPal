@@ -267,7 +267,10 @@ void UiPetRenderer::drawMoodBanner(const char* moodText, LumiExpression expr) {
   uint16_t pillBorder = color565(55, 130, 175);
   uint16_t textColor  = color565(225, 245, 255);
 
-  if (expr == EXPR_OVERHEATING) {
+  if (strstr(moodText, "<3") != nullptr) {
+    pillBorder = color565(255, 105, 180); // Warm romantic pink for petting
+    textColor  = color565(255, 195, 225);
+  } else if (expr == EXPR_OVERHEATING) {
     pillBorder = color565(255, 60, 60);
     textColor  = color565(255, 180, 180);
   } else if (expr == EXPR_FREEZING || expr == EXPR_HUNGRY || expr == EXPR_EXHAUSTED || expr == EXPR_SAD) {
@@ -1474,7 +1477,19 @@ void UiPetRenderer::updateSideOverlay(int baseCx, int baseCy, LumiExpression exp
     carrier->display.fillCircle(boxX + 16, sy, 3, dropCyan);
     carrier->display.fillTriangle(boxX + 16, sy - 5, boxX + 13, sy, boxX + 19, sy, dropCyan);
     carrier->display.drawPixel(boxX + 15, sy - 1, 0xFFFF);
-  } else if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING) {
+  } else if (expr == EXPR_SUPER_HAPPY) {
+    // Floating animated Kokiri Love Hearts <3
+    uint16_t heartPink = color565(255, 65, 115);
+    uint16_t heartCore = color565(255, 185, 210);
+    int hy = boxY + 20 - (phase * 4);
+    int hx = boxX + 15 + ((phase % 2 == 0) ? -2 : 2);
+    carrier->display.drawPixel(hx - 2, hy - 2, heartPink);
+    carrier->display.drawPixel(hx,     hy - 2, heartPink);
+    carrier->display.fillRect(hx - 3,  hy - 1, 5, 2, heartPink);
+    carrier->display.fillRect(hx - 2,  hy + 1, 3, 1, heartPink);
+    carrier->display.drawPixel(hx - 1, hy + 2, heartPink);
+    carrier->display.drawPixel(hx - 1, hy - 1, heartCore); // Highlight sparkle
+  } else if (expr == EXPR_PLAYING) {
     // Twinkling Nintendo star / heart sparkles
     uint16_t starGold = color565(255, 235, 80);
     int sy = boxY + 16 - (phase % 2) * 4;
@@ -1492,7 +1507,8 @@ void UiPetRenderer::updateSideOverlay(int baseCx, int baseCy, LumiExpression exp
 void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, bool forceRedraw) {
   if (carrier == nullptr) return;
 
-  LumiExpression expr    = determineExpression(pet);
+  bool beingPetted       = pet.isBeingPetted(nowMs);
+  LumiExpression expr    = beingPetted ? EXPR_SUPER_HAPPY : determineExpression(pet);
   PetStage stage         = pet.getStageEnum();
   PetOutfit outfit       = pet.getOutfitEnum();
   SkyWeatherMode weather = determineSkyWeather(pet, expr);
@@ -1585,7 +1601,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     if (expr == EXPR_DEAD) {
       drawMemorialCard(pet, nowMs, true);
     } else {
-      const char* mood = pet.getMoodStatusDanish();
+      const char* mood = beingPetted ? "LUMI ELSKER DIG! <3" : pet.getMoodStatusDanish();
       drawMoodBanner(mood, expr);
       lastMoodText = mood;
     }
@@ -1643,7 +1659,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   if (expr == EXPR_DEAD) {
     drawMemorialCard(pet, nowMs, false);
   } else {
-    const char* currentMood = pet.getMoodStatusDanish();
+    const char* currentMood = beingPetted ? "LUMI ELSKER DIG! <3" : pet.getMoodStatusDanish();
     if (currentMood != lastMoodText) {
       drawMoodBanner(currentMood, expr);
       lastMoodText = currentMood;
@@ -1697,5 +1713,166 @@ void UiPetRenderer::drawActionScene(const PetLogic& pet,
   drawMoodBanner(subtitle != nullptr ? subtitle : pet.getMoodStatusDanish(), actionExpr);
 
   // Mark stage so returning to SCREEN_HOME cleanly refreshes the sky weather
+  stageInitialized = false;
+}
+
+void UiPetRenderer::drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16_t generation) {
+  if (carrier == nullptr) return;
+
+  uint16_t bgColor   = color565(6, 10, 22);
+  uint16_t rimColor  = color565(26, 42, 72);
+  uint16_t titleGold = color565(255, 215, 80);
+  uint16_t subCyan   = color565(120, 215, 255);
+
+  static uint8_t lastDrawnPhase = 255;
+  bool phaseChanged = (phase != lastDrawnPhase);
+  if (phaseChanged) {
+    carrier->display.fillScreen(bgColor);
+    carrier->display.drawCircle(120, 120, 118, rimColor);
+
+    // Twinkling background stars
+    carrier->display.drawPixel(38, 35, color565(180, 220, 255));
+    carrier->display.drawPixel(55, 22, color565(255, 230, 120));
+    carrier->display.drawPixel(185, 24, color565(255, 230, 120));
+    carrier->display.drawPixel(202, 36, color565(180, 220, 255));
+    carrier->display.drawPixel(28, 80, color565(100, 140, 190));
+    carrier->display.drawPixel(212, 82, color565(100, 140, 190));
+
+    // Title (Y = 22)
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(titleGold);
+    const char* title = "* ET NYT LIV BEGYNDER *";
+    carrier->display.setCursor(120 - ((int)strlen(title) * 3), 22);
+    carrier->display.print(title);
+
+    // Subtitle (Y = 36)
+    char subBuf[32];
+    snprintf(subBuf, sizeof(subBuf), "< LUMI GENERATION %u >", (unsigned int)generation);
+    carrier->display.setTextColor(subCyan);
+    carrier->display.setCursor(120 - ((int)strlen(subBuf) * 3), 36);
+    carrier->display.print(subBuf);
+
+    // Mossy woven nest (X=90..150, Y=132..146)
+    carrier->display.fillRoundRect(90, 134, 60, 15, 5, color565(45, 60, 35));
+    carrier->display.fillRoundRect(95, 132, 50, 8, 3, color565(75, 150, 65));
+    carrier->display.drawPixel(94, 138, color565(210, 180, 70)); // Golden straw
+    carrier->display.drawPixel(145, 137, color565(210, 180, 70));
+    carrier->display.drawPixel(120, 142, color565(95, 185, 80)); // Moss speck
+
+    lastDrawnPhase = phase;
+  }
+
+  int cx = 120;
+  int cy = 114;
+
+  // Clear egg center dynamic region (X = 85..155, Y = 68..133)
+  carrier->display.fillRect(85, 68, 70, 65, bgColor);
+
+  uint16_t eggShell   = color565(250, 246, 230); // Warm ivory
+  uint16_t eggShadow  = color565(215, 205, 185); // Cream shadow
+  uint16_t eggSpeckle = color565(80, 195, 115);  // Emerald Kokiri dots
+  uint16_t crackColor = color565(40, 35, 30);    // Charcoal crack
+  uint16_t sparkGold  = color565(255, 225, 90);   // Golden spark
+
+  if (phase == 0) {
+    // Phase 0: Gentle rocking wobble in nest
+    int wobble = (int)(sin((double)nowMs * 0.012) * 3.0);
+    int ex = cx + wobble;
+
+    // Egg body (26 px wide, 32 px high)
+    carrier->display.fillRoundRect(ex - 13, cy - 16, 26, 32, 11, eggShell);
+    carrier->display.drawRoundRect(ex - 13, cy - 16, 26, 32, 11, eggShadow);
+
+    // Kokiri emerald spots
+    carrier->display.fillCircle(ex - 4, cy - 6, 2, eggSpeckle);
+    carrier->display.fillCircle(ex + 5, cy - 2, 3, eggSpeckle);
+    carrier->display.fillCircle(ex - 2, cy + 6, 2, eggSpeckle);
+    carrier->display.drawPixel(ex + 4, cy + 7, eggSpeckle);
+
+    // Prompt
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(color565(190, 215, 235), bgColor);
+    const char* p0 = "Aegget vugger roligt...";
+    carrier->display.setCursor(120 - ((int)strlen(p0) * 3), 175);
+    carrier->display.print(p0);
+  } else if (phase == 1) {
+    // Phase 1: More violent vibration + zigzag crack + golden sparks
+    int wobble = (int)(sin((double)nowMs * 0.025) * 4.5);
+    int ex = cx + wobble;
+
+    carrier->display.fillRoundRect(ex - 13, cy - 16, 26, 32, 11, eggShell);
+    carrier->display.drawRoundRect(ex - 13, cy - 16, 26, 32, 11, eggShadow);
+
+    // Speckles
+    carrier->display.fillCircle(ex - 4, cy - 6, 2, eggSpeckle);
+    carrier->display.fillCircle(ex + 5, cy - 2, 3, eggSpeckle);
+
+    // Zigzag fissure across egg
+    carrier->display.drawLine(ex - 11, cy - 1, ex - 4, cy - 5, crackColor);
+    carrier->display.drawLine(ex - 4, cy - 5, ex + 3, cy + 2, crackColor);
+    carrier->display.drawLine(ex + 3, cy + 2, ex + 10, cy - 3, crackColor);
+
+    // Golden light & sparks leaking out of crack
+    carrier->display.drawPixel(ex - 4, cy - 4, sparkGold);
+    carrier->display.drawPixel(ex + 3, cy + 3, sparkGold);
+    carrier->display.drawPixel(ex - 8, cy - 8, sparkGold);
+    carrier->display.drawPixel(ex + 7, cy - 7, sparkGold);
+
+    // Prompt
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(color565(255, 220, 90), bgColor);
+    const char* p1 = "KRAK! Skallen revner!";
+    carrier->display.setCursor(120 - ((int)strlen(p1) * 3), 175);
+    carrier->display.print(p1);
+  } else {
+    // Phase 2: Top shell pops off, Baby Lumi emerges with pacifier!
+    // Lower shell remains in nest
+    carrier->display.fillRoundRect(cx - 13, cy + 4, 26, 12, 4, eggShell);
+    carrier->display.drawRoundRect(cx - 13, cy + 4, 26, 12, 4, eggShadow);
+
+    // Top shell lifted and tilted up-left
+    int topY = cy - 26;
+    carrier->display.fillRoundRect(cx - 15, topY, 22, 11, 4, eggShell);
+    carrier->display.drawRoundRect(cx - 15, topY, 22, 11, 4, eggShadow);
+
+    // Baby Lumi emerging head (mint-green body)
+    carrier->display.fillRoundRect(cx - 14, cy - 16, 28, 22, 9, color565(155, 248, 220));
+
+    // Joyful closed arch eyes (^  ^)
+    uint16_t eyeDark = color565(18, 45, 35);
+    carrier->display.drawLine(cx - 8, cy - 8, cx - 6, cy - 11, eyeDark);
+    carrier->display.drawLine(cx - 6, cy - 11, cx - 4, cy - 8, eyeDark);
+    carrier->display.drawLine(cx + 4, cy - 8, cx + 6, cy - 11, eyeDark);
+    carrier->display.drawLine(cx + 6, cy - 11, cx + 8, cy - 8, eyeDark);
+
+    // Cute pink blushing cheeks
+    carrier->display.fillCircle(cx - 9, cy - 5, 2, color565(255, 140, 175));
+    carrier->display.fillCircle(cx + 9, cy - 5, 2, color565(255, 140, 175));
+
+    // Yellow dummy / pacifier
+    carrier->display.fillCircle(cx, cy - 3, 3, color565(255, 220, 60));
+    carrier->display.drawCircle(cx, cy - 3, 3, color565(200, 160, 30));
+
+    // Cute Kokiri sprout on head
+    carrier->display.drawFastVLine(cx, cy - 20, 4, color565(75, 205, 95));
+    carrier->display.fillCircle(cx + 2, cy - 21, 2, color565(95, 235, 115));
+
+    // Radiating magical golden stars
+    int step = ((nowMs / 80) % 6);
+    int rad = 22 + step * 2;
+    carrier->display.drawPixel(cx - rad, cy - 5, sparkGold);
+    carrier->display.drawPixel(cx + rad, cy - 5, sparkGold);
+    carrier->display.drawPixel(cx, cy - rad, sparkGold);
+    carrier->display.drawPixel(cx - (rad * 7 / 10), cy - (rad * 7 / 10), sparkGold);
+    carrier->display.drawPixel(cx + (rad * 7 / 10), cy - (rad * 7 / 10), sparkGold);
+
+    // Prompt
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(color565(80, 245, 150), bgColor);
+    const char* p2 = "Velkommen, Baby Lumi!";
+    carrier->display.setCursor(120 - ((int)strlen(p2) * 3), 175);
+    carrier->display.print(p2);
+  }
+
   stageInitialized = false;
 }

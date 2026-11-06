@@ -283,3 +283,4 @@ void UiMemorialRenderer::drawEmpty(uint16_t currentGen) {
   carrier->display.setCursor(120 - (nLen * 3), 208);
   carrier->display.print(navHint);
 }
+

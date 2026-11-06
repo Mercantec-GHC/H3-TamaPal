@@ -36,3 +36,4 @@ private:
 };
 
 #endif // UI_MEMORIAL_H
+

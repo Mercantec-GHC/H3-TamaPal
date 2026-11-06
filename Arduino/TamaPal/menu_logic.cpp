@@ -186,6 +186,9 @@ ScreenType MenuLogic::getMemorialReturnScreen() const {
 
 // TOUCH3: Back button - return to HOME screen from any other view
 void MenuLogic::onButtonBack() {
+  if (activeScreen == SCREEN_HATCHING) {
+    return; // Cannot cancel cinematic egg hatching sequence
+  }
   if (activeScreen == SCREEN_MINIGAME_PONG || activeScreen == SCREEN_MINIGAME_MAZE) {
     activeScreen = SCREEN_GAMES_MENU;
     pendingSound = SOUND_BACK;
@@ -204,6 +207,7 @@ void MenuLogic::onButtonBack() {
 
 // TOUCH4: Direct shortcut - toggle between HOME and STATS screen
 void MenuLogic::onButtonStatsShortcut() {
+  if (activeScreen == SCREEN_HATCHING) return;
   if (activeScreen == SCREEN_HOME) {
     activeScreen = SCREEN_STATS;
     pendingSound = SOUND_CLICK;

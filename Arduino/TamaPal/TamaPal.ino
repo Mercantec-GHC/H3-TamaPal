@@ -274,6 +274,8 @@ void setup() {
   Serial.println(F("Tip: Skriv 'w' for at aabne Garderoben (vinterhue & halstoerklaede)!"));
   Serial.println(F("Tip: Skriv 'f' for at simulere frostkulde (12 grader -> Lumi fryser)!"));
   Serial.println(F("Tip: Skriv 'h' for at simulere hedeboelge (28 grader -> Lumi sveder)!"));
+  Serial.println(F("Tip: Skriv 't' for at aele og klappe Lumi (+12% glaede <3)!"));
+  Serial.println(F("Tip: Skriv 'm' for at aabne Mindelund (Lumis Slægtsbog & Galleri)!"));
   Serial.println(F("Garderobe-genvej: Hold TOUCH 0 (<) og TOUCH 1 (>) i 400 ms!"));
   Serial.println(F("Naviger med TOUCH 0 (<) og TOUCH 1 (>)"));
   Serial.println(F("For at forbinde til Pong over MQTT:"));
@@ -359,16 +361,20 @@ void loop() {
       demoCause = (demoCause % 6) + 1; // Cycle next death cause (1..6)
     } else if (c == 'r' || c == 'R') {
       if (!petLogic.isAlive()) {
-        soundLed.playSound(SOUND_REBIRTH);
-        petLogic.rebirth();
-        storagePet.savePet(petLogic);
-        Serial.print(F("[LIVSCYKLUS] Rebirth via Serial! Ny generation: "));
-        Serial.println((unsigned int)petLogic.getGeneration());
-        menuLogic.setScreen(SCREEN_HOME, now);
-        uiMenu.drawInitialScreen();
-        uiMenu.drawMenuBar(menuLogic, true);
-        uiPet.updateHomeDisplay(petLogic, now, true);
-        syncPetStateToBackend(true);
+        petLogic.startHatching(now);
+        menuLogic.setScreen(SCREEN_HATCHING, now);
+        soundLed.playSound(SOUND_CRACK);
+        Serial.print(F("[LIVSCYKLUS] Aegget begynder at klaekke for Generation: "));
+        Serial.println((unsigned int)(petLogic.getGeneration() + 1));
+      }
+    } else if (c == 't' || c == 'T') {
+      if (petLogic.isAlive()) {
+        if (petLogic.pet(now)) {
+          soundLed.playSound(SOUND_PURR);
+          soundLed.flashColor(255, 105, 180, 500); // 500ms pink cuddle glow
+          Serial.println(F("[INTERAKTION] Du aeler og klapper Lumi virtuelt! (+12% glaede <3)"));
+          syncPetStateToBackend(true);
+        }
       }
     }
   }
@@ -536,18 +542,19 @@ void loop() {
     bool inAnyCombo = (touch0 && touch4) || (touch0 && touch1) || combo04Fired || combo01Fired || touch3HoldFired;
 
     if (currentScreen == SCREEN_HOME && !petLogic.isAlive()) {
-      // While Lumi is a ghost/cenotaph, only TOUCH2 triggers Rebirth!
+      // While Lumi is a ghost/cenotaph:
+      // TOUCH2: Egg Hatching & Rebirth
+      // TOUCH4: Open Mindelund (Ancestral Memorial)
       if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
         if (carrier.Buttons.onTouchDown(TOUCH2)) {
-          soundLed.playSound(SOUND_REBIRTH);
-          petLogic.rebirth();
-          storagePet.savePet(petLogic);
-          syncPetStateToBackend(true);
-          Serial.print(F("[LIVSCYKLUS] Lumi genfoedt! Ny generation: "));
-          Serial.println((unsigned int)petLogic.getGeneration());
-          uiMenu.drawInitialScreen();
-          uiMenu.drawMenuBar(menuLogic, true);
-          uiPet.updateHomeDisplay(petLogic, now, true);
+          petLogic.startHatching(now);
+          menuLogic.setScreen(SCREEN_HATCHING, now);
+          soundLed.playSound(SOUND_CRACK);
+          Serial.print(F("[LIVSCYKLUS] Aegget begynder at klaekke for Generation: "));
+          Serial.println((unsigned int)(petLogic.getGeneration() + 1));
+          lastTouchTimeMs = now;
+        } else if (carrier.Buttons.onTouchDown(TOUCH4)) {
+          menuLogic.openMemorial(storagePet.getGraveRecordCount(), SCREEN_HOME);
           lastTouchTimeMs = now;
         }
       }
@@ -625,11 +632,38 @@ void loop() {
     }
   }
 
+  // Real-time hand petting detection via APDS-9960 proximity sensor (every 100 ms on SCREEN_HOME)
+  static unsigned long lastProximityCheckMs = 0;
+  if (currentScreen == SCREEN_HOME && petLogic.isAlive() && (now - lastProximityCheckMs >= 100)) {
+    lastProximityCheckMs = now;
+    if (carrier.Light.proximityAvailable()) {
+      int prox = carrier.Light.readProximity();
+      if (prox >= 0 && prox < 140) {
+        if (petLogic.pet(now)) {
+          soundLed.playSound(SOUND_PURR);
+          soundLed.flashColor(255, 105, 180, 500); // 500ms warm pink cuddle flash
+          Serial.println(F("[INTERAKTION] Du aeler og klapper Lumi! (+12% glaede <3)"));
+          syncPetStateToBackend(true);
+        }
+      }
+    } else if (carrier.Light.gestureAvailable()) {
+      int g = carrier.Light.readGesture();
+      if (g != GESTURE_NONE) {
+        if (petLogic.pet(now)) {
+          soundLed.playSound(SOUND_PURR);
+          soundLed.flashColor(255, 105, 180, 500);
+          Serial.println(F("[INTERAKTION] Haand-bevaegelse! Lumi spinder af glaede! (+12% <3)"));
+          syncPetStateToBackend(true);
+        }
+      }
+    }
+  }
+
   // 4. SCREEN TRANSITIONS (Detect when entering or exiting controller, stats, games, or action mode)
   if (currentScreen != previousScreen) {
     muteMessageEndTimeMs = 0; // Cancel any active mute toast when switching screens
 
-    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE || previousScreen == SCREEN_MEMORIAL) {
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE || previousScreen == SCREEN_MEMORIAL || previousScreen == SCREEN_HATCHING) {
       // Exiting a fullscreen view: restore mood LEDs and redraw full home UI
       soundLed.setMoodColor(0, 150, 220);
       if (currentScreen == SCREEN_HOME) {
@@ -652,6 +686,10 @@ void loop() {
       case SCREEN_STATS:
         Serial.println(F("[UI] Skærm: STATISTIK (5 parametre)"));
         uiStats.updateDisplay(petLogic, true);
+        break;
+
+      case SCREEN_HATCHING:
+        Serial.println(F("[UI] Skærm: ÆGGEKLÆKNING (Rebirth Cinematic)"));
         break;
 
       case SCREEN_MEMORIAL:
@@ -836,6 +874,31 @@ void loop() {
   } else if (currentScreen == SCREEN_STATS) {
     // Real-time stats dashboard update (dirty updates only when values decay or change)
     uiStats.updateDisplay(petLogic, false);
+  } else if (currentScreen == SCREEN_HATCHING) {
+    uint8_t phase = petLogic.getHatchingPhase(now);
+    uiPet.drawHatchingScene(phase, now, petLogic.getGeneration() + 1);
+
+    static uint8_t lastHatchPhase = 0;
+    if (phase != lastHatchPhase) {
+      if (phase == 1) {
+        soundLed.playSound(SOUND_CRACK);
+      } else if (phase == 2) {
+        soundLed.playSound(SOUND_REBIRTH);
+      }
+      lastHatchPhase = phase;
+    }
+
+    if (!petLogic.isHatching()) {
+      lastHatchPhase = 0;
+      storagePet.savePet(petLogic);
+      syncPetStateToBackend(true);
+      Serial.print(F("[LIVSCYKLUS] Lumi genfoedt! Ny generation: "));
+      Serial.println((unsigned int)petLogic.getGeneration());
+      menuLogic.setScreen(SCREEN_HOME, now);
+      uiMenu.drawInitialScreen();
+      uiMenu.drawMenuBar(menuLogic, true);
+      uiPet.updateHomeDisplay(petLogic, now, true);
+    }
   } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_MEMORIAL) {
     // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME)
     if (petLogic.isAlive() || currentScreen != SCREEN_HOME) {

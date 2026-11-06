@@ -56,6 +56,9 @@ public:
                        const char* subtitle,
                        unsigned long nowMs);
 
+  // Render cinematic egg hatching sequence (SCREEN_HATCHING: 0=wobble, 1=crack, 2=breakout)
+  void drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16_t generation);
+
 private:
   MKRIoTCarrier* carrier;
   const char* lastMoodText;

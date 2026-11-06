@@ -60,6 +60,12 @@ void SoundLedController::playSound(SoundType sound) {
   } else if (sound == SOUND_REBIRTH) {
     applyLedColor(0, 255, 180);       // Brilliant emerald-gold flash
     ledResetTimeMs = now + 500;
+  } else if (sound == SOUND_PURR) {
+    applyLedColor(255, 105, 180);     // Warm pink cuddle glow
+    ledResetTimeMs = now + 450;
+  } else if (sound == SOUND_CRACK) {
+    applyLedColor(255, 220, 80);      // Golden crack sparkle
+    ledResetTimeMs = now + 150;
   }
 
   if (soundMuted) return;
@@ -110,6 +116,18 @@ void SoundLedController::playSound(SoundType sound) {
     case SOUND_REBIRTH:
       carrier->Buzzer.sound(1975);   // High joyful B6 chime
       toneEndTimeMs = now + 250;
+      isBuzzerPlaying = true;
+      break;
+
+    case SOUND_PURR:
+      carrier->Buzzer.sound(1046);   // Sweet C6 cuddle tone
+      toneEndTimeMs = now + 65;
+      isBuzzerPlaying = true;
+      break;
+
+    case SOUND_CRACK:
+      carrier->Buzzer.sound(1600);   // Sharp crack snap
+      toneEndTimeMs = now + 22;
       isBuzzerPlaying = true;
       break;
 

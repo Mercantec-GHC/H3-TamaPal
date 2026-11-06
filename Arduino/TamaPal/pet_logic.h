@@ -51,6 +51,11 @@ public:
   const char* getDeathEpitaph() const;   // Humor / memorial epitaph in Danish
   void triggerDeath(DeathCause cause);   // Trigger death with cause
   void rebirth();                        // Rebirth as Baby of next generation
+  void startHatching(unsigned long nowMs); // Begin 2.8s egg hatching sequence
+  bool isHatching() const;               // True while hatching animation is running
+  uint8_t getHatchingPhase(unsigned long nowMs) const; // 0 = wobble, 1 = crack, 2 = breakout
+  bool pet(unsigned long nowMs);         // Stroke / pet Lumi (+12% happiness, blissful purr)
+  bool isBeingPetted(unsigned long nowMs) const; // True during 1.8s petting reaction window
   const char* getStage() const;       // Lifecycle stage name: "baby", "teen", "adult", "old"
   PetStage getStageEnum() const;      // Current stage enum
   void setStage(PetStage stage);      // Set lifecycle stage
@@ -94,6 +99,10 @@ private:
   bool alive;
   DeathCause deathCause;
   uint16_t generation;
+  bool hatchingActive;
+  unsigned long hatchingStartTimeMs;
+  unsigned long pettingActiveUntilMs;
+  unsigned long lastPetTimeMs;
   uint8_t criticalTicks;
   bool decayInitialized;
   unsigned long lastDecayTimeMs;

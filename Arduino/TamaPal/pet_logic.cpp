@@ -29,6 +29,10 @@ void PetLogic::reset() {
   alive = true;
   deathCause = DEATH_NONE;
   generation = 1;
+  hatchingActive = false;
+  hatchingStartTimeMs = 0;
+  pettingActiveUntilMs = 0;
+  lastPetTimeMs = 0;
   criticalTicks = 0;
   decayInitialized = false;
   lastDecayTimeMs = 0;
@@ -188,6 +192,14 @@ void PetLogic::setAmbientLight(int lux, unsigned long nowMs) {
 }
 
 void PetLogic::update(unsigned long currentTimeMs) {
+  if (hatchingActive) {
+    if (currentTimeMs - hatchingStartTimeMs >= 2800) {
+      hatchingActive = false;
+      rebirth();
+    }
+    return; // Pause vitals decay and death checks during hatching cinematic
+  }
+
   if (!alive) return; // Simulation stops if Lumi is deceased
 
   if (!decayInitialized) {
@@ -399,6 +411,40 @@ void PetLogic::rebirth() {
   generation = nextGen;
   highScorePong = keepPong;
   highScoreMaze = keepMaze;
+}
+
+void PetLogic::startHatching(unsigned long nowMs) {
+  hatchingActive = true;
+  hatchingStartTimeMs = nowMs;
+}
+
+bool PetLogic::isHatching() const {
+  return hatchingActive;
+}
+
+uint8_t PetLogic::getHatchingPhase(unsigned long nowMs) const {
+  if (!hatchingActive) return 0;
+  unsigned long elapsed = nowMs - hatchingStartTimeMs;
+  if (elapsed < 1000) return 0; // 0..1000 ms: Wobble in nest
+  if (elapsed < 2000) return 1; // 1000..2000 ms: Crack + sparks
+  return 2;                     // 2000..2800 ms: Shell pop + Baby emerges
+}
+
+bool PetLogic::pet(unsigned long nowMs) {
+  if (!alive || hatchingActive) return false;
+  if (lastPetTimeMs > 0 && (nowMs - lastPetTimeMs < 1500)) return false; // Cooldown 1.5s
+  lastPetTimeMs = nowMs;
+  pettingActiveUntilMs = nowMs + 1800;
+
+  happinessVal = clamp0100(happinessVal + 12.0f);
+  if (isAsleep) {
+    isAsleep = false; // Gentle cuddle wakes Lumi up happily
+  }
+  return true;
+}
+
+bool PetLogic::isBeingPetted(unsigned long nowMs) const {
+  return (alive && !hatchingActive && (nowMs < pettingActiveUntilMs));
 }
 
 const char* PetLogic::getStage() const {

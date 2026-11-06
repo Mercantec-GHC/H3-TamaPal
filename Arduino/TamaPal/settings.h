@@ -96,7 +96,8 @@ enum ScreenType : uint8_t {
   SCREEN_GAMES_MENU,       // On-board minigames selection menu (Pong / Maze)
   SCREEN_MINIGAME_PONG,    // Solo Wall-Pong minigame on Oplà display
   SCREEN_MINIGAME_MAZE,    // Procedural Marble Maze minigame on Oplà display
-  SCREEN_MEMORIAL          // Hall of Fame / Mindelund ancestral memorial gallery
+  SCREEN_MEMORIAL,         // Hall of Fame / Mindelund ancestral memorial gallery
+  SCREEN_HATCHING          // Egg hatching newborn cinematic sequence
 };
 
 // The 5 icons in the top navigation menu
@@ -128,7 +129,9 @@ enum SoundType : uint8_t {
   SOUND_MISS,              // Low buzz when missing ball (220 Hz, 150 ms)
   SOUND_GAMEOVER,          // 3-note descending game over jingle
   SOUND_DEATH,             // Somber descending requiem tone
-  SOUND_REBIRTH            // Joyful ascending rebirth fanfare
+  SOUND_REBIRTH,           // Joyful ascending rebirth fanfare
+  SOUND_PURR,              // Gentle purring cuddle chime when petted (500 ms)
+  SOUND_CRACK              // Sharp eggshell cracking tick (25 ms)
 };
 
 // Events received from backend over MQTT (tamapal/opla-1/event)

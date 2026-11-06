@@ -1294,6 +1294,76 @@ void testMemorialGallery() {
   CHECK(menu.getActiveScreen() == SCREEN_STATS, "Returns to STATS screen via onButtonBack");
 }
 
+void testEggHatchingAndPettingLogic() {
+  printf("\n--- Test: Egg Hatching Sequence & Proximity Petting ---\n");
+
+  // 1. Egg Hatching timing & transitions
+  PetLogic dyingPet;
+  dyingPet.setGeneration(1);
+  dyingPet.setHighScorePong(18);
+  dyingPet.setHighScoreMaze(32);
+  dyingPet.triggerDeath(DEATH_HUNGER);
+  CHECK(!dyingPet.isAlive(), "Pet is initially dead");
+  CHECK(!dyingPet.isHatching(), "Not hatching initially");
+
+  dyingPet.startHatching(1000);
+  CHECK(dyingPet.isHatching(), "Hatching is now active");
+  CHECK(dyingPet.getHatchingPhase(1000) == 0, "Phase 0 (wobble) at 0ms");
+  CHECK(dyingPet.getHatchingPhase(1800) == 0, "Phase 0 (wobble) at 800ms");
+  CHECK(dyingPet.getHatchingPhase(2000) == 1, "Phase 1 (crack) at 1000ms");
+  CHECK(dyingPet.getHatchingPhase(2700) == 1, "Phase 1 (crack) at 1700ms");
+  CHECK(dyingPet.getHatchingPhase(3000) == 2, "Phase 2 (breakout) at 2000ms");
+  CHECK(dyingPet.getHatchingPhase(3700) == 2, "Phase 2 (breakout) at 2700ms");
+
+  // Before 2800ms has elapsed: still hatching
+  dyingPet.update(3700); // 2700ms elapsed
+  CHECK(dyingPet.isHatching(), "Still hatching before 2800ms");
+  CHECK(!dyingPet.isAlive(), "Pet not alive until hatching finishes");
+
+  // At 2800ms+: auto-completes to rebirth!
+  dyingPet.update(3850); // 2850ms elapsed
+  CHECK(!dyingPet.isHatching(), "Hatching finished after 2850ms");
+  CHECK(dyingPet.isAlive(), "Pet is now alive as newborn!");
+  CHECK(dyingPet.getGeneration() == 2, "Generation incremented to 2");
+  CHECK(dyingPet.getStageEnum() == STAGE_BABY, "Reborn as cute Baby");
+  CHECK(dyingPet.getHighScorePong() == 18, "Pong score preserved");
+  CHECK(dyingPet.getHighScoreMaze() == 32, "Maze score preserved");
+  CHECK(dyingPet.getOverallHealth() > 70, "Health restored to full");
+
+  // 2. Proximity Petting & Affection
+  PetLogic pet;
+  pet.setVitals(80, 80, 80, 50, 50); // Happiness = 50%
+  CHECK(!pet.isBeingPetted(1000), "Not being petted initially");
+
+  bool pettedOk = pet.pet(1000);
+  CHECK(pettedOk, "Petting succeeds");
+  CHECK(pet.isBeingPetted(1500), "Is being petted within 1.8s window");
+  CHECK(pet.getHappiness() == 62.0f, "Happiness increased by +12% (50 -> 62)");
+
+  // Spam protection / cooldown
+  bool spamOk = pet.pet(1200); // Only 200ms later
+  CHECK(!spamOk, "Cooldown prevents spam petting");
+  CHECK(pet.getHappiness() == 62.0f, "Happiness unchanged during cooldown");
+
+  // Petting after cooldown (1500ms+)
+  bool nextPetOk = pet.pet(2600); // 1600ms later
+  CHECK(nextPetOk, "Petting succeeds after 1.5s cooldown");
+  CHECK(pet.getHappiness() == 74.0f, "Happiness increased by +12% (62 -> 74)");
+
+  // Reaction window expiration
+  CHECK(!pet.isBeingPetted(4500), "Petting reaction window expires after 1.8s");
+
+  // Petting wakes sleeping pet
+  pet.setAmbientLight(10, 0); // immediate dark sleep trigger
+  CHECK(pet.isSleeping(), "Pet is asleep in the dark");
+  pet.pet(10000);
+  CHECK(!pet.isSleeping(), "Petting gently wakes sleeping Lumi");
+
+  // Cannot pet deceased pet
+  pet.triggerDeath(DEATH_COLD);
+  CHECK(!pet.pet(20000), "Cannot pet deceased pet");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -1322,6 +1392,7 @@ int main() {
   testMarbleMazeLogic();
   testPetDeathAndRebirth();
   testMemorialGallery();
+  testEggHatchingAndPettingLogic();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {
