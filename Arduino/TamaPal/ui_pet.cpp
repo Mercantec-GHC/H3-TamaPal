@@ -336,15 +336,23 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   int rightEyeX = (stage == STAGE_BABY) ? (cx + 7) : (cx + 10);
   int eyeY      = (stage == STAGE_BABY) ? (cy - 3) : (cy - 4);
 
-  // Sweat drop for overheating
+  // Sweat drops for overheating
   if (expr == EXPR_OVERHEATING) {
+    int dropY = eyeY - 8 + ((int)(millis() / 180) % 5);
     uint16_t dropCyan = color565(90, 220, 255);
     uint16_t dropBlue = color565(25, 125, 215);
-    carrier->display.drawPixel(cx + 14, eyeY - 8, dropCyan);
-    carrier->display.fillRect(cx + 13, eyeY - 7, 3, 3, dropCyan);
-    carrier->display.fillRect(cx + 12, eyeY - 6, 5, 4, dropCyan);
-    carrier->display.drawPixel(cx + 13, eyeY - 6, pureWhite);
-    carrier->display.drawPixel(cx + 14, eyeY - 3, dropBlue);
+
+    // Primary trickling sweat drop on right temple
+    carrier->display.drawPixel(cx + 14, dropY - 2, dropCyan);
+    carrier->display.fillRect(cx + 13, dropY - 1, 3, 2, dropCyan);
+    carrier->display.fillRect(cx + 12, dropY,     5, 4, dropCyan);
+    carrier->display.drawPixel(cx + 13, dropY,     pureWhite);
+    carrier->display.drawPixel(cx + 14, dropY + 3, dropBlue);
+
+    // Secondary bead of perspiration on left brow
+    carrier->display.drawPixel(cx - 13, eyeY - 6, dropCyan);
+    carrier->display.drawPixel(cx - 14, eyeY - 5, pureWhite);
+    carrier->display.drawPixel(cx - 13, eyeY - 5, dropCyan);
   }
 
   // 2. Render Eyes according to expression and blink state
@@ -437,15 +445,16 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
     carrier->display.fillRoundRect(leftEyeX - 4, eyeY - 8, 9, 3, 1, 0xFFFF);
     carrier->display.fillRoundRect(rightEyeX - 4, eyeY - 8, 9, 3, 1, 0xFFFF);
 
-    // Round golden wireframe spectacles
-    carrier->display.drawCircle(leftEyeX, eyeY - 1, 5, glassesGold);
-    carrier->display.drawCircle(rightEyeX, eyeY - 1, 5, glassesGold);
+    // Round golden wireframe spectacles (slips down nose when sweaty/overheating)
+    int glassesY = (eyeY - 1) + (expr == EXPR_OVERHEATING ? 2 : 0);
+    carrier->display.drawCircle(leftEyeX, glassesY, 5, glassesGold);
+    carrier->display.drawCircle(rightEyeX, glassesY, 5, glassesGold);
     // Bridge connecting the round rims
-    carrier->display.drawFastHLine(cx - 3, eyeY - 2, 7, glassesGold);
+    carrier->display.drawFastHLine(cx - 3, glassesY - 1, 7, glassesGold);
 
     // Subtle glint on upper lens edge
-    carrier->display.drawPixel(leftEyeX - 2, eyeY - 3, glassGlint);
-    carrier->display.drawPixel(rightEyeX - 2, eyeY - 3, glassGlint);
+    carrier->display.drawPixel(leftEyeX - 2, glassesY - 2, glassGlint);
+    carrier->display.drawPixel(rightEyeX - 2, glassesY - 2, glassGlint);
   }
 
   // 3. Render Mouth / Pacifier / Elder Mustache
@@ -459,7 +468,12 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   }
 
   // If Baby is eating berry, show the berry eating action. Otherwise, Baby wears a cute pacifier/dummy!
-  if (stage == STAGE_BABY && expr != EXPR_EATING && expr != EXPR_DEAD) {
+  // If Baby is eating berry, show the berry eating action.
+  // If Baby is overheating, pacifier drops out so Baby can pant with tongue!
+  // Otherwise, Baby wears a cute pacifier/dummy that chatters when freezing!
+  if (stage == STAGE_BABY && expr != EXPR_EATING && expr != EXPR_OVERHEATING && expr != EXPR_DEAD) {
+    int paciDx = (expr == EXPR_FREEZING && (((int)(millis() / 50)) % 2 == 0)) ? -1 : 0;
+
     // Cute Baby Pacifier (Dummy)
     uint16_t paciShield = color565(255, 220, 70);  // Bright sunny yellow shield
     uint16_t paciBorder = color565(210, 150, 20);  // Warm outline
@@ -467,15 +481,15 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
     uint16_t paciRing   = color565(255, 245, 170); // Little dangling ring
 
     // Pacifier shield (oval disk in center mouth)
-    carrier->display.fillRoundRect(cx - 5, mouthY - 1, 11, 7, 3, paciShield);
-    carrier->display.drawRoundRect(cx - 5, mouthY - 1, 11, 7, 3, paciBorder);
+    carrier->display.fillRoundRect(cx - 5 + paciDx, mouthY - 1, 11, 7, 3, paciShield);
+    carrier->display.drawRoundRect(cx - 5 + paciDx, mouthY - 1, 11, 7, 3, paciBorder);
 
     // Center button knob
-    carrier->display.fillCircle(cx, mouthY + 2, 2, paciCenter);
-    carrier->display.drawPixel(cx - 1, mouthY + 1, pureWhite); // Tiny reflection
+    carrier->display.fillCircle(cx + paciDx, mouthY + 2, 2, paciCenter);
+    carrier->display.drawPixel(cx - 1 + paciDx, mouthY + 1, pureWhite); // Tiny reflection
 
     // Hanging little ring handle
-    carrier->display.drawCircle(cx, mouthY + 5, 2, paciRing);
+    carrier->display.drawCircle(cx + paciDx, mouthY + 5, 2, paciRing);
     return;
   }
 
@@ -532,23 +546,34 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
       carrier->display.drawPixel(cx, mouthY + 1, tonguePink);
       break;
 
-    case EXPR_FREEZING:
-      // Chattering wavy mouth (~)
-      carrier->display.drawPixel(cx - 4, mouthY + 1, mouthDark);
-      carrier->display.drawPixel(cx - 3, mouthY, mouthDark);
-      carrier->display.drawPixel(cx - 2, mouthY + 1, mouthDark);
-      carrier->display.drawPixel(cx - 1, mouthY + 2, mouthDark);
-      carrier->display.drawPixel(cx,     mouthY + 1, mouthDark);
-      carrier->display.drawPixel(cx + 1, mouthY, mouthDark);
-      carrier->display.drawPixel(cx + 2, mouthY + 1, mouthDark);
-      carrier->display.drawPixel(cx + 3, mouthY + 2, mouthDark);
+    case EXPR_FREEZING: {
+      // Rapid shivering teeth chattering (alternates every 70 ms)
+      bool chatterOpen = (((int)(millis() / 70)) % 2 == 0);
+      if (chatterOpen) {
+        carrier->display.fillRect(cx - 3, mouthY, 7, 3, mouthDark);
+        carrier->display.drawFastHLine(cx - 2, mouthY + 1, 5, 0xFFFF); // Visible chattering white teeth
+      } else {
+        carrier->display.drawPixel(cx - 4, mouthY + 1, mouthDark);
+        carrier->display.drawPixel(cx - 3, mouthY, mouthDark);
+        carrier->display.drawPixel(cx - 2, mouthY + 1, mouthDark);
+        carrier->display.drawPixel(cx - 1, mouthY + 2, mouthDark);
+        carrier->display.drawPixel(cx,     mouthY + 1, mouthDark);
+        carrier->display.drawPixel(cx + 1, mouthY, mouthDark);
+        carrier->display.drawPixel(cx + 2, mouthY + 1, mouthDark);
+        carrier->display.drawPixel(cx + 3, mouthY + 2, mouthDark);
+      }
       break;
+    }
 
-    case EXPR_OVERHEATING:
-      // Panting open mouth with tongue out
-      carrier->display.fillRoundRect(cx - 3, mouthY, 7, 6, 2, mouthDark);
-      carrier->display.fillRoundRect(cx - 2, mouthY + 3, 5, 4, 1, tonguePink);
+    case EXPR_OVERHEATING: {
+      // Heavy panting mouth with protruding tongue heaving in rhythm
+      bool pantingBeat = (((int)(millis() / 120)) % 2 == 0);
+      int tLen = pantingBeat ? 6 : 4;
+      carrier->display.fillRoundRect(cx - 4, mouthY, 8, 6, 2, mouthDark);
+      carrier->display.fillRoundRect(cx - 2, mouthY + 3, 5, tLen, 1, tonguePink);
+      carrier->display.drawPixel(cx - 1, mouthY + 3 + tLen - 1, 0xFFFF); // saliva gleam
       break;
+    }
 
     case EXPR_SAD:
     case EXPR_SCOLDED:
@@ -800,8 +825,15 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillCircle(cx + 17, cy - 11, 3, bodyMain);
     carrier->display.fillCircle(cx + 17, cy - 11, 2, earInner);
   } else {
-    // Teen/Adult ears (Perky when happy, slightly drooped when sad/tired)
-    int earTipOffsetY = (expr == EXPR_SAD || expr == EXPR_EXHAUSTED || expr == EXPR_SCOLDED) ? -19 : -25;
+    // Teen/Adult ears (Perky when happy, slightly drooped when sad/tired, tucked tight when freezing, wilting when overheating)
+    int earTipOffsetY = -25;
+    if (expr == EXPR_SAD || expr == EXPR_EXHAUSTED || expr == EXPR_SCOLDED) {
+      earTipOffsetY = -19;
+    } else if (expr == EXPR_FREEZING) {
+      earTipOffsetY = -17; // Tucked tight against shivering head
+    } else if (expr == EXPR_OVERHEATING) {
+      earTipOffsetY = -13; // Wilting limply sideways from heat exhaustion
+    }
     // Left Ear
     carrier->display.fillTriangle(cx - 21, cy - 11, cx - 26, cy + earTipOffsetY, cx - 10, cy - 18, bodyOutline);
     carrier->display.fillTriangle(cx - 20, cy - 12, cx - 24, cy + earTipOffsetY + 2, cx - 11, cy - 17, bodyMain);
@@ -822,31 +854,39 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillRoundRect(cx + 6,  cy + 16, 10, 6, 3, footColor);
   }
 
-  // 4. 2.5D Chubby Mochi Body
+  // 4. 2.5D Chubby Mochi Body (Hunched and compressed when FREEZING)
   if (stage == STAGE_BABY) {
-    // Baby stage: Chubby egg-like round mochi body (38x34 px)
-    carrier->display.fillRoundRect(cx - 19, cy - 17, 38, 34, 15, bodyOutline);
-    carrier->display.fillRoundRect(cx - 17, cy - 15, 34, 30, 13, bodyShade);
-    carrier->display.fillRoundRect(cx - 17, cy - 15, 34, 27, 12, bodyMain);
-
-    // Baby Specular Gloss Highlight
-    carrier->display.fillRoundRect(cx - 10, cy - 14, 8, 3, 1, 0xFFFF);
-    carrier->display.drawPixel(cx - 11, cy - 12, 0xFFFF);
-
-    // Cute Baby Soft Belly Patch
-    carrier->display.fillRoundRect(cx - 10, cy + 5, 20, 8, 4, bellyPatch);
+    if (expr == EXPR_FREEZING) {
+      // Baby huddles into a tighter shivering egg (36x30 px instead of 38x34 px)
+      carrier->display.fillRoundRect(cx - 18, cy - 14, 36, 30, 13, bodyOutline);
+      carrier->display.fillRoundRect(cx - 16, cy - 12, 32, 26, 11, bodyShade);
+      carrier->display.fillRoundRect(cx - 16, cy - 12, 32, 23, 10, bodyMain);
+      carrier->display.fillRoundRect(cx - 9,  cy - 11, 7,  3,  1,  0xFFFF);
+      carrier->display.fillRoundRect(cx - 9,  cy + 5,  18, 6,  3,  bellyPatch);
+    } else {
+      carrier->display.fillRoundRect(cx - 19, cy - 17, 38, 34, 15, bodyOutline);
+      carrier->display.fillRoundRect(cx - 17, cy - 15, 34, 30, 13, bodyShade);
+      carrier->display.fillRoundRect(cx - 17, cy - 15, 34, 27, 12, bodyMain);
+      carrier->display.fillRoundRect(cx - 10, cy - 14, 8,  3,  1,  0xFFFF);
+      carrier->display.drawPixel(cx - 11, cy - 12, 0xFFFF);
+      carrier->display.fillRoundRect(cx - 10, cy + 5,  20, 8,  4,  bellyPatch);
+    }
   } else {
-    // Teen stage: 48x38 rounded silhouette
-    carrier->display.fillRoundRect(cx - 24, cy - 20, 48, 39, 16, bodyOutline);
-    carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 35, 14, bodyShade);
-    carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 31, 13, bodyMain);
-
-    // Top-left 2.5D Specular Gloss Highlight on forehead
-    carrier->display.fillRoundRect(cx - 13, cy - 16, 10, 3, 1, 0xFFFF);
-    carrier->display.drawPixel(cx - 15, cy - 14, 0xFFFF);
-
-    // Soft Cream Belly Patch (Tamagotchi Paradise aesthetic)
-    carrier->display.fillRoundRect(cx - 13, cy + 7, 26, 9, 4, bellyPatch);
+    if (expr == EXPR_FREEZING) {
+      // Teen/Adult/Old hunches shoulders inward (44x35 px instead of 48x39 px)
+      carrier->display.fillRoundRect(cx - 22, cy - 17, 44, 35, 14, bodyOutline);
+      carrier->display.fillRoundRect(cx - 20, cy - 15, 40, 31, 12, bodyShade);
+      carrier->display.fillRoundRect(cx - 20, cy - 15, 40, 27, 11, bodyMain);
+      carrier->display.fillRoundRect(cx - 11, cy - 13, 8,  3,  1,  0xFFFF);
+      carrier->display.fillRoundRect(cx - 11, cy + 6,  22, 7,  3,  bellyPatch);
+    } else {
+      carrier->display.fillRoundRect(cx - 24, cy - 20, 48, 39, 16, bodyOutline);
+      carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 35, 14, bodyShade);
+      carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 31, 13, bodyMain);
+      carrier->display.fillRoundRect(cx - 13, cy - 16, 10, 3,  1,  0xFFFF);
+      carrier->display.drawPixel(cx - 15, cy - 14, 0xFFFF);
+      carrier->display.fillRoundRect(cx - 13, cy + 7,  26, 9,  4,  bellyPatch);
+    }
   }
 
   // 4b. Crimson Business Tie with Gold Clip for ADULT stage
@@ -855,17 +895,24 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     uint16_t tieShadow   = color565(140, 20, 40);
     uint16_t tieGoldClip = color565(255, 215, 60);
 
-    // Collar knot
-    carrier->display.fillRoundRect(cx - 3, cy + 1, 6, 4, 1, tieRed);
-    carrier->display.drawPixel(cx, cy + 2, color565(255, 120, 140));
+    if (expr == EXPR_OVERHEATING) {
+      // Loosened collar knot, tie askew to the right from heat exhaustion
+      carrier->display.fillRoundRect(cx - 2, cy + 3, 6, 3, 1, tieRed);
+      carrier->display.fillTriangle(cx - 2, cy + 5, cx + 5, cy + 5, cx + 5, cy + 14, tieRed);
+      carrier->display.drawFastHLine(cx + 1, cy + 8, 5, tieGoldClip);
+    } else {
+      // Collar knot
+      carrier->display.fillRoundRect(cx - 3, cy + 1, 6, 4, 1, tieRed);
+      carrier->display.drawPixel(cx, cy + 2, color565(255, 120, 140));
 
-    // Pointed tie draping over belly
-    carrier->display.fillTriangle(cx - 3, cy + 4, cx + 3, cy + 4, cx, cy + 13, tieRed);
-    carrier->display.drawLine(cx, cy + 4, cx, cy + 12, tieShadow);
+      // Pointed tie draping over belly
+      carrier->display.fillTriangle(cx - 3, cy + 4, cx + 3, cy + 4, cx, cy + 13, tieRed);
+      carrier->display.drawLine(cx, cy + 4, cx, cy + 12, tieShadow);
 
-    // Golden tie bar / clip
-    carrier->display.drawFastHLine(cx - 2, cy + 7, 5, tieGoldClip);
-    carrier->display.drawPixel(cx + 2, cy + 7, 0xFFFF);
+      // Golden tie bar / clip
+      carrier->display.drawFastHLine(cx - 2, cy + 7, 5, tieGoldClip);
+      carrier->display.drawPixel(cx + 2, cy + 7, 0xFFFF);
+    }
   }
 
   // 4c. Golden Pocket Watch Chain for OLD stage
@@ -945,6 +992,18 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
       carrier->display.fillCircle(cx - 20, cy - 5, 2, bodyMain);
       carrier->display.fillCircle(cx + 20, cy - 5, 3, bodyOutline);
       carrier->display.fillCircle(cx + 20, cy - 5, 2, bodyMain);
+    } else if (expr == EXPR_FREEZING) {
+      // Huddled tight across chest
+      carrier->display.fillCircle(cx - 13, cy + 2, 3, bodyOutline);
+      carrier->display.fillCircle(cx - 13, cy + 2, 2, bodyMain);
+      carrier->display.fillCircle(cx + 13, cy + 2, 3, bodyOutline);
+      carrier->display.fillCircle(cx + 13, cy + 2, 2, bodyMain);
+    } else if (expr == EXPR_OVERHEATING) {
+      // Sprawled out limp on the ground from heat exhaustion
+      carrier->display.fillCircle(cx - 22, cy + 5, 3, bodyOutline);
+      carrier->display.fillCircle(cx - 22, cy + 5, 2, bodyMain);
+      carrier->display.fillCircle(cx + 22, cy + 5, 3, bodyOutline);
+      carrier->display.fillCircle(cx + 22, cy + 5, 2, bodyMain);
     } else {
       carrier->display.fillCircle(cx - 20, cy + 1, 3, bodyOutline);
       carrier->display.fillCircle(cx - 20, cy + 1, 2, bodyMain);
@@ -1000,6 +1059,24 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
       carrier->display.fillRoundRect(caseX, caseY, caseW, caseH, 2, caseBrown);
       carrier->display.drawRoundRect(caseX, caseY, caseW, caseH, 2, caseDark);
       carrier->display.fillRect(caseX + 5, caseY + 3, 3, 3, caseGold);
+
+    } else if (expr == EXPR_OVERHEATING) {
+      // Overheating: Left paw wiping sweaty brow at temple
+      carrier->display.fillRoundRect(cx - 23, cy - 8, 6, 7, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx - 22, cy - 7, 4, 5, 1, bodyMain);
+
+      // Briefcase slumped down flat on ground
+      int caseX = cx + 18;
+      int caseY = cy + 7;
+      int caseW = 13;
+      int caseH = 9;
+      carrier->display.fillRoundRect(caseX, caseY, caseW, caseH, 2, caseBrown);
+      carrier->display.drawRoundRect(caseX, caseY, caseW, caseH, 2, caseDark);
+      carrier->display.fillRect(caseX + 5, caseY + 2, 3, 3, caseGold);
+
+      // Right paw dangling limp beside briefcase
+      carrier->display.fillRoundRect(cx + 20, cy + 2, 5, 7, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx + 21, cy + 3, 3, 5, 1, bodyMain);
 
     } else {
       // Composed adult: Left paw relaxed at side
@@ -1077,6 +1154,23 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
       carrier->display.fillRoundRect(cx - 20, cy + 2, 6, 6, 2, bodyOutline);
       carrier->display.fillRoundRect(cx + 14, cy + 2, 6, 6, 2, bodyOutline);
 
+    } else if (expr == EXPR_OVERHEATING) {
+      // Heat exhaustion: leaning heavily forward with both paws slumped on cane crook
+      int caneX = cx + 19;
+      int caneY = cy + 3;
+
+      carrier->display.fillRect(caneX, caneY, 3, 19, caneWood);
+      carrier->display.drawFastVLine(caneX + 2, caneY, 19, caneDark);
+      carrier->display.fillRect(caneX, caneY + 17, 3, 2, caneGold);
+      carrier->display.fillRoundRect(caneX - 5, caneY - 4, 9, 5, 2, caneGold);
+      carrier->display.fillRoundRect(caneX - 3, caneY - 2, 5, 3, 1, bgColor);
+
+      // Slumped paws together on the handle
+      carrier->display.fillRoundRect(caneX - 4, caneY - 1, 8, 5, 2, bodyOutline);
+      carrier->display.fillRoundRect(caneX - 3, caneY,     6, 3, 1, bodyMain);
+      carrier->display.fillRoundRect(cx - 24, cy + 3, 5, 7, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx - 23, cy + 4, 3, 5, 1, bodyMain);
+
     } else {
       // Calm wise elder: Left paw relaxed at side
       carrier->display.fillRoundRect(cx - 26, cy - 1, 5, 8, 2, bodyOutline);
@@ -1113,6 +1207,12 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
       // Tucked-in shivering paws hugging body
       carrier->display.fillRoundRect(cx - 21, cy + 2, 6, 6, 2, bodyOutline);
       carrier->display.fillRoundRect(cx + 15, cy + 2, 6, 6, 2, bodyOutline);
+    } else if (expr == EXPR_OVERHEATING) {
+      // Limp paws sprawled down and outwards from heat exhaustion
+      carrier->display.fillRoundRect(cx - 28, cy + 4, 6, 7, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx - 27, cy + 5, 4, 5, 1, bodyMain);
+      carrier->display.fillRoundRect(cx + 22, cy + 4, 6, 7, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx + 23, cy + 5, 4, 5, 1, bodyMain);
     } else {
       // Relaxed side paws
       carrier->display.fillRoundRect(cx - 26, cy - 1, 5, 8, 2, bodyOutline);
@@ -1131,19 +1231,21 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     uint16_t hpNeonCyan = color565(0, 230, 255);   // Glowing cyber cyan ear cups
     uint16_t hpAccent   = color565(255, 60, 110);  // Neon pink accent ring
 
+    int hpOffsetY = (expr == EXPR_OVERHEATING) ? 5 : 0; // headphones slipping down neck from heat/sweat
+
     // Arch headband over the head
-    carrier->display.drawCircle(cx, cy - 8, 22, hpBand);
-    carrier->display.drawCircle(cx, cy - 8, 23, hpBand);
+    carrier->display.drawCircle(cx, cy - 8 + hpOffsetY, 22, hpBand);
+    carrier->display.drawCircle(cx, cy - 8 + hpOffsetY, 23, hpBand);
 
     // Left DJ Ear Cup (rounded capsule over left ear)
-    carrier->display.fillRoundRect(cx - 27, cy - 13, 6, 12, 3, hpBand);
-    carrier->display.fillRoundRect(cx - 26, cy - 11, 4, 8, 2, hpNeonCyan);
-    carrier->display.drawPixel(cx - 25, cy - 7, hpAccent);
+    carrier->display.fillRoundRect(cx - 27, cy - 13 + hpOffsetY, 6, 12, 3, hpBand);
+    carrier->display.fillRoundRect(cx - 26, cy - 11 + hpOffsetY, 4, 8, 2, hpNeonCyan);
+    carrier->display.drawPixel(cx - 25, cy - 7 + hpOffsetY, hpAccent);
 
     // Right DJ Ear Cup (rounded capsule over right ear)
-    carrier->display.fillRoundRect(cx + 21, cy - 13, 6, 12, 3, hpBand);
-    carrier->display.fillRoundRect(cx + 22, cy - 11, 4, 8, 2, hpNeonCyan);
-    carrier->display.drawPixel(cx + 24, cy - 7, hpAccent);
+    carrier->display.fillRoundRect(cx + 21, cy - 13 + hpOffsetY, 6, 12, 3, hpBand);
+    carrier->display.fillRoundRect(cx + 22, cy - 11 + hpOffsetY, 4, 8, 2, hpNeonCyan);
+    carrier->display.drawPixel(cx + 24, cy - 7 + hpOffsetY, hpAccent);
   }
 }
 
@@ -1256,28 +1358,37 @@ void UiPetRenderer::updateSideOverlay(int baseCx, int baseCy, LumiExpression exp
 void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, bool forceRedraw) {
   if (carrier == nullptr) return;
 
-  // Throttle smooth procedural animation to ~15 FPS (65 ms per frame)
-  if (!forceRedraw && stageInitialized && (nowMs - lastAnimTickMs < 65)) {
-    return;
-  }
-  lastAnimTickMs = nowMs;
-
   LumiExpression expr    = determineExpression(pet);
   PetStage stage         = pet.getStageEnum();
   PetOutfit outfit       = pet.getOutfitEnum();
   SkyWeatherMode weather = determineSkyWeather(pet, expr);
   bool isNight           = (weather == SKY_NIGHT_STARRY);
 
+  // Dynamic frame rate: 45 ms (~22 FPS) for high-frequency shivering tremor & panting, 65 ms (~15 FPS) for calm states
+  unsigned long minFrameMs = (expr == EXPR_FREEZING || expr == EXPR_OVERHEATING) ? 45 : 65;
+  if (!forceRedraw && stageInitialized && (nowMs - lastAnimTickMs < minFrameMs)) {
+    return;
+  }
+  lastAnimTickMs = nowMs;
+
   // Match the exact screen background from ui_menu.cpp so there is no rectangular box
   uint16_t nativeBg = color565(8, 12, 26);
 
-  // 1. Compute procedural squash/stretch breathing, happy hop, and cold shiver offsets
+  // 1. Compute procedural squash/stretch breathing, happy hop, cold shiver, and panting offsets
   int dx = 0;
   int dy = 0;
 
   if (expr == EXPR_FREEZING) {
-    // Rapid left-right shivering (+/- 2 px) as described in the Game Design Doc
-    dx = ((nowMs / 65) % 2 == 0) ? -2 : 2;
+    // 4-phase micro-tremor spasm (~22 Hz): asymmetric involuntary shivering + hunched posture (+1..+2 px)
+    const int shiverX[4] = {-2, 1, -1, 2};
+    const int shiverY[4] = {2, 1, 2, 1}; // hunched down tight
+    dx = shiverX[(nowMs / 45) % 4];
+    dy = shiverY[(nowMs / 45) % 4];
+  } else if (expr == EXPR_OVERHEATING) {
+    // Heavy rapid thermal panting heave: exhausted wilt/slump rhythm (90 ms per step)
+    const int pantingDy[4] = {-1, 0, 1, 0};
+    dy = pantingDy[(nowMs / 90) % 4];
+    dx = 0;
   } else if (expr == EXPR_SLEEPING) {
     // Slow, deep sleeping respiration
     const int sleepBreath[4] = {0, 0, -1, -1};
