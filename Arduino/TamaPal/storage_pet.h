@@ -67,6 +67,24 @@ public:
                                uint16_t& pong,
                                uint16_t& maze,
                                uint32_t& age);
+  static bool deserializeState(const char* text,
+                               float& hunger,
+                               float& warmth,
+                               float& energy,
+                               float& happiness,
+                               float& discipline,
+                               bool& asleep,
+                               PetStage& stage,
+                               PetOutfit& outfit,
+                               uint16_t& pong,
+                               uint16_t& maze,
+                               uint32_t& age,
+                               uint16_t& generation,
+                               bool& alive,
+                               DeathCause& deathCause);
+
+  // Memorial ancestral log on MicroSD (appends to grave.txt)
+  bool logGraveRecord(const PetLogic& pet);
 
   // FNV-1a non-cryptographic hash for dirty checking before SPI writes
   static uint32_t computeHash(const char* str);

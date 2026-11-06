@@ -42,7 +42,14 @@ public:
   // Overall status queries
   int getOverallHealth() const;       // Weighted average (0..100)
   bool isSleeping() const;
-  bool isAlive() const;               // True if overall health > 0
+  bool isAlive() const;               // True if alive, false if spirit/dead
+  DeathCause getDeathCause() const;   // Cause of death enum
+  uint16_t getGeneration() const;     // Generation counter (Gen 1, Gen 2...)
+  void setGeneration(uint16_t gen);
+  const char* getDeathCauseName() const; // E.g. "Døde af sult", "Døde af alderdom"
+  const char* getDeathEpitaph() const;   // Humor / memorial epitaph in Danish
+  void triggerDeath(DeathCause cause);   // Trigger death with cause
+  void rebirth();                        // Rebirth as Baby of next generation
   const char* getStage() const;       // Lifecycle stage name: "baby", "teen", "adult", "old"
   PetStage getStageEnum() const;      // Current stage enum
   void setStage(PetStage stage);      // Set lifecycle stage
@@ -83,6 +90,10 @@ private:
   PetStage currentStage;
   PetOutfit currentOutfit;
   bool isAsleep;
+  bool alive;
+  DeathCause deathCause;
+  uint16_t generation;
+  uint8_t criticalTicks;
   bool decayInitialized;
   unsigned long lastDecayTimeMs;
   unsigned long darkStartTimeMs;

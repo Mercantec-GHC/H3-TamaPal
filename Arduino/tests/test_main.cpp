@@ -1076,6 +1076,112 @@ void testMarbleMazeLogic() {
   CHECK(berryMaze.getElapsedSeconds() == rawElapsed - 2, "Maze: berry bonus reduces elapsed time by 2s");
 }
 
+void testPetDeathAndRebirth() {
+  printf("\n--- Test: Pet Lifecycle, Death Causes, Memorial Chronicle & Rebirth ---\n");
+  PetLogic pet;
+
+  // 1. Initial State
+  CHECK(pet.isAlive(), "Pet is initially alive");
+  CHECK(pet.getGeneration() == 1, "Initial generation is 1");
+  CHECK(pet.getDeathCause() == DEATH_NONE, "Initial death cause is DEATH_NONE");
+
+  // 2. Manual death triggering & actions disabled
+  pet.triggerDeath(DEATH_HUNGER);
+  CHECK(!pet.isAlive(), "Pet is dead after triggerDeath");
+  CHECK(pet.getDeathCause() == DEATH_HUNGER, "Death cause is DEATH_HUNGER");
+  CHECK(strcmp(pet.getDeathCauseName(), "Doede af sult") == 0, "Danish cause is 'Doede af sult'");
+  CHECK(strcmp(pet.getDeathEpitaph(), "Maven rumlede til sidst...") == 0, "Danish epitaph is hungry rumble");
+
+  // Actions must fail when dead
+  CHECK(!pet.feed(), "Cannot feed a deceased pet");
+  CHECK(!pet.play(), "Cannot play with a deceased pet");
+  CHECK(!pet.scold(), "Cannot scold a deceased pet");
+
+  // 3. Test all other death causes and epitaphs
+  pet.triggerDeath(DEATH_COLD);
+  CHECK(strcmp(pet.getDeathCauseName(), "Froes ihjel") == 0, "Danish cause is 'Froes ihjel'");
+  CHECK(strcmp(pet.getDeathEpitaph(), "Vinteren var for haard...") == 0, "Epitaph for freezing death");
+
+  pet.triggerDeath(DEATH_HEAT);
+  CHECK(strcmp(pet.getDeathCauseName(), "Doede af hedeslag") == 0, "Danish cause is 'Doede af hedeslag'");
+  CHECK(strcmp(pet.getDeathEpitaph(), "Smeltede i pejsens varme!") == 0, "Epitaph for heatstroke");
+
+  pet.triggerDeath(DEATH_BOREDOM);
+  CHECK(strcmp(pet.getDeathCauseName(), "Doede af ensomhed") == 0, "Danish cause is 'Doede af ensomhed'");
+  CHECK(strcmp(pet.getDeathEpitaph(), "Hjertet visnede af savn.") == 0, "Epitaph for boredom");
+
+  pet.triggerDeath(DEATH_EXHAUSTION);
+  CHECK(strcmp(pet.getDeathCauseName(), "Doede af udmattelse") == 0, "Danish cause is 'Doede af udmattelse'");
+  CHECK(strcmp(pet.getDeathEpitaph(), "Fik aldrig sovet ud...") == 0, "Epitaph for exhaustion");
+
+  pet.triggerDeath(DEATH_OLD_AGE);
+  CHECK(strcmp(pet.getDeathCauseName(), "Doede af alderdom") == 0, "Danish cause is 'Doede af alderdom'");
+  CHECK(strcmp(pet.getDeathEpitaph(), "Levede et lykkeligt liv!") == 0, "Epitaph for happy old age");
+
+  // 4. Test Rebirth
+  pet.setHighScorePong(25);
+  pet.setHighScoreMaze(42);
+  pet.rebirth();
+  CHECK(pet.isAlive(), "Pet is alive after rebirth");
+  CHECK(pet.getGeneration() == 2, "Generation incremented to 2");
+  CHECK(pet.getDeathCause() == DEATH_NONE, "Death cause reset to DEATH_NONE");
+  CHECK(pet.getStageEnum() == STAGE_BABY, "Reborn as cute baby");
+  CHECK(pet.getHighScorePong() == 25, "Pong high score preserved across generations");
+  CHECK(pet.getHighScoreMaze() == 42, "Maze high score preserved across generations");
+  CHECK(pet.getOverallHealth() > 70, "Health restored on rebirth");
+
+  // Second rebirth
+  pet.triggerDeath(DEATH_COLD);
+  pet.rebirth();
+  CHECK(pet.getGeneration() == 3, "Generation incremented to 3");
+
+  // 5. Test automatic death triggers via sustained decay
+  PetLogic dyingPet;
+  dyingPet.setVitals(0, 50, 50, 50, 50); // 0% hunger
+  // Simulate sustained starvation (12 intervals * 10000ms = 120s)
+  dyingPet.update(10000); // init decay
+  for (int i = 1; i <= 15; i++) {
+    dyingPet.update(10000 + i * 10000);
+  }
+  CHECK(!dyingPet.isAlive(), "Sustained starvation automatically triggers death");
+  CHECK(dyingPet.getDeathCause() == DEATH_HUNGER, "Death cause is hunger");
+
+  // 6. Test Serialization of Generation, Alive, and DeathCause
+  char buf[256];
+  StoragePet::serializeState(buf, sizeof(buf), dyingPet);
+  CHECK(strstr(buf, "GEN=1") != NULL, "Serialized text contains GEN=1");
+  CHECK(strstr(buf, "ALIVE=0") != NULL, "Serialized text contains ALIVE=0");
+  CHECK(strstr(buf, "DEATH=1") != NULL, "Serialized text contains DEATH=1 (HUNGER)");
+
+  float h, w, e, hap, d;
+  bool asleep;
+  PetStage stage;
+  PetOutfit outfit;
+  uint16_t pong, maze, gen;
+  uint32_t age;
+  bool alive;
+  DeathCause dc;
+  bool ok = StoragePet::deserializeState(buf, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age, gen, alive, dc);
+  CHECK(ok, "Deserializes full state with generation and death status");
+  CHECK(gen == 1, "Deserialized generation is 1");
+  CHECK(!alive, "Deserialized alive is false");
+  CHECK(dc == DEATH_HUNGER, "Deserialized death cause is DEATH_HUNGER");
+
+  // 7. Test Memorial Chronicle (grave.txt) record string formatting
+  char graveRecord[220];
+  snprintf(graveRecord, sizeof(graveRecord),
+           "GEN %u | Alder: %lu min | Doed: %s | Pong: %u | Labyrint: %u sek | \"%s\"\n",
+           (unsigned int)dyingPet.getGeneration(),
+           (unsigned long)dyingPet.getAgeMinutes(),
+           dyingPet.getDeathCauseName(),
+           (unsigned int)dyingPet.getHighScorePong(),
+           (unsigned int)dyingPet.getHighScoreMaze(),
+           dyingPet.getDeathEpitaph());
+  CHECK(strstr(graveRecord, "GEN 1 |") != NULL, "Grave record has GEN 1");
+  CHECK(strstr(graveRecord, "Doed: Doede af sult") != NULL, "Grave record has cause");
+  CHECK(strstr(graveRecord, "Maven rumlede til sidst...") != NULL, "Grave record has epitaph");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -1102,6 +1208,7 @@ int main() {
   testPetWardrobeAndThermoregulation();
   testSoloPongLogic();
   testMarbleMazeLogic();
+  testPetDeathAndRebirth();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

@@ -28,7 +28,8 @@ UiPetRenderer::UiPetRenderer()
     lastOutfit(OUTFIT_DEFAULT),
     lastWeather(SKY_DAY_SUNNY),
     stageInitialized(false),
-    lastBlinking(false) {}
+    lastBlinking(false),
+    lastPromptBlink(false) {}
 
 void UiPetRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
@@ -64,6 +65,9 @@ LumiExpression UiPetRenderer::determineExpression(const PetLogic& pet) {
 }
 
 SkyWeatherMode UiPetRenderer::determineSkyWeather(const PetLogic& pet, LumiExpression expr) {
+  if (expr == EXPR_DEAD) {
+    return SKY_NIGHT_STARRY;
+  }
   if (expr == EXPR_SLEEPING || pet.isSleeping()) {
     return SKY_NIGHT_STARRY;
   }
@@ -187,7 +191,7 @@ void UiPetRenderer::updateSkyWeather(SkyWeatherMode weather, int phase, uint16_t
   }
 }
 
-void UiPetRenderer::drawForestStage(SkyWeatherMode weather) {
+void UiPetRenderer::drawForestStage(SkyWeatherMode weather, bool isDead) {
   if (carrier == nullptr) return;
 
   // Use exact native screen background color (8, 12, 26) so there is NO square box behind Lumi!
@@ -206,9 +210,34 @@ void UiPetRenderer::drawForestStage(SkyWeatherMode weather) {
   carrier->display.fillRoundRect(58, 153, 124, 6, 3, mossTop);
   carrier->display.drawFastHLine(66, 153, 108, mossEdge);
 
-  // Soft ground shadow directly beneath Lumi (anchors 2.5D depth)
-  uint16_t dropShadow = color565(12, 42, 30);
-  carrier->display.fillRoundRect(96, 154, 48, 5, 2, dropShadow);
+  if (isDead) {
+    // Cenotaph / Memorial Gravestone in center of glade (X = 106..134, Y = 126..154)
+    uint16_t stoneBase   = color565(75, 85, 100);
+    uint16_t stoneShadow = color565(45, 52, 65);
+    uint16_t stoneEdge   = color565(115, 130, 150);
+    uint16_t leafCarve   = color565(50, 60, 75);
+    uint16_t leafTint    = color565(85, 150, 115);
+
+    // Stone stele with rounded arch top
+    carrier->display.fillRoundRect(106, 126, 28, 28, 5, stoneBase);
+    carrier->display.drawRoundRect(106, 126, 28, 28, 5, stoneEdge);
+    carrier->display.drawFastHLine(104, 153, 32, stoneShadow);
+
+    // Carved Kokiri leaf engraving on stone
+    carrier->display.drawLine(120, 133, 120, 143, leafCarve);
+    carrier->display.fillCircle(120, 137, 3, leafCarve);
+    carrier->display.drawPixel(120, 137, leafTint);
+    carrier->display.drawLine(118, 139, 120, 136, leafTint);
+    carrier->display.drawLine(122, 139, 120, 136, leafTint);
+
+    // Ground moss creeps onto stone base
+    carrier->display.drawFastHLine(107, 152, 6, color565(56, 148, 86));
+    carrier->display.drawFastHLine(125, 152, 7, color565(56, 148, 86));
+  } else {
+    // Soft ground shadow directly beneath Lumi (anchors 2.5D depth)
+    uint16_t dropShadow = color565(12, 42, 30);
+    carrier->display.fillRoundRect(96, 154, 48, 5, 2, dropShadow);
+  }
 
   // Left flora: Glowing Kokiri Magic Mushroom (X = 63..75, Y = 143..154)
   uint16_t stemCream   = color565(235, 230, 210);
@@ -263,6 +292,84 @@ void UiPetRenderer::drawMoodBanner(const char* moodText, LumiExpression expr) {
   if (textX < 52) textX = 52;
   carrier->display.setCursor(textX, 179);
   carrier->display.print(moodText);
+}
+
+void UiPetRenderer::drawMemorialCard(const PetLogic& pet, unsigned long nowMs, bool force) {
+  if (carrier == nullptr) return;
+
+  uint16_t cardBg     = color565(12, 18, 34);
+  uint16_t cardBorder = color565(55, 85, 125);
+  uint16_t goldColor  = color565(255, 215, 70);
+  uint16_t coralColor = color565(255, 125, 115);
+  uint16_t textDim    = color565(180, 205, 225);
+  uint16_t statColor  = color565(110, 150, 195);
+
+  if (force) {
+    carrier->display.fillRoundRect(33, 160, 174, 64, 7, cardBg);
+    carrier->display.drawRoundRect(33, 160, 174, 64, 7, cardBorder);
+
+    carrier->display.setTextSize(1);
+
+    // Line 1: * LUMI HVILER * (GEN X)
+    char titleBuf[32];
+    snprintf(titleBuf, sizeof(titleBuf), "* LUMI HVILER * (GEN %u)", (unsigned int)pet.getGeneration());
+    int tLen = (int)strlen(titleBuf);
+    int tX = 120 - (tLen * 3);
+    if (tX < 36) tX = 36;
+    carrier->display.setTextColor(goldColor);
+    carrier->display.setCursor(tX, 164);
+    carrier->display.print(titleBuf);
+
+    // Line 2: Cause of death
+    const char* causeStr = pet.getDeathCauseName();
+    int cLen = (int)strlen(causeStr);
+    int cX = 120 - (cLen * 3);
+    if (cX < 36) cX = 36;
+    carrier->display.setTextColor(coralColor);
+    carrier->display.setCursor(cX, 174);
+    carrier->display.print(causeStr);
+
+    // Line 3: Epitaph quote
+    const char* epitaph = pet.getDeathEpitaph();
+    char epBuf[36];
+    snprintf(epBuf, sizeof(epBuf), "\"%s\"", epitaph);
+    int epLen = (int)strlen(epBuf);
+    int epX = 120 - (epLen * 3);
+    if (epX < 36) epX = 36;
+    carrier->display.setTextColor(textDim);
+    carrier->display.setCursor(epX, 184);
+    carrier->display.print(epBuf);
+
+    // Line 4: Alder & record stats
+    char statBuf[36];
+    uint16_t bestScore = pet.getHighScorePong();
+    if (pet.getHighScoreMaze() > 0 && (bestScore == 0 || pet.getHighScoreMaze() < bestScore)) {
+      snprintf(statBuf, sizeof(statBuf), "Alder: %lums | Lab: %us", (unsigned long)pet.getAgeMinutes(), (unsigned int)pet.getHighScoreMaze());
+    } else {
+      snprintf(statBuf, sizeof(statBuf), "Alder: %lumin | Pong: %u", (unsigned long)pet.getAgeMinutes(), (unsigned int)bestScore);
+    }
+    int sLen = (int)strlen(statBuf);
+    int sX = 120 - (sLen * 3);
+    if (sX < 36) sX = 36;
+    carrier->display.setTextColor(statColor);
+    carrier->display.setCursor(sX, 195);
+    carrier->display.print(statBuf);
+  }
+
+  // Line 5: Blinking prompt [OK] FOR NYT AEG (500 ms toggle)
+  bool promptBlink = ((nowMs / 500) % 2 == 0);
+  if (force || promptBlink != lastPromptBlink) {
+    carrier->display.fillRect(38, 207, 164, 12, cardBg);
+    carrier->display.setTextSize(1);
+    carrier->display.setCursor(72, 209);
+    if (promptBlink) {
+      carrier->display.setTextColor(color565(60, 240, 150)); // Bright emerald
+    } else {
+      carrier->display.setTextColor(color565(25, 75, 45));   // Dim green
+    }
+    carrier->display.print("[OK] FOR NYT AEG");
+    lastPromptBlink = promptBlink;
+  }
 }
 
 void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int newCy, uint16_t bgColor) {
@@ -511,8 +618,13 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
       break;
     }
 
-    case EXPR_CONTENT:
     case EXPR_DEAD:
+      // Peaceful resting smile
+      carrier->display.drawLine(cx - 3, mouthY + 1, cx, mouthY + 2, mouthDark);
+      carrier->display.drawLine(cx, mouthY + 2, cx + 3, mouthY + 1, mouthDark);
+      break;
+
+    case EXPR_CONTENT:
       if (stage == STAGE_TEEN) {
         // Teen: totally swag confident smirk tilted to the right!
         carrier->display.drawLine(cx - 3, mouthY + 1, cx, mouthY + 2, mouthDark);
@@ -635,6 +747,10 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   if (expr == EXPR_DEAD) {
     // Golden Spirit Halo above head
     carrier->display.drawRoundRect(cx - 10, cy - 29, 20, 5, 2, color565(255, 235, 90));
+    // Tiny ethereal spirit sprout leaf
+    carrier->display.fillRect(cx - 1, cy - 24, 2, 4, stemGreen);
+    carrier->display.fillCircle(cx + 2, cy - 25, 3, leafEmerald);
+    carrier->display.drawPixel(cx + 2, cy - 26, leafHighlight);
   } else if (outfit == OUTFIT_WINTER) {
     // =============================================================
     // WINTER WARDROBE: Stage-adapted winter headgear & beanies
@@ -815,7 +931,13 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   }
 
   // 2. Expressive Forest Spirit Ears
-  if (stage == STAGE_BABY) {
+  if (expr == EXPR_DEAD) {
+    // Unified gentle ethereal spirit ears
+    carrier->display.fillCircle(cx - 17, cy - 11, 4, bodyOutline);
+    carrier->display.fillCircle(cx - 17, cy - 11, 3, bodyMain);
+    carrier->display.fillCircle(cx + 17, cy - 11, 4, bodyOutline);
+    carrier->display.fillCircle(cx + 17, cy - 11, 3, bodyMain);
+  } else if (stage == STAGE_BABY) {
     // Baby stage: Cute tiny rounded nub ears
     carrier->display.fillCircle(cx - 17, cy - 11, 4, bodyOutline);
     carrier->display.fillCircle(cx - 17, cy - 11, 3, bodyMain);
@@ -844,8 +966,13 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillTriangle(cx + 19, cy - 13, cx + 22, cy + earTipOffsetY + 4, cx + 13, cy - 16, earInner);
   }
 
-  // 3. Cute Stubby Feet resting on the mossy forest glade
-  if (stage == STAGE_BABY) {
+  // 3. Feet or floating ghost tail wisps
+  if (expr == EXPR_DEAD) {
+    // Soft floating spirit wisps
+    carrier->display.fillCircle(cx - 7, cy + 14, 3, footColor);
+    carrier->display.fillCircle(cx + 7, cy + 14, 3, footColor);
+    carrier->display.fillCircle(cx, cy + 16, 2, footColor);
+  } else if (stage == STAGE_BABY) {
     // Tiny baby button paws
     carrier->display.fillCircle(cx - 10, cy + 16, 4, footColor);
     carrier->display.fillCircle(cx + 10, cy + 16, 4, footColor);
@@ -855,7 +982,14 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   }
 
   // 4. 2.5D Chubby Mochi Body (Hunched and compressed when FREEZING)
-  if (stage == STAGE_BABY) {
+  if (expr == EXPR_DEAD) {
+    // Unified ethereal ghost body with glowing white belly
+    carrier->display.fillRoundRect(cx - 20, cy - 18, 40, 34, 14, bodyOutline);
+    carrier->display.fillRoundRect(cx - 18, cy - 16, 36, 30, 12, bodyShade);
+    carrier->display.fillRoundRect(cx - 18, cy - 16, 36, 27, 11, bodyMain);
+    carrier->display.fillRoundRect(cx - 10, cy - 14, 8,  3,  1,  0xFFFF);
+    carrier->display.fillRoundRect(cx - 11, cy + 5,  22, 8,  4,  bellyPatch);
+  } else if (stage == STAGE_BABY) {
     if (expr == EXPR_FREEZING) {
       // Baby huddles into a tighter shivering egg (36x30 px instead of 38x34 px)
       carrier->display.fillRoundRect(cx - 18, cy - 14, 36, 30, 13, bodyOutline);
@@ -1378,7 +1512,12 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   int dx = 0;
   int dy = 0;
 
-  if (expr == EXPR_FREEZING) {
+  if (expr == EXPR_DEAD) {
+    // Ethereal gentle vertical hover oscillation above cenotaph
+    const int ghostHover[4] = {0, -1, -2, -1};
+    dy = ghostHover[(nowMs / 280) % 4];
+    dx = 0;
+  } else if (expr == EXPR_FREEZING) {
     // 4-phase micro-tremor spasm (~22 Hz): asymmetric involuntary shivering + hunched posture (+1..+2 px)
     const int shiverX[4] = {-2, 1, -1, 2};
     const int shiverY[4] = {2, 1, 2, 1}; // hunched down tight
@@ -1397,17 +1536,17 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     // Joyful Nintendo bounce rhythm
     const int happyHop[4] = {0, -2, -3, -1};
     dy = happyHop[(nowMs / 240) % 4];
-  } else if (expr != EXPR_DEAD) {
+  } else {
     // Gentle organic idle breathing
     const int idleBreath[4] = {0, -1, -2, -1};
     dy = idleBreath[(nowMs / 340) % 4];
   }
 
   int targetCx = LUMI_BASE_CX + dx;
-  int targetCy = LUMI_BASE_CY + dy;
+  int targetCy = (expr == EXPR_DEAD) ? (98 + dy) : (LUMI_BASE_CY + dy);
 
-  // Natural eye blink: 140 ms blink every 3.2 seconds
-  bool isBlinking = (!isNight) && ((nowMs % 3200) < 140);
+  // Natural eye blink: 140 ms blink every 3.2 seconds (never when dead or sleeping)
+  bool isBlinking = (!isNight && expr != EXPR_DEAD) && ((nowMs % 3200) < 140);
 
   // Fairies gentle floating orbits
   const int naviDx[4] = {0, 2, 0, -2};
@@ -1424,15 +1563,32 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   bool weatherChanged = (weather != lastWeather);
   bool stageChanged   = (stage != lastStage);
   bool outfitChanged  = (outfit != lastOutfit);
-  if (forceRedraw || !stageInitialized || weatherChanged || stageChanged || outfitChanged) {
-    drawForestStage(weather);
+  bool deathChanged   = ((expr == EXPR_DEAD) != (lastExpression == EXPR_DEAD));
+  if (forceRedraw || !stageInitialized || weatherChanged || stageChanged || outfitChanged || deathChanged) {
+    if (expr == EXPR_DEAD) {
+      // Clear top menu area for peaceful memorial starry sky
+      carrier->display.fillRect(38, 14, 164, 50, nativeBg);
+      carrier->display.setTextSize(1);
+      carrier->display.setTextColor(color565(120, 150, 200));
+      carrier->display.setCursor(74, 32);
+      carrier->display.print("* I EVIG HVILE *");
+      carrier->display.drawPixel(54, 25, color565(180, 220, 255));
+      carrier->display.drawPixel(186, 28, color565(180, 220, 255));
+      carrier->display.drawFastHLine(44, 66, 152, color565(35, 50, 80));
+    }
+    drawForestStage(weather, (expr == EXPR_DEAD));
     updateSkyWeather(weather, overlayPhase, nativeBg, true);
     drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, outfit, nativeBg);
     updateFairies(targetNaviX, targetNaviY, targetSmallY, isNight, nativeBg, true);
     updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, expr, overlayPhase, nativeBg, true);
 
-    const char* mood = pet.getMoodStatusDanish();
-    drawMoodBanner(mood, expr);
+    if (expr == EXPR_DEAD) {
+      drawMemorialCard(pet, nowMs, true);
+    } else {
+      const char* mood = pet.getMoodStatusDanish();
+      drawMoodBanner(mood, expr);
+      lastMoodText = mood;
+    }
 
     lastDrawnCx      = targetCx;
     lastDrawnCy      = targetCy;
@@ -1442,14 +1598,15 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     lastOutfit       = outfit;
     lastWeather      = weather;
     lastZzzPhase     = overlayPhase;
-    lastMoodText     = mood;
     stageInitialized = true;
     return;
   }
 
   // 3. Delta-update Lumi (zero-flicker partial redraw)
   if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression || outfit != lastOutfit) {
-    if (expr != lastExpression || outfit != lastOutfit) {
+    if (expr == EXPR_DEAD) {
+      carrier->display.fillRect(lastDrawnCx - 26, lastDrawnCy - 32, 52, 54, nativeBg);
+    } else if (expr != lastExpression || outfit != lastOutfit) {
       // Expression or outfit changed: clear full character bounds (paws, ears, horns, briefcase, halo, beanie, scarf)
       carrier->display.fillRect(lastDrawnCx - 31, lastDrawnCy - 35, 65, 57, nativeBg);
       carrier->display.fillRoundRect(96, 154, 48, 5, 2, color565(12, 42, 30)); // drop shadow
@@ -1482,11 +1639,15 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   lastZzzPhase = overlayPhase;
   lastWeather  = weather;
 
-  // 5. Delta-update Danish mood banner if status text changed
-  const char* currentMood = pet.getMoodStatusDanish();
-  if (currentMood != lastMoodText) {
-    drawMoodBanner(currentMood, expr);
-    lastMoodText = currentMood;
+  // 5. Delta-update Danish mood banner or memorial card prompt
+  if (expr == EXPR_DEAD) {
+    drawMemorialCard(pet, nowMs, false);
+  } else {
+    const char* currentMood = pet.getMoodStatusDanish();
+    if (currentMood != lastMoodText) {
+      drawMoodBanner(currentMood, expr);
+      lastMoodText = currentMood;
+    }
   }
 }
 

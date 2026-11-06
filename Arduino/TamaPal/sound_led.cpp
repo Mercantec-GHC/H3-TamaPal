@@ -54,6 +54,12 @@ void SoundLedController::playSound(SoundType sound) {
   } else if (sound == SOUND_GAMEOVER) {
     applyLedColor(255, 120, 0);      // Amber flash
     ledResetTimeMs = now + 400;
+  } else if (sound == SOUND_DEATH) {
+    applyLedColor(80, 20, 140);       // Somber violet fade
+    ledResetTimeMs = now + 600;
+  } else if (sound == SOUND_REBIRTH) {
+    applyLedColor(0, 255, 180);       // Brilliant emerald-gold flash
+    ledResetTimeMs = now + 500;
   }
 
   if (soundMuted) return;
@@ -91,6 +97,18 @@ void SoundLedController::playSound(SoundType sound) {
 
     case SOUND_GAMEOVER:
       carrier->Buzzer.sound(330);    // Low tone for game over
+      toneEndTimeMs = now + 250;
+      isBuzzerPlaying = true;
+      break;
+
+    case SOUND_DEATH:
+      carrier->Buzzer.sound(180);    // Low somber requiem drone
+      toneEndTimeMs = now + 400;
+      isBuzzerPlaying = true;
+      break;
+
+    case SOUND_REBIRTH:
+      carrier->Buzzer.sound(1975);   // High joyful B6 chime
       toneEndTimeMs = now + 250;
       isBuzzerPlaying = true;
       break;

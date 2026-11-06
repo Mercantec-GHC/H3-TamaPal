@@ -26,6 +26,10 @@ void PetLogic::reset() {
   currentStage = STAGE_BABY;     // Starts as cute egg baby
   currentOutfit = OUTFIT_DEFAULT; // Natural fur mode
   isAsleep = false;
+  alive = true;
+  deathCause = DEATH_NONE;
+  generation = 1;
+  criticalTicks = 0;
   decayInitialized = false;
   lastDecayTimeMs = 0;
   darkStartTimeMs = 0;
@@ -48,7 +52,7 @@ void PetLogic::setVitals(float hunger, float warmth, float energy, float happine
 }
 
 bool PetLogic::feed() {
-  if (isAsleep) return false;     // Cannot feed while sleeping
+  if (!alive || isAsleep) return false;     // Cannot feed while dead or sleeping
   if (hungerVal >= 100.0f) return false; // Already completely full
 
   hungerVal = clamp0100(hungerVal + PET_FEED_RESTORE);
@@ -57,7 +61,7 @@ bool PetLogic::feed() {
 }
 
 bool PetLogic::play() {
-  if (isAsleep) return false;    // Cannot play while sleeping
+  if (!alive || isAsleep) return false;    // Cannot play while dead or sleeping
   if (energyVal < 15.0f) return false; // Too exhausted to play
 
   happinessVal = clamp0100(happinessVal + PET_PLAY_RESTORE);
@@ -67,7 +71,7 @@ bool PetLogic::play() {
 }
 
 bool PetLogic::scold() {
-  if (isAsleep) return false;
+  if (!alive || isAsleep) return false; // Cannot scold while dead or sleeping
 
   disciplineVal = clamp0100(disciplineVal + PET_SCOLD_RESTORE);
   happinessVal = clamp0100(happinessVal - 10.0f);
@@ -178,6 +182,8 @@ void PetLogic::setAmbientLight(int lux, unsigned long nowMs) {
 }
 
 void PetLogic::update(unsigned long currentTimeMs) {
+  if (!alive) return; // Simulation stops if Lumi is deceased
+
   if (!decayInitialized) {
     lastDecayTimeMs = currentTimeMs;
     decayInitialized = true;
@@ -209,6 +215,44 @@ void PetLogic::update(unsigned long currentTimeMs) {
       if (isOverheating()) {
         happinessVal = clamp0100(happinessVal - (1.5f * intervals));
       }
+    }
+
+    // Check critical death conditions (after sustained neglected status)
+    if (hungerVal <= 0.0f) {
+      criticalTicks += (uint8_t)elapsedIntervals;
+      if (criticalTicks >= 12) { // ~2 minutes of absolute 0% hunger
+        triggerDeath(DEATH_HUNGER);
+        return;
+      }
+    } else if (warmthVal <= 0.0f) {
+      criticalTicks += (uint8_t)elapsedIntervals;
+      if (criticalTicks >= 12) { // ~2 minutes of absolute 0% warmth in freezing cold
+        triggerDeath(DEATH_COLD);
+        return;
+      }
+    } else if (isOverheating() && warmthVal >= 90.0f && happinessVal <= 0.0f) {
+      criticalTicks += (uint8_t)elapsedIntervals;
+      if (criticalTicks >= 12) { // ~2 minutes of severe heat exhaustion
+        triggerDeath(DEATH_HEAT);
+        return;
+      }
+    } else if (happinessVal <= 0.0f && energyVal < 20.0f) {
+      criticalTicks += (uint8_t)elapsedIntervals;
+      if (criticalTicks >= 18) { // ~3 minutes of absolute boredom / depression
+        triggerDeath(DEATH_BOREDOM);
+        return;
+      }
+    } else if (energyVal <= 0.0f && hungerVal < 20.0f) {
+      criticalTicks += (uint8_t)elapsedIntervals;
+      if (criticalTicks >= 12) { // ~2 minutes of complete exhaustion
+        triggerDeath(DEATH_EXHAUSTION);
+        return;
+      }
+    } else if (currentStage == STAGE_OLD && ageMinutes >= 120) {
+      triggerDeath(DEATH_OLD_AGE); // Peaceful old age death
+      return;
+    } else {
+      criticalTicks = 0;
     }
   }
 }
@@ -278,7 +322,73 @@ const char* PetLogic::getMoodStatusDanish() const {
 }
 
 bool PetLogic::isAlive() const {
-  return getOverallHealth() > 0;
+  return alive && (getOverallHealth() > 0);
+}
+
+DeathCause PetLogic::getDeathCause() const {
+  if (deathCause == DEATH_NONE && getOverallHealth() == 0) {
+    return DEATH_HUNGER;
+  }
+  return deathCause;
+}
+
+uint16_t PetLogic::getGeneration() const {
+  return generation;
+}
+
+void PetLogic::setGeneration(uint16_t gen) {
+  generation = (gen == 0) ? 1 : gen;
+}
+
+const char* PetLogic::getDeathCauseName() const {
+  switch (deathCause) {
+    case DEATH_HUNGER:     return "Doede af sult";
+    case DEATH_COLD:       return "Froes ihjel";
+    case DEATH_HEAT:       return "Doede af hedeslag";
+    case DEATH_BOREDOM:    return "Doede af ensomhed";
+    case DEATH_EXHAUSTION: return "Doede af udmattelse";
+    case DEATH_OLD_AGE:    return "Doede af alderdom";
+    default:               return "Ukendt aarsag";
+  }
+}
+
+const char* PetLogic::getDeathEpitaph() const {
+  switch (deathCause) {
+    case DEATH_HUNGER:
+      return "Maven rumlede til sidst...";
+    case DEATH_COLD:
+      return "Vinteren var for haard...";
+    case DEATH_HEAT:
+      return "Smeltede i pejsens varme!";
+    case DEATH_BOREDOM:
+      return "Hjertet visnede af savn.";
+    case DEATH_EXHAUSTION:
+      return "Fik aldrig sovet ud...";
+    case DEATH_OLD_AGE:
+      if (happinessVal >= 60.0f) {
+        return "Levede et lykkeligt liv!";
+      } else {
+        return "Doede i en skoenheds arme!";
+      }
+    default:
+      return "Lumi sover i skovens dyb.";
+  }
+}
+
+void PetLogic::triggerDeath(DeathCause cause) {
+  alive = false;
+  deathCause = cause;
+  isAsleep = false;
+}
+
+void PetLogic::rebirth() {
+  uint16_t nextGen = generation + 1;
+  uint16_t keepPong = highScorePong;
+  uint16_t keepMaze = highScoreMaze;
+  reset();
+  generation = nextGen;
+  highScorePong = keepPong;
+  highScoreMaze = keepMaze;
 }
 
 const char* PetLogic::getStage() const {

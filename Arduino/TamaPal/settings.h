@@ -125,7 +125,9 @@ enum SoundType : uint8_t {
   SOUND_BACK,              // Low tone when returning back
   SOUND_HIT,               // High ping when hitting ball in Pong (1200 Hz, 80 ms)
   SOUND_MISS,              // Low buzz when missing ball (220 Hz, 150 ms)
-  SOUND_GAMEOVER           // 3-note descending game over jingle
+  SOUND_GAMEOVER,          // 3-note descending game over jingle
+  SOUND_DEATH,             // Somber descending requiem tone
+  SOUND_REBIRTH            // Joyful ascending rebirth fanfare
 };
 
 // Events received from backend over MQTT (tamapal/opla-1/event)
@@ -183,6 +185,19 @@ enum PetStage : uint8_t {
 enum PetOutfit : uint8_t {
   OUTFIT_DEFAULT = 0, // Natural mochi look (summer / standard)
   OUTFIT_WINTER  = 1  // Winter beanie with pompom + cozy warm scarf
+};
+
+// ============================================================================
+// CAUSES OF DEATH (Dødsårsager & Livscyklus)
+// ============================================================================
+enum DeathCause : uint8_t {
+  DEATH_NONE = 0,
+  DEATH_HUNGER,     // Døde af sult (0% sult i lang tid)
+  DEATH_COLD,       // Frøs ihjel (0% varme i iskold rum)
+  DEATH_HEAT,       // Døde af hedeslag (overophedet i vintertøj ved pejs)
+  DEATH_BOREDOM,    // Døde af ensomhed (0% glæde, ingen leg)
+  DEATH_EXHAUSTION, // Døde af udmattelse (0% energi, aldrig sovet)
+  DEATH_OLD_AGE     // Døde af alderdom (Old-stadie, mæt af dage)
 };
 
 #endif // SETTINGS_H

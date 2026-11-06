@@ -339,6 +339,38 @@ void loop() {
       menuLogic.openMazeGame();
       soundLed.playSound(SOUND_CONFIRM);
       Serial.println(F("[SPIL] Starter Marmor-Labyrint direkte via Serial Monitor!"));
+    } else if (c == 'k' || c == 'K') {
+      // Demo death cycle (1..6) for teacher/exam presentation
+      static uint8_t demoCause = 1;
+      DeathCause cause = (DeathCause)demoCause;
+      petLogic.triggerDeath(cause);
+      soundLed.playSound(SOUND_DEATH);
+      storagePet.logGraveRecord(petLogic);
+      storagePet.savePet(petLogic);
+      Serial.print(F("[LIVSCYKLUS] Lumi er doed! Aarsag: "));
+      Serial.print(petLogic.getDeathCauseName());
+      Serial.print(F(" - "));
+      Serial.println(petLogic.getDeathEpitaph());
+      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+        uiPet.updateHomeDisplay(petLogic, now, true);
+      }
+      syncPetStateToBackend(true);
+      demoCause = (demoCause % 6) + 1; // Cycle next death cause (1..6)
+    } else if (c == 'r' || c == 'R') {
+      if (!petLogic.isAlive()) {
+        soundLed.playSound(SOUND_REBIRTH);
+        storagePet.logGraveRecord(petLogic);
+        petLogic.rebirth();
+        storagePet.savePet(petLogic);
+        Serial.print(F("[LIVSCYKLUS] Rebirth via Serial! Ny generation: "));
+        Serial.println((unsigned int)petLogic.getGeneration());
+        if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+          uiMenu.drawInitialScreen();
+          uiMenu.drawMenuBar(menuLogic, true);
+          uiPet.updateHomeDisplay(petLogic, now, true);
+        }
+        syncPetStateToBackend(true);
+      }
     }
   }
 
@@ -504,7 +536,24 @@ void loop() {
     // Normal menu screens (HOME, STATS, ACTION):
     bool inAnyCombo = (touch0 && touch4) || (touch0 && touch1) || combo04Fired || combo01Fired || touch3HoldFired;
 
-    if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
+    if (currentScreen == SCREEN_HOME && !petLogic.isAlive()) {
+      // While Lumi is a ghost/cenotaph, only TOUCH2 triggers Rebirth!
+      if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
+        if (carrier.Buttons.onTouchDown(TOUCH2)) {
+          soundLed.playSound(SOUND_REBIRTH);
+          storagePet.logGraveRecord(petLogic);
+          petLogic.rebirth();
+          storagePet.savePet(petLogic);
+          syncPetStateToBackend(true);
+          Serial.print(F("[LIVSCYKLUS] Lumi genfoedt! Ny generation: "));
+          Serial.println((unsigned int)petLogic.getGeneration());
+          uiMenu.drawInitialScreen();
+          uiMenu.drawMenuBar(menuLogic, true);
+          uiPet.updateHomeDisplay(petLogic, now, true);
+          lastTouchTimeMs = now;
+        }
+      }
+    } else if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
       if (!touch4 && carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.onButtonPrev(); // Previous icon (<)
         lastTouchTimeMs = now;
@@ -545,9 +594,24 @@ void loop() {
   }
 
   // 3. LOGIC LAYER: Advance animations and countdown timers
+  bool wasAlive = petLogic.isAlive();
   menuLogic.update(now);
   petLogic.update(now);
   soundLed.update(now);
+
+  if (wasAlive && !petLogic.isAlive()) {
+    soundLed.playSound(SOUND_DEATH);
+    storagePet.logGraveRecord(petLogic);
+    storagePet.savePet(petLogic);
+    Serial.print(F("[LIVSCYKLUS] Lumi er doed! Aarsag: "));
+    Serial.print(petLogic.getDeathCauseName());
+    Serial.print(F(" - "));
+    Serial.println(petLogic.getDeathEpitaph());
+    if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+      uiPet.updateHomeDisplay(petLogic, now, true);
+    }
+    syncPetStateToBackend(true);
+  }
 
   currentScreen = menuLogic.getActiveScreen();
 
@@ -762,10 +826,12 @@ void loop() {
     // Real-time stats dashboard update (dirty updates only when values decay or change)
     uiStats.updateDisplay(petLogic, false);
   } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU) {
-    // Normal menu modes (HOME, ACTION): update sliding top menu bar
-    uiMenu.drawMenuBar(menuLogic, false);
+    // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME)
+    if (petLogic.isAlive() || currentScreen != SCREEN_HOME) {
+      uiMenu.drawMenuBar(menuLogic, false);
+    }
 
-    // Real-time 2.5D Lumi character animation on HOME screen (breathing, blinking, Navi, shivering)
+    // Real-time 2.5D Lumi character animation on HOME screen (breathing, blinking, Navi, shivering, ghost cenotaph)
     if (currentScreen == SCREEN_HOME && muteMessageEndTimeMs == 0) {
       uiPet.updateHomeDisplay(petLogic, now, false);
     }

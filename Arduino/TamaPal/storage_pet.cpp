@@ -56,7 +56,7 @@ uint32_t StoragePet::getLastSavedHash() const {
 void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pet) {
   if (buffer == nullptr || bufSize == 0) return;
   snprintf(buffer, bufSize,
-           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\nPONG=%u\nMAZE=%u\nAGE=%lu\n",
+           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\nPONG=%u\nMAZE=%u\nAGE=%lu\nGEN=%u\nALIVE=%d\nDEATH=%d\n",
            pet.getHunger(),
            pet.getWarmth(),
            pet.getEnergy(),
@@ -67,7 +67,10 @@ void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pe
            (int)pet.getOutfitEnum(),
            (unsigned int)pet.getHighScorePong(),
            (unsigned int)pet.getHighScoreMaze(),
-           (unsigned long)pet.getAgeMinutes());
+           (unsigned long)pet.getAgeMinutes(),
+           (unsigned int)pet.getGeneration(),
+           pet.isAlive() ? 1 : 0,
+           (int)pet.getDeathCause());
 }
 
 bool StoragePet::deserializeState(const char* text,
@@ -120,7 +123,10 @@ bool StoragePet::deserializeState(const char* text,
                                  PetOutfit& outfit,
                                  uint16_t& pong,
                                  uint16_t& maze,
-                                 uint32_t& age) {
+                                 uint32_t& age,
+                                 uint16_t& generation,
+                                 bool& alive,
+                                 DeathCause& deathCause) {
   if (text == nullptr || text[0] == '\0') return false;
 
   int h = -1, w = -1, e = -1, hap = -1, d = -1, s = -1;
@@ -129,6 +135,9 @@ bool StoragePet::deserializeState(const char* text,
   int pVal = 0;
   int mVal = 0;
   long aVal = 0;
+  int gVal = 1;
+  int alVal = 1;
+  int dcVal = 0;
   const char* p = text;
 
   // Robust line-by-line parser supporting arbitrary line order
@@ -155,6 +164,12 @@ bool StoragePet::deserializeState(const char* text,
       mVal = atoi(p + 5);
     } else if (strncmp(p, "AGE=", 4) == 0) {
       aVal = atol(p + 4);
+    } else if (strncmp(p, "GEN=", 4) == 0) {
+      gVal = atoi(p + 4);
+    } else if (strncmp(p, "ALIVE=", 6) == 0) {
+      alVal = atoi(p + 6);
+    } else if (strncmp(p, "DEATH=", 6) == 0) {
+      dcVal = atoi(p + 6);
     }
 
     const char* nextLine = strchr(p, '\n');
@@ -171,7 +186,8 @@ bool StoragePet::deserializeState(const char* text,
       s < 0 || s > 1 ||
       st < 0 || st > 3 ||
       outf < 0 || outf > 1 ||
-      pVal < 0 || mVal < 0 || aVal < 0) {
+      pVal < 0 || mVal < 0 || aVal < 0 ||
+      gVal < 1 || alVal < 0 || alVal > 1 || dcVal < 0 || dcVal > 6) {
     return false;
   }
 
@@ -186,14 +202,35 @@ bool StoragePet::deserializeState(const char* text,
   pong = (uint16_t)pVal;
   maze = (uint16_t)mVal;
   age = (uint32_t)aVal;
+  generation = (uint16_t)gVal;
+  alive = (alVal == 1);
+  deathCause = (DeathCause)dcVal;
   return true;
+}
+
+bool StoragePet::deserializeState(const char* text,
+                                 float& hunger,
+                                 float& warmth,
+                                 float& energy,
+                                 float& happiness,
+                                 float& discipline,
+                                 bool& asleep,
+                                 PetStage& stage,
+                                 PetOutfit& outfit,
+                                 uint16_t& pong,
+                                 uint16_t& maze,
+                                 uint32_t& age) {
+  uint16_t gen = 1;
+  bool al = true;
+  DeathCause dc = DEATH_NONE;
+  return deserializeState(text, hunger, warmth, energy, happiness, discipline, asleep, stage, outfit, pong, maze, age, gen, al, dc);
 }
 
 bool StoragePet::savePet(const PetLogic& pet) {
 #if defined(ARDUINO)
   if (!cardInitialized) return false;
 
-  char buffer[160];
+  char buffer[256];
   serializeState(buffer, sizeof(buffer), pet);
 
   uint32_t currentHash = computeHash(buffer);
@@ -238,7 +275,7 @@ bool StoragePet::loadPet(PetLogic& pet) {
     return false;
   }
 
-  char buffer[160];
+  char buffer[256];
   int bytesRead = 0;
   while (file.available() && bytesRead < (int)(sizeof(buffer) - 1)) {
     buffer[bytesRead++] = (char)file.read();
@@ -253,7 +290,10 @@ bool StoragePet::loadPet(PetLogic& pet) {
   uint16_t pong = 0;
   uint16_t maze = 0;
   uint32_t age = 0;
-  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age)) {
+  uint16_t gen = 1;
+  bool alive = true;
+  DeathCause deathCause = DEATH_NONE;
+  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age, gen, alive, deathCause)) {
     pet.setVitals(h, w, e, hap, d);
     pet.setSleeping(asleep);
     pet.setStage(stage);
@@ -261,15 +301,21 @@ bool StoragePet::loadPet(PetLogic& pet) {
     pet.setHighScorePong(pong);
     pet.setHighScoreMaze(maze);
     pet.setAgeMinutes(age);
+    pet.setGeneration(gen);
+    if (!alive) {
+      pet.triggerDeath(deathCause);
+    }
     lastSavedHash = computeHash(buffer);
-    Serial.print(F("[STORAGE] SUCCES: Indlaeste Lumi fra MicroSD! Sult: "));
+    Serial.print(F("[STORAGE] SUCCES: Indlaeste Lumi fra MicroSD! GEN: "));
+    Serial.print((unsigned int)gen);
+    Serial.print(F(", Status: "));
+    Serial.print(alive ? F("Levende") : F("Doed"));
+    Serial.print(F(", Sult: "));
     Serial.print((int)h);
     Serial.print(F("%, Energi: "));
     Serial.print((int)e);
     Serial.print(F("%, Stadie: "));
     Serial.print(pet.getStage());
-    Serial.print(F(", Toej: "));
-    Serial.print(pet.getOutfit());
     Serial.print(F(", Alder: "));
     Serial.print((unsigned long)age);
     Serial.println(F(" min"));
@@ -278,6 +324,37 @@ bool StoragePet::loadPet(PetLogic& pet) {
     Serial.println(F("[STORAGE] ADVARSEL: lumi.txt data var ugyldig, starter forfra."));
     return false;
   }
+#else
+  (void)pet;
+  return false;
+#endif
+}
+
+bool StoragePet::logGraveRecord(const PetLogic& pet) {
+#if defined(ARDUINO)
+  if (!cardInitialized) return false;
+
+  File file = SD.open("grave.txt", FILE_WRITE);
+  if (!file) {
+    Serial.println(F("[STORAGE] FEJL: Kunne ikke aabne grave.txt til mindeskrift!"));
+    return false;
+  }
+
+  char record[220];
+  snprintf(record, sizeof(record),
+           "GEN %u | Alder: %lu min | Doed: %s | Pong: %u | Labyrint: %u sek | \"%s\"\n",
+           (unsigned int)pet.getGeneration(),
+           (unsigned long)pet.getAgeMinutes(),
+           pet.getDeathCauseName(),
+           (unsigned int)pet.getHighScorePong(),
+           (unsigned int)pet.getHighScoreMaze(),
+           pet.getDeathEpitaph());
+  file.print(record);
+  file.close();
+
+  Serial.print(F("[STORAGE] Mindeskrift tilfoejet til grave.txt for GEN "));
+  Serial.println((unsigned int)pet.getGeneration());
+  return true;
 #else
   (void)pet;
   return false;

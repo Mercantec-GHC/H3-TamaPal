@@ -74,9 +74,13 @@ private:
   SkyWeatherMode lastWeather;
   bool stageInitialized;
   bool lastBlinking;
+  bool lastPromptBlink;
 
-  // Draw seamless Kokiri forest glade platform and flora (no colored background box)
-  void drawForestStage(SkyWeatherMode weather);
+  // Draw seamless Kokiri forest glade platform and flora (cenotaph gravestone when dead)
+  void drawForestStage(SkyWeatherMode weather, bool isDead = false);
+
+  // Draw bottom memorial card when Lumi is deceased
+  void drawMemorialCard(const PetLogic& pet, unsigned long nowMs, bool force);
 
   // Draw animated sky weather (sun with ray dots, night stars, or winter snowflakes)
   void updateSkyWeather(SkyWeatherMode weather, int phase, uint16_t bgColor, bool force);
