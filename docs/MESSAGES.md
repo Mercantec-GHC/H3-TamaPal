@@ -656,6 +656,38 @@ Lumis **Voksen-stadie (Adult)** er nu fuldt implementeret med et stilet forretni
 * Tryk `s` i Serial Monitor (115200 baud) for at skifte til **Adult** (`[STAGE] Skiftet stadie til: adult`).
 * Test handlinger (Foder, Leg, Skæld ud) for at se kufferten og slipset animere sømløst uden flimmer.
 
+___
+
+### 🎩 Opdatering 6/11 (Formiddag): Gammel Lumi (Old / Vismand) med høj hat, guldbriller, overskæg og spadserestok
+**Branch:** `feature/arduino-stages`  
+**Ansvarlig:** Oleh
+
+Lumis fjerde og sidste livsstadie: **Den Gamle Vismand (Old)** er nu fuldt implementeret med masser af personlighed, visdom og retro-charme:
+
+#### Hvad er tilføjet:
+1. **Klassisk høj hat (gentleman top hat / vismandshat):**
+   - Mørk koksgrå cylinderhat (`#232837`) med bred buet skygge og lysstribe-highlight.
+   - Karminrødt silkebånd om bunden af hatten med et gyldent spænde i midten.
+   - En fjergrøn Kokiri-visdomsfjer stukket ind i hattebåndet.
+2. **Runde guldbriller og buskede hvide øjenbryn:**
+   - Fine runde trådbriller i guld med næsebro og lysglimt i brilleglasset over Lumis øjne.
+   - Buskede, bløde hvide øjenbryn ovenover brillerne, som giver et klogt og godmodigt professor-udtryk.
+3. **Hvidt mochi-overskæg og mildt smil:**
+   - Sødt hvidt overskæg under næsen, som følger med i alle udtryk og vejrtrækninger.
+   - Et mildt, tilfreds vismands-smil (`EXPR_CONTENT`).
+4. **Gylden lommeur-kæde:**
+   - Dobbeltbuede guldkæde tværs over Lumis mave med et lille rundt lommeur stukket ind i linningen.
+5. **Mahogni-spadserestok (walking cane):**
+   - Solid mahognistok med messing-dup, der støtter solidt på den mosbegroede platform.
+   - Buede gylden kryk-håndtag (crook handle) med lysglimt, som Lumi holder fast i med højre pote.
+   - **Interaktiv holdning:** Ved jubel (`SUPER_HAPPY` / `PLAYING`) løfter den gamle Lumi stokken muntert op i luften og vinker med den! Ved kulde (`FREEZING`) læner han sig rystende ind over stokken med begge poter.
+
+#### Komplet livscyklus på plads:
+Alle 4 livsstadier fra Game Design Doc er nu færdigudviklet:
+`Baby` (æg/sut) $\to$ `Teen` (swag/horn/DJ) $\to$ `Adult` (forretning/kuffert/slips) $\to$ `Old` (vismand/hat/briller/stok).  
+Skift frit imellem dem med `s` i Serial Monitor, og se MicroSD gemme og gendanne det automatisk!
+
+
 
 
 

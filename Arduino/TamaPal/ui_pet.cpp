@@ -400,8 +400,35 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
     }
   }
 
-  // 3. Render Mouth / Pacifier
+  // 2b. Spectacles & Bushy Eyebrows for OLD STAGE
+  if (stage == STAGE_OLD && expr != EXPR_DEAD) {
+    uint16_t glassesGold = color565(255, 215, 60);
+    uint16_t glassGlint  = color565(210, 245, 255);
+
+    // Fluffy wise white elder eyebrows
+    carrier->display.fillRoundRect(leftEyeX - 4, eyeY - 8, 9, 3, 1, 0xFFFF);
+    carrier->display.fillRoundRect(rightEyeX - 4, eyeY - 8, 9, 3, 1, 0xFFFF);
+
+    // Round golden wireframe spectacles
+    carrier->display.drawCircle(leftEyeX, eyeY - 1, 5, glassesGold);
+    carrier->display.drawCircle(rightEyeX, eyeY - 1, 5, glassesGold);
+    // Bridge connecting the round rims
+    carrier->display.drawFastHLine(cx - 3, eyeY - 2, 7, glassesGold);
+
+    // Subtle glint on upper lens edge
+    carrier->display.drawPixel(leftEyeX - 2, eyeY - 3, glassGlint);
+    carrier->display.drawPixel(rightEyeX - 2, eyeY - 3, glassGlint);
+  }
+
+  // 3. Render Mouth / Pacifier / Elder Mustache
   int mouthY = cy + 2;
+
+  // Cute white fluffy mochi mustache for OLD stage (visible across expressions)
+  if (stage == STAGE_OLD && expr != EXPR_DEAD) {
+    carrier->display.fillCircle(cx - 3, mouthY, 2, 0xFFFF);
+    carrier->display.fillCircle(cx + 3, mouthY, 2, 0xFFFF);
+    carrier->display.drawPixel(cx, mouthY - 1, color565(225, 230, 240));
+  }
 
   // If Baby is eating berry, show the berry eating action. Otherwise, Baby wears a cute pacifier/dummy!
   if (stage == STAGE_BABY && expr != EXPR_EATING && expr != EXPR_DEAD) {
@@ -456,6 +483,10 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
         carrier->display.drawLine(cx + 1, mouthY + 2, cx + 4, mouthY + 1, mouthDark);
         carrier->display.drawPixel(cx - 4, mouthY, mouthDark);
         carrier->display.drawPixel(cx + 4, mouthY, mouthDark);
+      } else if (stage == STAGE_OLD) {
+        // Old: gentle sage smile resting softly beneath mustache
+        carrier->display.drawLine(cx - 3, mouthY + 3, cx, mouthY + 4, mouthDark);
+        carrier->display.drawLine(cx, mouthY + 4, cx + 3, mouthY + 3, mouthDark);
       } else {
         // Classic Tamagotchi 'w' cat smile
         carrier->display.drawLine(cx - 4, mouthY, cx - 2, mouthY + 2, mouthDark);
@@ -584,8 +615,35 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillCircle(cx, cy - 27, 4, blossomGold);
     carrier->display.fillCircle(cx, cy - 27, 2, blossomAmber);
     carrier->display.drawPixel(cx - 1, cy - 28, 0xFFFF);
+  } else if (stage == STAGE_OLD) {
+    // -------------------------------------------------------------
+    // OLD STAGE: Distinguished Gentleman Top Hat / Sage Cap!
+    // -------------------------------------------------------------
+    uint16_t hatColor     = color565(35, 40, 55);    // Dark charcoal felt
+    uint16_t hatBrim      = color565(25, 28, 40);    // Deep rim
+    uint16_t hatRibbon    = color565(190, 45, 65);   // Crimson silk ribbon band
+    uint16_t hatGold      = color565(255, 215, 60);  // Gold buckle
+    uint16_t featherGreen = color565(65, 225, 105);  // Kokiri sage feather
+
+    // Crown cylinder (X = cx - 11..cx + 10, Y = cy - 35..cy - 24)
+    carrier->display.fillRoundRect(cx - 11, cy - 35, 22, 12, 2, hatColor);
+    carrier->display.drawFastVLine(cx - 9, cy - 34, 10, color565(60, 65, 85));
+
+    // Wide curved hat brim
+    carrier->display.fillRoundRect(cx - 16, cy - 24, 32, 4, 1, hatBrim);
+
+    // Crimson ribbon band around base
+    carrier->display.fillRect(cx - 11, cy - 26, 22, 3, hatRibbon);
+
+    // Little gold buckle in center
+    carrier->display.drawRect(cx - 2, cy - 27, 5, 5, hatGold);
+    carrier->display.drawPixel(cx, cy - 25, 0xFFFF);
+
+    // Kokiri sage feather tucked in ribbon
+    carrier->display.fillTriangle(cx + 7, cy - 26, cx + 12, cy - 33, cx + 9, cy - 27, featherGreen);
+    carrier->display.drawLine(cx + 8, cy - 26, cx + 11, cy - 31, leafHighlight);
   } else {
-    // Default / Old: Stem + Kokiri Leaves
+    // Fallback: Stem + Kokiri Leaves
     carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
     carrier->display.fillTriangle(cx - 1, cy - 25, cx - 10, cy - 31, cx - 7, cy - 23, leafEmerald);
     carrier->display.fillTriangle(cx + 1, cy - 25, cx + 10, cy - 31, cx + 7, cy - 23, leafEmerald);
@@ -670,6 +728,18 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     // Golden tie bar / clip
     carrier->display.drawFastHLine(cx - 2, cy + 7, 5, tieGoldClip);
     carrier->display.drawPixel(cx + 2, cy + 7, 0xFFFF);
+  }
+
+  // 4c. Golden Pocket Watch Chain for OLD stage
+  if (stage == STAGE_OLD && expr != EXPR_DEAD) {
+    uint16_t watchGold = color565(255, 215, 60);
+
+    // Draped gold chain across belly
+    carrier->display.drawLine(cx - 7, cy + 8, cx - 2, cy + 12, watchGold);
+    carrier->display.drawLine(cx - 2, cy + 12, cx + 4, cy + 10, watchGold);
+    // Little round gold pocket watch tucked into waist
+    carrier->display.fillCircle(cx + 6, cy + 10, 2, watchGold);
+    carrier->display.drawPixel(cx + 6, cy + 10, 0xFFFF);
   }
 
   // 5. Stubby Arms / Paws (Raised in celebration when super happy/playing/eating!)
@@ -768,6 +838,74 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
       // Right paw firmly gripping the handle
       carrier->display.fillRoundRect(caseX + 3, caseY - 2, 7, 4, 2, bodyOutline);
       carrier->display.fillRoundRect(caseX + 4, caseY - 1, 5, 2, 1, bodyMain);
+    }
+  } else if (stage == STAGE_OLD && expr != EXPR_DEAD) {
+    // -------------------------------------------------------------
+    // OLD STAGE: Right paw holding Wooden Walking Cane (spadserestok)!
+    // -------------------------------------------------------------
+    uint16_t caneWood = color565(155, 85, 40);   // Polished mahogany wood shaft
+    uint16_t caneDark = color565(85, 45, 20);    // Wood shadow
+    uint16_t caneGold = color565(255, 215, 60);  // Brass crook handle & ferrule
+
+    if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING || expr == EXPR_EATING) {
+      // Cheerful: Left paw raised high
+      carrier->display.fillRoundRect(cx - 27, cy - 7, 6, 8, 3, bodyOutline);
+      carrier->display.fillRoundRect(cx - 26, cy - 6, 4, 6, 2, bodyMain);
+
+      // Right paw waving walking cane merrily in the air!
+      int caneX = cx + 20;
+      int caneY = cy - 12;
+
+      // Wooden shaft
+      carrier->display.fillRect(caneX, caneY, 3, 17, caneWood);
+      carrier->display.drawFastVLine(caneX + 2, caneY, 17, caneDark);
+      carrier->display.fillRect(caneX, caneY + 15, 3, 2, caneGold);
+
+      // Curved brass crook handle
+      carrier->display.fillRoundRect(caneX - 4, caneY - 4, 8, 5, 2, caneGold);
+      carrier->display.fillRoundRect(caneX - 2, caneY - 2, 4, 3, 1, bgColor);
+
+      // Right paw holding cane shaft
+      carrier->display.fillRoundRect(caneX - 2, cy - 6, 6, 6, 2, bodyOutline);
+      carrier->display.fillRoundRect(caneX - 1, cy - 5, 4, 4, 1, bodyMain);
+
+    } else if (expr == EXPR_FREEZING) {
+      // Shivering: leaning both paws against cane close to body
+      int caneX = cx + 16;
+      int caneY = cy;
+
+      carrier->display.fillRect(caneX, caneY, 3, 21, caneWood);
+      carrier->display.fillRect(caneX, caneY + 19, 3, 2, caneGold);
+      carrier->display.fillRoundRect(caneX - 4, caneY - 4, 8, 5, 2, caneGold);
+      carrier->display.fillRoundRect(caneX - 2, caneY - 2, 4, 3, 1, bgColor);
+
+      carrier->display.fillRoundRect(cx - 20, cy + 2, 6, 6, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx + 14, cy + 2, 6, 6, 2, bodyOutline);
+
+    } else {
+      // Calm wise elder: Left paw relaxed at side
+      carrier->display.fillRoundRect(cx - 26, cy - 1, 5, 8, 2, bodyOutline);
+      carrier->display.fillRoundRect(cx - 25, cy,     3, 6, 1, bodyMain);
+
+      // Stately walking cane planted firmly on the moss glade
+      int caneX = cx + 21;
+      int caneY = cy + 1;
+
+      // Mahogany shaft down to ground (cy + 21)
+      carrier->display.fillRect(caneX, caneY, 3, 21, caneWood);
+      carrier->display.drawFastVLine(caneX + 2, caneY, 21, caneDark);
+
+      // Brass ferrule tip at ground
+      carrier->display.fillRect(caneX, cy + 20, 3, 2, caneGold);
+
+      // Polished brass crook handle
+      carrier->display.fillRoundRect(caneX - 5, caneY - 4, 9, 5, 2, caneGold);
+      carrier->display.fillRoundRect(caneX - 3, caneY - 2, 5, 3, 1, bgColor);
+      carrier->display.drawPixel(caneX - 3, caneY - 3, 0xFFFF); // gleam
+
+      // Right paw resting gently on top of cane crook
+      carrier->display.fillRoundRect(caneX - 4, caneY, 6, 5, 2, bodyOutline);
+      carrier->display.fillRoundRect(caneX - 3, caneY + 1, 4, 3, 1, bodyMain);
     }
   } else {
     if (expr == EXPR_SUPER_HAPPY || expr == EXPR_PLAYING || expr == EXPR_EATING) {
