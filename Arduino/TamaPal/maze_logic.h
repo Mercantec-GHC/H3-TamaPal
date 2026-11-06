@@ -31,6 +31,7 @@
 enum MazeState : uint8_t {
   MAZE_STATE_READY = 0,    // Generated, ready to start
   MAZE_STATE_PLAYING,      // Rolling ball under IMU control
+  MAZE_STATE_PAUSED,       // Paused
   MAZE_STATE_PITFALL_FALL, // Ball fell into a hole (short animation/pause)
   MAZE_STATE_VICTORY       // Reached exit portal
 };
@@ -51,6 +52,9 @@ public:
   // Update physical ball motion from IMU accelerometer tiltX, tiltY (-1.0f .. +1.0f)
   void setTilt(float tiltX, float tiltY);
 
+  // Pause / Resume game
+  void setPaused(bool paused, unsigned long currentMs);
+
   // Physics simulation step
   void update(unsigned long currentTimeMs);
 
@@ -63,7 +67,7 @@ public:
   float getBallVy() const;
   uint8_t getBerriesCollected() const;
   uint8_t getTotalBerries() const;
-  uint16_t getElapsedSeconds() const;
+  uint16_t getElapsedSeconds(unsigned long currentMs = 0) const;
   uint16_t getBestSeconds() const;
   bool isNewBestRecord() const;
 
@@ -90,6 +94,7 @@ private:
   unsigned long startTimeMs;
   unsigned long lastUpdateMs;
   unsigned long stateTimerEndMs;
+  unsigned long pauseStartMs;
   unsigned long totalPausedMs;
 
   uint16_t bestSeconds;

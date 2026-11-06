@@ -359,7 +359,7 @@ uint16_t PetLogic::getHighScoreMaze() const {
 }
 
 void PetLogic::setHighScoreMaze(uint16_t score) {
-  if (score > highScoreMaze) {
+  if (score == 0 || highScoreMaze == 0 || score < highScoreMaze) {
     highScoreMaze = score;
   }
 }

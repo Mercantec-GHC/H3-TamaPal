@@ -468,23 +468,31 @@ void testPetStorageSerialization() {
   pet.setHighScorePong(42);
   pet.setHighScoreMaze(108);
   pet.setAgeMinutes(15);
-  // Setting a lower score should keep highest record
+  // Setting a lower score should keep highest record in Pong
   pet.setHighScorePong(10);
   CHECK(pet.getHighScorePong() == 42, "HighScorePong retains highest record (42)");
   CHECK(pet.getHighScoreMaze() == 108, "HighScoreMaze is 108");
   CHECK(pet.getAgeMinutes() == 15, "AgeMinutes is 15");
 
+  // In Maze, lower completion time is a better record!
+  pet.setHighScoreMaze(45);
+  CHECK(pet.getHighScoreMaze() == 45, "HighScoreMaze updated to 45s (better than 108s)");
+  pet.setHighScoreMaze(30);
+  CHECK(pet.getHighScoreMaze() == 30, "HighScoreMaze updated to 30s (faster time wins!)");
+  pet.setHighScoreMaze(50);
+  CHECK(pet.getHighScoreMaze() == 30, "HighScoreMaze ignored slower 50s time and stayed 30s");
+
   char extBuffer[160];
   StoragePet::serializeState(extBuffer, sizeof(extBuffer), pet);
   CHECK(strstr(extBuffer, "PONG=42\n") != NULL, "Serialized text contains PONG=42");
-  CHECK(strstr(extBuffer, "MAZE=108\n") != NULL, "Serialized text contains MAZE=108");
+  CHECK(strstr(extBuffer, "MAZE=30\n") != NULL, "Serialized text contains MAZE=30");
   CHECK(strstr(extBuffer, "AGE=15\n") != NULL, "Serialized text contains AGE=15");
 
   uint16_t rPong = 0, rMaze = 0;
   uint32_t rAge = 0;
   CHECK(StoragePet::deserializeState(extBuffer, h, w, e, hap, d, asleep, stage, outfit, rPong, rMaze, rAge), "Deserializes extended state with high scores & age");
   CHECK(rPong == 42, "Restored Pong record is 42");
-  CHECK(rMaze == 108, "Restored Maze record is 108");
+  CHECK(rMaze == 30, "Restored Maze record is 30");
   CHECK(rAge == 15, "Restored Age is 15 minutes");
 
   uint32_t hash1 = StoragePet::computeHash(extBuffer);
@@ -553,13 +561,13 @@ void testSoloPongLogic() {
   // 2. Paddle movement and clamping
   float midY = pong.getPaddleY();
   pong.movePaddle(500.0f); // Try to move way past bottom
-  CHECK(pong.getPaddleY() == (float)(PongLogic::FIELD_BOTTOM - PongLogic::PADDLE_HEIGHT - 1), "Paddle clamped at bottom boundary");
+  CHECK(pong.getPaddleY() == (float)(PongLogic::FIELD_BOTTOM - PongLogic::PADDLE_HEIGHT - 2), "Paddle clamped at bottom boundary");
 
   pong.movePaddle(-1000.0f); // Try to move way past top
-  CHECK(pong.getPaddleY() == (float)(PongLogic::FIELD_TOP + 1), "Paddle clamped at top boundary");
+  CHECK(pong.getPaddleY() == (float)(PongLogic::FIELD_TOP + 2), "Paddle clamped at top boundary");
 
   // Reset paddle to center
-  pong.movePaddle(midY - (float)(PongLogic::FIELD_TOP + 1));
+  pong.movePaddle(midY - (float)(PongLogic::FIELD_TOP + 2));
 
   // 3. Serve ball
   pong.serveBall();
@@ -663,6 +671,29 @@ void testSoloPongLogic() {
   CHECK(hiPong.getScore() == 0, "New game score reset to 0");
   CHECK(hiPong.getHighScore() == 15, "New game high score set to 15");
   CHECK(hiPong.getLives() == 3, "New game lives reset to 3");
+
+  // 10. Test swept collision prevents paddle tunneling on large timesteps
+  PongLogic sweptPong;
+  sweptPong.startNewGame();
+  sweptPong.serveBall();
+  unsigned long st = 1000;
+  sweptPong.update(st);
+  for (int i = 0; i < 200; i++) {
+    st += 20;
+    sweptPong.update(st);
+    if (sweptPong.popWallHit()) break;
+  }
+  // Ball is returning towards paddle. Let it get near x=40
+  for (int i = 0; i < 200 && sweptPong.getBallX() > 42.0f; i++) {
+    st += 10;
+    sweptPong.movePaddle(sweptPong.getBallY() - sweptPong.getPaddleY());
+    sweptPong.update(st);
+  }
+  // Step with large dt (60ms) where ball jumps past paddle without swept collision
+  st += 60;
+  sweptPong.movePaddle(sweptPong.getBallY() - sweptPong.getPaddleY());
+  sweptPong.update(st);
+  CHECK(sweptPong.getScore() == 1, "Swept collision successfully hits paddle on large timestep (no tunneling)");
 }
 
 void testMarbleMazeLogic() {
@@ -776,18 +807,31 @@ void testMarbleMazeLogic() {
   vicMaze.update(120);
 
   // Simulate reaching the portal at cell (6, 6)
-  // Exit center is at ORIGIN_X + 6*CELL_SIZE + 12, ORIGIN_Y + 6*CELL_SIZE + 12
-  // We can test victory condition directly by moving near portal
   float exitX = (float)(MazeLogic::ORIGIN_X + (MAZE_COLS - 1) * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
   float exitY = (float)(MazeLogic::ORIGIN_Y + (MAZE_ROWS - 1) * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
-  vicMaze.setTilt(0.0f, 0.0f);
-  // Place ball directly at exit portal
-  for (int i = 0; i < 20; i++) {
-    // Manually push ball to exit coordinates
+  for (int i = 0; i < 40; i++) {
     vicMaze.setTilt((exitX - vicMaze.getBallX()) * 0.05f, (exitY - vicMaze.getBallY()) * 0.05f);
     vicMaze.update(200 + i * 20);
     if (vicMaze.getState() == MAZE_STATE_VICTORY) break;
   }
+
+  // 7. Test pause functionality and timer freezing
+  MazeLogic pauseMaze;
+  pauseMaze.generateMaze(123, 60);
+  pauseMaze.setTilt(0.5f, 0.0f);
+  pauseMaze.update(1000);
+  pauseMaze.update(1020); // Playing, startTimeMs = 1020
+  pauseMaze.update(3020); // 2 seconds elapsed
+  CHECK(pauseMaze.getElapsedSeconds(3020) == 2, "2 seconds elapsed before pause");
+  pauseMaze.setPaused(true, 3020);
+  CHECK(pauseMaze.getState() == MAZE_STATE_PAUSED, "Maze state is MAZE_STATE_PAUSED");
+  pauseMaze.update(7020); // 4 seconds passed in pause, physics doesn't step
+  CHECK(pauseMaze.getElapsedSeconds(7020) == 2, "Elapsed seconds frozen during pause");
+  pauseMaze.setPaused(false, 8020); // Resumed after 5 seconds
+  CHECK(pauseMaze.getState() == MAZE_STATE_PLAYING, "Maze state resumed to PLAYING");
+  CHECK(pauseMaze.getElapsedSeconds(8020) == 2, "Elapsed seconds remained 2s right after resume");
+  pauseMaze.update(9020); // 1s more of play
+  CHECK(pauseMaze.getElapsedSeconds(9020) == 3, "Elapsed seconds advanced to 3s after active play resumed");
 }
 
 int main() {

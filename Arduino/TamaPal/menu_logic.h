@@ -24,6 +24,9 @@ public:
   void selectPlayer(int playerId);
   int getPlayerId() const;
 
+  // Direct screen state transition
+  void setScreen(ScreenType screen, unsigned long currentTimeMs = 0);
+
   // Games menu helpers
   uint8_t getSelectedGame() const;
   void selectGame(uint8_t gameIndex);

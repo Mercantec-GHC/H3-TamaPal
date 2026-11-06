@@ -4,6 +4,7 @@
 
 #include "maze_logic.h"
 #include <string.h>
+#include <math.h>
 
 MazeLogic::MazeLogic()
   : state(MAZE_STATE_READY),
@@ -18,6 +19,7 @@ MazeLogic::MazeLogic()
     startTimeMs(0),
     lastUpdateMs(0),
     stateTimerEndMs(0),
+    pauseStartMs(0),
     totalPausedMs(0),
     bestSeconds(0),
     newBestRecord(false),
@@ -43,6 +45,7 @@ void MazeLogic::generateMaze(uint32_t seed, uint16_t existingBestSeconds) {
   berriesCollected = 0;
   totalBerries = 0;
   totalPausedMs = 0;
+  pauseStartMs = 0;
   startTimeMs = 0;
   lastUpdateMs = 0;
   stateTimerEndMs = 0;
@@ -224,7 +227,25 @@ void MazeLogic::setTilt(float tiltX, float tiltY) {
   currentTiltY = tiltY;
 }
 
+void MazeLogic::setPaused(bool paused, unsigned long currentMs) {
+  if (paused && state == MAZE_STATE_PLAYING) {
+    state = MAZE_STATE_PAUSED;
+    pauseStartMs = currentMs;
+  } else if (!paused && state == MAZE_STATE_PAUSED) {
+    state = MAZE_STATE_PLAYING;
+    if (pauseStartMs > 0 && currentMs >= pauseStartMs) {
+      startTimeMs += (currentMs - pauseStartMs);
+    }
+    pauseStartMs = 0;
+    lastUpdateMs = currentMs;
+  }
+}
+
 void MazeLogic::update(unsigned long currentTimeMs) {
+  if (state == MAZE_STATE_PAUSED) {
+    return;
+  }
+
   if (lastUpdateMs == 0) {
     lastUpdateMs = currentTimeMs;
     startTimeMs = currentTimeMs;
@@ -396,6 +417,34 @@ void MazeLogic::resolveWallCollisions() {
     }
   }
 
+  // 5. Corner pillars (intersections of grid walls)
+  const float pillarR = r + 1.0f;
+  const float pillarRSq = pillarR * pillarR;
+  const float cornerX[4] = { cellLeft, cellRight, cellLeft, cellRight };
+  const float cornerY[4] = { cellTop, cellTop, cellBottom, cellBottom };
+
+  for (int i = 0; i < 4; i++) {
+    float dx = ballX - cornerX[i];
+    float dy = ballY - cornerY[i];
+    float dSq = dx * dx + dy * dy;
+    if (dSq < pillarRSq && dSq > 0.0001f) {
+      float d = sqrtf(dSq);
+      float nx = dx / d;
+      float ny = dy / d;
+      ballX = cornerX[i] + nx * pillarR;
+      ballY = cornerY[i] + ny * pillarR;
+
+      float dot = ballVx * nx + ballVy * ny;
+      if (dot < 0.0f) {
+        ballVx -= (1.3f * dot * nx);
+        ballVy -= (1.3f * dot * ny);
+        ballVx *= 0.5f;
+        ballVy *= 0.5f;
+        wallCollidedFlag = true;
+      }
+    }
+  }
+
   // Global outer boundary clamping
   float globalMinX = (float)(ORIGIN_X + r + 1);
   float globalMaxX = (float)(ORIGIN_X + MAZE_COLS * CELL_SIZE - r - 1);
@@ -441,11 +490,15 @@ uint8_t MazeLogic::getTotalBerries() const {
   return totalBerries;
 }
 
-uint16_t MazeLogic::getElapsedSeconds() const {
+uint16_t MazeLogic::getElapsedSeconds(unsigned long currentMs) const {
   if (startTimeMs == 0) return 0;
-  unsigned long now = (state == MAZE_STATE_VICTORY) ? lastUpdateMs : (lastUpdateMs == 0 ? startTimeMs : lastUpdateMs);
-  unsigned long total = (now - startTimeMs) + totalPausedMs;
-  return (uint16_t)(total / 1000);
+  if (state == MAZE_STATE_PAUSED && pauseStartMs >= startTimeMs) {
+    return (uint16_t)((pauseStartMs - startTimeMs) / 1000UL);
+  }
+  unsigned long now = (state == MAZE_STATE_VICTORY) ? lastUpdateMs :
+                      (currentMs > 0 ? currentMs : (lastUpdateMs == 0 ? startTimeMs : lastUpdateMs));
+  if (now < startTimeMs) return 0;
+  return (uint16_t)((now - startTimeMs) / 1000UL);
 }
 
 uint16_t MazeLogic::getBestSeconds() const {

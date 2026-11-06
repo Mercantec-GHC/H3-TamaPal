@@ -446,6 +446,12 @@ void loop() {
         pongLogic.movePaddle(-4.5f); // Up
       }
       if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+        if (pongLogic.getScore() > 0) {
+          if (pongLogic.getScore() > petLogic.getHighScorePong()) {
+            petLogic.setHighScorePong(pongLogic.getScore());
+            storagePet.savePet(petLogic);
+          }
+        }
         menuLogic.onButtonBack(); // Exit game early
         lastTouchTimeMs = now;
       }
@@ -501,8 +507,18 @@ void loop() {
         lastTouchTimeMs = now;
       }
       else if (carrier.Buttons.onTouchDown(TOUCH2)) {
-        menuLogic.onButtonOk(now); // OK / Select
-        lastTouchTimeMs = now;
+        if (currentScreen == SCREEN_HOME && menuLogic.getSelectedIcon() == ICON_PLAY) {
+          if (petLogic.isSleeping() || petLogic.getEnergy() < 15) {
+            menuLogic.setScreen(SCREEN_ACTION, now);
+            lastTouchTimeMs = now;
+          } else {
+            menuLogic.onButtonOk(now); // OK / Select
+            lastTouchTimeMs = now;
+          }
+        } else {
+          menuLogic.onButtonOk(now); // OK / Select
+          lastTouchTimeMs = now;
+        }
       }
       else if (carrier.Buttons.onTouchDown(TOUCH3)) {
         menuLogic.onButtonBack(); // Back to Home

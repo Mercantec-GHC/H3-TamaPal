@@ -3,6 +3,7 @@
 // USED BY: TamaPal.ino, ui_pong.cpp, tests/test_main.cpp
 
 #include "pong_logic.h"
+#include <math.h>
 
 PongLogic::PongLogic()
   : state(PONG_STATE_READY),
@@ -51,14 +52,11 @@ void PongLogic::serveBall() {
 }
 
 void PongLogic::setPaddleTilt(float tiltY) {
-  // tiltY ranges from -1.0 (down/back) to +1.0 (up/forward)
-  float normalized = (tiltY + 1.0f) * 0.5f;
-  if (normalized < 0.0f) normalized = 0.0f;
-  if (normalized > 1.0f) normalized = 1.0f;
-
-  float targetY = FIELD_TOP + (FIELD_BOTTOM - FIELD_TOP - PADDLE_HEIGHT) * normalized;
-  paddleY += (targetY - paddleY) * 0.35f; // Smooth lerp
-  clampPaddle();
+  if (state == PONG_STATE_GAMEOVER) return;
+  // Deadzone so flat board on table does not fight touch buttons
+  if (fabs(tiltY) < 0.12f) return;
+  // Positive tiltY = move up (negative Y), negative tiltY = move down (positive Y)
+  movePaddle(-tiltY * 3.8f);
 }
 
 void PongLogic::movePaddle(float deltaY) {
@@ -67,8 +65,8 @@ void PongLogic::movePaddle(float deltaY) {
 }
 
 void PongLogic::clampPaddle() {
-  const float minY = (float)(FIELD_TOP + 1);
-  const float maxY = (float)(FIELD_BOTTOM - PADDLE_HEIGHT - 1);
+  const float minY = (float)(FIELD_TOP + 2);
+  const float maxY = (float)(FIELD_BOTTOM - PADDLE_HEIGHT - 2);
   if (paddleY < minY) paddleY = minY;
   if (paddleY > maxY) paddleY = maxY;
 }
@@ -102,36 +100,38 @@ void PongLogic::update(unsigned long currentTimeMs) {
     return;
   }
 
-  // Active gameplay simulation
+  // Active gameplay simulation with swept collision tracking
+  float prevBallX = ballX;
   ballX += ballVx * speedFactor;
   ballY += ballVy * speedFactor;
 
-  // 1. Top wall collision
-  if (ballY <= (float)FIELD_TOP) {
-    ballY = (float)FIELD_TOP;
-    ballVy = -ballVy;
+  // 1. Top & Bottom wall bounce (keep 1px inside border lines)
+  const float minBallY = (float)(FIELD_TOP + 1);
+  const float maxBallY = (float)(FIELD_BOTTOM - BALL_SIZE - 1);
+  if (ballY <= minBallY) {
+    ballY = minBallY;
+    ballVy = fabs(ballVy);
+    wallHitFlag = true;
+    pendingSound = SOUND_CLICK;
+  } else if (ballY >= maxBallY) {
+    ballY = maxBallY;
+    ballVy = -fabs(ballVy);
     wallHitFlag = true;
     pendingSound = SOUND_CLICK;
   }
 
-  // 2. Bottom wall collision
-  if (ballY + BALL_SIZE >= (float)FIELD_BOTTOM) {
-    ballY = (float)(FIELD_BOTTOM - BALL_SIZE);
-    ballVy = -ballVy;
+  // 2. Right wall collision (keep 1px left of right wall at FIELD_RIGHT - 2)
+  const float maxBallX = (float)(FIELD_RIGHT - 2 - BALL_SIZE);
+  if (ballX >= maxBallX) {
+    ballX = maxBallX;
+    ballVx = -fabs(ballVx);
     wallHitFlag = true;
     pendingSound = SOUND_CLICK;
   }
 
-  // 3. Right wall collision (Wall-Pong rebound)
-  if (ballX + BALL_SIZE >= (float)FIELD_RIGHT) {
-    ballX = (float)(FIELD_RIGHT - BALL_SIZE);
-    ballVx = -ballVx;
-    wallHitFlag = true;
-    pendingSound = SOUND_CLICK;
-  }
-
-  // 4. Paddle collision (Left paddle)
-  if (ballVx < 0.0f && ballX <= (float)(PADDLE_X + PADDLE_WIDTH) && (ballX + BALL_SIZE) >= (float)PADDLE_X) {
+  // 3. Paddle collision (Left paddle - swept check using prevBallX to prevent high-speed tunneling)
+  const float paddleRight = (float)(PADDLE_X + PADDLE_WIDTH);
+  if (ballVx < 0.0f && ballX <= paddleRight && (prevBallX + BALL_SIZE) >= (float)PADDLE_X) {
     if ((ballY + BALL_SIZE) >= paddleY && ballY <= (paddleY + PADDLE_HEIGHT)) {
       ballX = (float)(PADDLE_X + PADDLE_WIDTH);
 

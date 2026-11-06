@@ -34,12 +34,16 @@ private:
   int16_t lastBallX;
   int16_t lastBallY;
   uint8_t lastBerries;
+  uint8_t lastCollectedBerries;
   uint16_t lastSeconds;
   MazeState lastState;
   bool isInitialized;
 
   void drawAllWalls(const MazeLogic& maze);
   void drawCellItems(const MazeLogic& maze);
+  void drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8_t r);
+  void drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8_t r);
+  void repairMazeRegion(const MazeLogic& maze, int16_t centerPxX, int16_t centerPxY);
   void drawHud(const MazeLogic& maze, bool force);
   void drawMiniLumi(int x, int y, float vx, float vy);
   void eraseMiniLumi(int x, int y, const MazeLogic& maze);

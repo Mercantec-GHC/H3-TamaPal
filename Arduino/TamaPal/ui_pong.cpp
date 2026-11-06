@@ -226,15 +226,29 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
   uint16_t nativeBg     = color565(8, 12, 26);
   uint16_t paddleCyan   = color565(0, 220, 255);
   uint16_t ballYellow   = color565(255, 230, 80);
+  uint16_t wallRedDotted = color565(180, 50, 70);
 
   // State transitions
   PongState currentState = pong.getState();
   if (currentState != lastState) {
-    if (lastState == PONG_STATE_READY) {
+    if (lastState == PONG_STATE_READY && currentState == PONG_STATE_PLAYING) {
+      clearReadyPrompt();
+      lastBallX = -1;
+      lastBallY = -1;
+      lastPaddleY = -1;
+    } else if (lastState == PONG_STATE_READY) {
       clearReadyPrompt();
     }
+
     if (currentState == PONG_STATE_READY) {
       drawReadyPrompt();
+    } else if (currentState == PONG_STATE_BALL_LOST) {
+      if (lastBallX >= 0) {
+        carrier->display.fillRect(lastBallX, lastBallY,
+                                  PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, nativeBg);
+        lastBallX = -1;
+        lastBallY = -1;
+      }
     } else if (currentState == PONG_STATE_GAMEOVER) {
       drawGameOverScreen(pong);
       lastState = currentState;
@@ -265,20 +279,31 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     lastPaddleY = newPaddleY;
   }
 
-  // 3. Ball delta-rendering
-  int16_t newBallX = (int16_t)pong.getBallX();
-  int16_t newBallY = (int16_t)pong.getBallY();
-  if (newBallX != lastBallX || newBallY != lastBallY) {
-    if (lastBallX != -1 && lastBallY != -1) {
-      carrier->display.fillRect(lastBallX, lastBallY,
-                                PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, nativeBg);
-    }
+  // 3. Ball delta-rendering (do not render ball during BALL_LOST delay)
+  if (currentState != PONG_STATE_BALL_LOST) {
+    int16_t newBallX = (int16_t)pong.getBallX();
+    int16_t newBallY = (int16_t)pong.getBallY();
+    if (newBallX != lastBallX || newBallY != lastBallY) {
+      if (lastBallX != -1 && lastBallY != -1) {
+        carrier->display.fillRect(lastBallX, lastBallY,
+                                  PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, nativeBg);
+      }
 
-    carrier->display.fillRoundRect(newBallX, newBallY,
-                                  PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, 1, ballYellow);
-    carrier->display.drawPixel(newBallX + 1, newBallY + 1, 0xFFFF);
-    lastBallX = newBallX;
-    lastBallY = newBallY;
+      carrier->display.fillRoundRect(newBallX, newBallY,
+                                    PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, 1, ballYellow);
+      carrier->display.drawPixel(newBallX + 1, newBallY + 1, 0xFFFF);
+      lastBallX = newBallX;
+      lastBallY = newBallY;
+    }
+  }
+
+  // Restore left danger dotted line if ball was near left boundary
+  if (currentState == PONG_STATE_PLAYING || currentState == PONG_STATE_BALL_LOST) {
+    if (lastBallX <= PongLogic::FIELD_LEFT + 6 || pong.getBallX() <= (float)(PongLogic::FIELD_LEFT + 6)) {
+      for (int16_t y = PongLogic::FIELD_TOP + 2; y < PongLogic::FIELD_BOTTOM; y += 4) {
+        carrier->display.drawPixel(PongLogic::FIELD_LEFT, y, wallRedDotted);
+      }
+    }
   }
 }
 

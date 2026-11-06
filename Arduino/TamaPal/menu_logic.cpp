@@ -113,6 +113,13 @@ void MenuLogic::selectPlayer(int id) {
   pendingSound = SOUND_CONFIRM;
 }
 
+void MenuLogic::setScreen(ScreenType screen, unsigned long currentTimeMs) {
+  activeScreen = screen;
+  if (screen == SCREEN_ACTION) {
+    actionStartTimeMs = currentTimeMs;
+  }
+}
+
 int MenuLogic::getPlayerId() const {
   return playerId;
 }
