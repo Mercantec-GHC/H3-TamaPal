@@ -301,7 +301,7 @@ void PetLogic::update(unsigned long currentTimeMs) {
         triggerDeath(DEATH_EXHAUSTION);
         return;
       }
-    } else if (currentStage == STAGE_OLD && ageMinutes >= 120) {
+    } else if (currentStage == STAGE_OLD && ageMinutes >= 100) {
       triggerDeath(DEATH_OLD_AGE); // Peaceful old age death
       return;
     } else {

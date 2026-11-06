@@ -1566,6 +1566,22 @@ void testNameEntryLogic() {
   CHECK(rec.deathCause == DEATH_OLD_AGE, "Parsed ancestor cause is DEATH_OLD_AGE");
 }
 
+void testOldAgeThreshold() {
+  printf("\n--- Test: Old Age 100 Days Threshold ---\n");
+  PetLogic pet;
+  pet.setStage(STAGE_OLD);
+  pet.setAgeMinutes(99);
+  pet.update(0);
+  CHECK(pet.isAlive(), "Pet is alive at age 99");
+
+  pet.setAgeMinutes(100);
+  pet.update(10000);
+  CHECK(!pet.isAlive(), "Pet peacefully passes at age 100 days");
+  CHECK(pet.getDeathCause() == DEATH_OLD_AGE, "Death cause is DEATH_OLD_AGE");
+  CHECK(strcmp(pet.getDeathCauseName(), "Doede af alderdom") == 0, "Danish cause is 'Doede af alderdom'");
+  CHECK(strcmp(pet.getDeathEpitaph(), "Levede et lykkeligt liv!") == 0, "Danish epitaph is 'Levede et lykkeligt liv!'");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -1600,6 +1616,7 @@ int main() {
   testSicknessProgressionAndCure();
   testStorageCarePersistence();
   testNameEntryLogic();
+  testOldAgeThreshold();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

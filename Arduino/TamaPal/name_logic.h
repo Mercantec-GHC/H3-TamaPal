@@ -54,3 +54,4 @@ private:
 };
 
 #endif // NAME_LOGIC_H
+

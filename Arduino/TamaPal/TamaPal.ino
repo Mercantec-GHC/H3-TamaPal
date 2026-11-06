@@ -297,6 +297,7 @@ void loop() {
   // Listen for commands in Serial Monitor:
   // 'c' = toggle plastic case sensitivity
   // 's' = cycle through life stages (Baby -> Teen -> Adult -> Old) on-the-fly!
+  // 'o' = Old age (1st: 100 days elder with beard & glasses, 2nd: peaceful passing with angel wings)
   // 'w' = toggle wardrobe outfit (standard <-> vintertøj / beanie & scarf)
   // 'f' = simulate freezing cold (test winter clothing warming effect)
   // 'h' = simulate overheating heat wave (test sweating & hat removal)
@@ -430,6 +431,30 @@ void loop() {
         uiPet.updateHomeDisplay(petLogic, now, true);
       }
       syncPetStateToBackend(true);
+    } else if (c == 'o' || c == 'O') {
+      if (petLogic.getStageEnum() != STAGE_OLD || !petLogic.isAlive()) {
+        petLogic.setStage(STAGE_OLD);
+        petLogic.setAgeMinutes(100);
+        soundLed.playSound(SOUND_CONFIRM);
+        Serial.println(F("[ALDERDOM] Lumi er nu 100 dage gammel! Vismand med hvidt skaeg og briller."));
+        if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+          uiPet.updateHomeDisplay(petLogic, now, true);
+        }
+        syncPetStateToBackend(true);
+      } else {
+        // Already STAGE_OLD and alive -> trigger peaceful old age passing!
+        petLogic.triggerDeath(DEATH_OLD_AGE);
+        soundLed.playSound(SOUND_REBIRTH);
+        soundLed.flashColor(180, 220, 255, 600); // Serene spirit glow
+        storagePet.logGraveRecord(petLogic);
+        storagePet.savePet(petLogic);
+        Serial.print(F("[LIVSCYKLUS] Lumi sover stille ind efter 100 gode dage (Almindelig alderdom)."));
+        Serial.print(F(" Gravskrift: "));
+        Serial.println(petLogic.getDeathEpitaph());
+        menuLogic.setScreen(SCREEN_HOME, now);
+        uiPet.updateHomeDisplay(petLogic, now, true);
+        syncPetStateToBackend(true);
+      }
     }
   }
 

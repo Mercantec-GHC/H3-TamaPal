@@ -145,3 +145,4 @@ void UiNameRenderer::drawNameEntry(const NameEntryLogic& nameLogic, unsigned lon
   lastCursorSlot = currentSlot;
   lastArrowBlink = blinkArrow;
 }
+

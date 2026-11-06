@@ -122,3 +122,4 @@ const char* NameEntryLogic::getName() const {
 
   return trimmedName;
 }
+

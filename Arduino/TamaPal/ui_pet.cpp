@@ -352,9 +352,9 @@ void UiPetRenderer::drawMemorialCard(const PetLogic& pet, unsigned long nowMs, b
     char statBuf[36];
     uint16_t bestScore = pet.getHighScorePong();
     if (pet.getHighScoreMaze() > 0 && (bestScore == 0 || pet.getHighScoreMaze() < bestScore)) {
-      snprintf(statBuf, sizeof(statBuf), "Alder: %lums | Lab: %us", (unsigned long)pet.getAgeMinutes(), (unsigned int)pet.getHighScoreMaze());
+      snprintf(statBuf, sizeof(statBuf), "Alder: %lu dage | Lab: %us", (unsigned long)pet.getAgeMinutes(), (unsigned int)pet.getHighScoreMaze());
     } else {
-      snprintf(statBuf, sizeof(statBuf), "Alder: %lumin | Pong: %u", (unsigned long)pet.getAgeMinutes(), (unsigned int)bestScore);
+      snprintf(statBuf, sizeof(statBuf), "Alder: %lu dage | Pong: %u", (unsigned long)pet.getAgeMinutes(), (unsigned int)bestScore);
     }
     int sLen = (int)strlen(statBuf);
     int sX = 120 - (sLen * 3);
@@ -552,9 +552,9 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   }
 
   // 2b. Spectacles & Bushy Eyebrows for OLD STAGE
-  if (stage == STAGE_OLD && expr != EXPR_DEAD) {
-    uint16_t glassesGold = color565(255, 215, 60);
-    uint16_t glassGlint  = color565(210, 245, 255);
+  if (stage == STAGE_OLD) {
+    uint16_t glassesColor = (expr == EXPR_DEAD) ? color565(190, 220, 245) : color565(255, 215, 60);
+    uint16_t glassGlint   = 0xFFFF;
 
     // Fluffy wise white elder eyebrows
     carrier->display.fillRoundRect(leftEyeX - 4, eyeY - 8, 9, 3, 1, 0xFFFF);
@@ -562,24 +562,31 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
 
     // Round golden wireframe spectacles (slips down nose when sweaty/overheating)
     int glassesY = (eyeY - 1) + (expr == EXPR_OVERHEATING ? 2 : 0);
-    carrier->display.drawCircle(leftEyeX, glassesY, 5, glassesGold);
-    carrier->display.drawCircle(rightEyeX, glassesY, 5, glassesGold);
+    carrier->display.drawCircle(leftEyeX, glassesY, 5, glassesColor);
+    carrier->display.drawCircle(rightEyeX, glassesY, 5, glassesColor);
     // Bridge connecting the round rims
-    carrier->display.drawFastHLine(cx - 3, glassesY - 1, 7, glassesGold);
+    carrier->display.drawFastHLine(cx - 3, glassesY - 1, 7, glassesColor);
 
     // Subtle glint on upper lens edge
     carrier->display.drawPixel(leftEyeX - 2, glassesY - 2, glassGlint);
     carrier->display.drawPixel(rightEyeX - 2, glassesY - 2, glassGlint);
   }
 
-  // 3. Render Mouth / Pacifier / Elder Mustache
+  // 3. Render Mouth / Pacifier / Elder Mustache & Flowing Sage Beard
   int mouthY = cy + 2;
 
-  // Cute white fluffy mochi mustache for OLD stage (visible across expressions)
-  if (stage == STAGE_OLD && expr != EXPR_DEAD) {
+  // Cute white fluffy mochi mustache and flowing sage beard for OLD stage
+  if (stage == STAGE_OLD) {
     carrier->display.fillCircle(cx - 3, mouthY, 2, 0xFFFF);
     carrier->display.fillCircle(cx + 3, mouthY, 2, 0xFFFF);
     carrier->display.drawPixel(cx, mouthY - 1, color565(225, 230, 240));
+
+    // Flowing white sage beard tapering down to chest
+    carrier->display.fillRoundRect(cx - 4, mouthY + 2, 9, 3, 1, 0xFFFF);
+    carrier->display.fillRoundRect(cx - 3, mouthY + 4, 7, 3, 1, 0xFFFF);
+    carrier->display.fillRoundRect(cx - 2, mouthY + 6, 5, 3, 1, 0xFFFF);
+    carrier->display.drawFastHLine(cx - 1, mouthY + 9, 3, color565(230, 235, 245));
+    carrier->display.drawPixel(cx, mouthY + 10, color565(200, 210, 225));
   }
 
   // If Baby is eating berry, show the berry eating action. Otherwise, Baby wears a cute pacifier/dummy!
@@ -794,6 +801,23 @@ void UiPetRenderer::drawSleepingBed(int cx, int cy, PetStage stage, PetOutfit ou
   carrier->display.drawPixel(headX - 4, headY, eyeDark);
   carrier->display.drawFastHLine(headX + 2, headY - 1, 4, eyeDark);
   carrier->display.drawPixel(headX + 4, headY, eyeDark);
+
+  if (stage == STAGE_OLD) {
+    uint16_t glassesGold = color565(255, 215, 60);
+    // Wise white bushy eyebrows
+    carrier->display.fillRoundRect(headX - 7, headY - 4, 5, 2, 1, 0xFFFF);
+    carrier->display.fillRoundRect(headX + 1, headY - 4, 5, 2, 1, 0xFFFF);
+
+    // Spectacles frame resting on sleepy nose
+    carrier->display.drawCircle(headX - 4, headY - 1, 3, glassesGold);
+    carrier->display.drawCircle(headX + 4, headY - 1, 3, glassesGold);
+    carrier->display.drawFastHLine(headX - 1, headY - 1, 3, glassesGold);
+
+    // Fluffy white mustache and beard resting above blanket
+    carrier->display.fillCircle(headX - 3, headY + 3, 2, 0xFFFF);
+    carrier->display.fillCircle(headX + 2, headY + 3, 2, 0xFFFF);
+    carrier->display.fillRoundRect(headX - 4, headY + 5, 8, 3, 1, 0xFFFF);
+  }
 
   // Rosy blushing cheeks
   carrier->display.fillCircle(headX - 5, headY + 3, 2, blushPink);
@@ -1179,6 +1203,29 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
 
   // 4. 2.5D Chubby Mochi Body (Hunched and compressed when FREEZING)
   if (expr == EXPR_DEAD) {
+    // Ethereal feathery angel wings spreading behind Lumi
+    uint16_t wingGlow   = color565(160, 210, 245);
+    uint16_t wingWhite  = 0xFFFF;
+    uint16_t wingShadow = color565(110, 155, 195);
+
+    // Left Angel Wing (3 layered soft feathers spreading gracefully)
+    carrier->display.fillTriangle(cx - 14, cy - 4, cx - 27, cy - 15, cx - 22, cy - 3, wingShadow);
+    carrier->display.fillTriangle(cx - 14, cy - 4, cx - 26, cy - 14, cx - 21, cy - 3, wingWhite);
+    carrier->display.fillTriangle(cx - 14, cy - 2, cx - 28, cy - 8,  cx - 21, cy + 2, wingShadow);
+    carrier->display.fillTriangle(cx - 14, cy - 2, cx - 27, cy - 7,  cx - 20, cy + 2, wingWhite);
+    carrier->display.fillTriangle(cx - 14, cy,     cx - 25, cy - 1,  cx - 18, cy + 6, wingGlow);
+    carrier->display.drawPixel(cx - 26, cy - 13, 0xFFFF);
+    carrier->display.drawPixel(cx - 27, cy - 6, 0xFFFF);
+
+    // Right Angel Wing (3 layered soft feathers spreading gracefully)
+    carrier->display.fillTriangle(cx + 14, cy - 4, cx + 27, cy - 15, cx + 22, cy - 3, wingShadow);
+    carrier->display.fillTriangle(cx + 14, cy - 4, cx + 26, cy - 14, cx + 21, cy - 3, wingWhite);
+    carrier->display.fillTriangle(cx + 14, cy - 2, cx + 28, cy - 8,  cx + 21, cy + 2, wingShadow);
+    carrier->display.fillTriangle(cx + 14, cy - 2, cx + 27, cy - 7,  cx + 20, cy + 2, wingWhite);
+    carrier->display.fillTriangle(cx + 14, cy,     cx + 25, cy - 1,  cx + 18, cy + 6, wingGlow);
+    carrier->display.drawPixel(cx + 26, cy - 13, 0xFFFF);
+    carrier->display.drawPixel(cx + 27, cy - 6, 0xFFFF);
+
     // Unified ethereal ghost body with glowing white belly
     carrier->display.fillRoundRect(cx - 20, cy - 18, 40, 34, 14, bodyOutline);
     carrier->display.fillRoundRect(cx - 18, cy - 16, 36, 30, 12, bodyShade);
@@ -1819,7 +1866,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   // 3. Delta-update Lumi (zero-flicker partial redraw)
   if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression || outfit != lastOutfit) {
     if (expr == EXPR_DEAD) {
-      carrier->display.fillRect(lastDrawnCx - 26, lastDrawnCy - 32, 52, 54, nativeBg);
+      carrier->display.fillRect(lastDrawnCx - 30, lastDrawnCy - 34, 61, 56, nativeBg);
     } else if (expr != lastExpression || outfit != lastOutfit) {
       // Expression or outfit changed: clear full character bounds (paws, ears, horns, briefcase, halo, beanie, scarf)
       carrier->display.fillRect(lastDrawnCx - 31, lastDrawnCy - 35, 65, 57, nativeBg);
