@@ -658,14 +658,19 @@ void testSoloPongLogic() {
 
   // 9. New High Score achievement
   PongLogic hiPong;
-  hiPong.startNewGame(2);
-  // Cheat-simulate score higher than high score
+  hiPong.startNewGame(1);
+  CHECK(!hiPong.isNewHighScore(), "Pong: isNewHighScore false at start");
   hiPong.serveBall();
-  for (int s = 0; s < 3; s++) {
-    // Manually trigger paddle hits
+  t = 10000;
+  hiPong.update(t);
+  for (int step = 0; step < 600 && hiPong.getScore() < 2; step++) {
     t += 20;
+    hiPong.setPaddleY(hiPong.getBallY() - PongLogic::PADDLE_HEIGHT * 0.5f);
     hiPong.update(t);
   }
+  CHECK(hiPong.getScore() >= 2, "Pong: score reaches 2 to beat initial high score 1");
+  CHECK(hiPong.isNewHighScore(), "Pong: isNewHighScore becomes true after beating high score");
+  CHECK(hiPong.getHighScore() == hiPong.getScore(), "Pong: highScore updated dynamically");
   // Test startNewGame resets score but keeps high score
   hiPong.startNewGame(15);
   CHECK(hiPong.getScore() == 0, "New game score reset to 0");
@@ -802,18 +807,79 @@ void testMarbleMazeLogic() {
   // Generate a new maze and test victory at exit coordinates
   MazeLogic vicMaze;
   vicMaze.generateMaze(999, 50);
-  vicMaze.setTilt(0.5f, 0.5f);
+  vicMaze.setTilt(0.5f, 0.0f);
   vicMaze.update(100);
   vicMaze.update(120);
 
-  // Simulate reaching the portal at cell (6, 6)
-  float exitX = (float)(MazeLogic::ORIGIN_X + (MAZE_COLS - 1) * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
-  float exitY = (float)(MazeLogic::ORIGIN_Y + (MAZE_ROWS - 1) * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
-  for (int i = 0; i < 40; i++) {
-    vicMaze.setTilt((exitX - vicMaze.getBallX()) * 0.05f, (exitY - vicMaze.getBallY()) * 0.05f);
-    vicMaze.update(200 + i * 20);
-    if (vicMaze.getState() == MAZE_STATE_VICTORY) break;
+  // BFS pathfinding from (0,0) to exit portal (MAZE_COLS - 1, MAZE_ROWS - 1)
+  int vCol[MAZE_ROWS][MAZE_COLS];
+  int vRow[MAZE_ROWS][MAZE_COLS];
+  memset(vCol, -1, sizeof(vCol));
+  memset(vRow, -1, sizeof(vRow));
+
+  uint8_t vqC[49], vqR[49];
+  int vqH = 0, vqT = 0;
+  vqC[vqT] = 0; vqR[vqT] = 0; vqT++;
+  vCol[0][0] = 0; vRow[0][0] = 0;
+
+  int targetExitC = MAZE_COLS - 1, targetExitR = MAZE_ROWS - 1;
+  while (vqH < vqT) {
+    uint8_t c = vqC[vqH];
+    uint8_t r = vqR[vqH];
+    vqH++;
+    if (c == targetExitC && r == targetExitR) break;
+    uint8_t cell = vicMaze.getCell(c, r);
+    if (!(cell & MAZE_WALL_NORTH) && r > 0 && vCol[r - 1][c] == -1) {
+      vCol[r - 1][c] = c; vRow[r - 1][c] = r; vqC[vqT] = c; vqR[vqT] = r - 1; vqT++;
+    }
+    if (!(cell & MAZE_WALL_EAST) && c < MAZE_COLS - 1 && vCol[r][c + 1] == -1) {
+      vCol[r][c + 1] = c; vRow[r][c + 1] = r; vqC[vqT] = c + 1; vqR[vqT] = r; vqT++;
+    }
+    if (!(cell & MAZE_WALL_SOUTH) && r < MAZE_ROWS - 1 && vCol[r + 1][c] == -1) {
+      vCol[r + 1][c] = c; vRow[r + 1][c] = r; vqC[vqT] = c; vqR[vqT] = r + 1; vqT++;
+    }
+    if (!(cell & MAZE_WALL_WEST) && c > 0 && vCol[r][c - 1] == -1) {
+      vCol[r][c - 1] = c; vRow[r][c - 1] = r; vqC[vqT] = c - 1; vqR[vqT] = r; vqT++;
+    }
   }
+
+  uint8_t vpathC[49], vpathR[49];
+  int vpathLen = 0;
+  int vcurrC = targetExitC, vcurrR = targetExitR;
+  while (!(vcurrC == 0 && vcurrR == 0) && vpathLen < 49 && vcurrC >= 0 && vcurrR >= 0) {
+    vpathC[vpathLen] = vcurrC;
+    vpathR[vpathLen] = vcurrR;
+    vpathLen++;
+    int prevC = vCol[vcurrR][vcurrC];
+    int prevR = vRow[vcurrR][vcurrC];
+    vcurrC = prevC;
+    vcurrR = prevR;
+  }
+  for (int i = 0; i < vpathLen / 2; i++) {
+    uint8_t tc = vpathC[i]; vpathC[i] = vpathC[vpathLen - 1 - i]; vpathC[vpathLen - 1 - i] = tc;
+    uint8_t tr = vpathR[i]; vpathR[i] = vpathR[vpathLen - 1 - i]; vpathR[vpathLen - 1 - i] = tr;
+  }
+
+  unsigned long vtSim = 120;
+  for (int p = 0; p < vpathLen && vicMaze.getState() != MAZE_STATE_VICTORY; p++) {
+    float targetX = (float)(MazeLogic::ORIGIN_X + vpathC[p] * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
+    float targetY = (float)(MazeLogic::ORIGIN_Y + vpathR[p] * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
+    for (int step = 0; step < 50; step++) {
+      float dx = targetX - vicMaze.getBallX();
+      float dy = targetY - vicMaze.getBallY();
+      float tx = (dx > 2.0f) ? 0.9f : ((dx < -2.0f) ? -0.9f : 0.0f);
+      float ty = (dy > 2.0f) ? 0.9f : ((dy < -2.0f) ? -0.9f : 0.0f);
+      vicMaze.setTilt(tx, ty);
+      vtSim += 20;
+      vicMaze.update(vtSim);
+      if (vicMaze.getState() == MAZE_STATE_VICTORY) break;
+      if (fabs(dx) <= 5.0f && fabs(dy) <= 5.0f) break;
+    }
+  }
+
+  CHECK(vicMaze.getState() == MAZE_STATE_VICTORY, "Maze: reaches MAZE_STATE_VICTORY at exit portal");
+  CHECK(vicMaze.isNewBestRecord(), "Maze: sets newBestRecord when beating previous bestSeconds");
+  CHECK(vicMaze.getBestSeconds() >= 1 && vicMaze.getBestSeconds() < 50, "Maze: updates bestSeconds (>= 1s) on victory");
 
   // 7. Test pause functionality and timer freezing
   MazeLogic pauseMaze;
@@ -923,6 +989,90 @@ void testMarbleMazeLogic() {
 
   CHECK(hitPit, "Ball triggered pitfall collision");
   CHECK(readyMaze.getElapsedSeconds(tSim) >= 9, "Pitfall adds +5s penalty to elapsed timer");
+
+  // Test berry pickup and bonus (-2s)
+  MazeLogic berryMaze;
+  berryMaze.generateMaze(101, 60);
+  berryMaze.setTilt(0.5f, 0.0f);
+  berryMaze.update(1000);
+  berryMaze.update(1020); // Playing state
+
+  // Find reachable berry avoiding pitfalls and exit portal via BFS
+  int bCol[MAZE_ROWS][MAZE_COLS];
+  int bRow[MAZE_ROWS][MAZE_COLS];
+  memset(bCol, -1, sizeof(bCol));
+  memset(bRow, -1, sizeof(bRow));
+
+  uint8_t bqC[49], bqR[49];
+  int bqH = 0, bqT = 0;
+  bqC[bqT] = 0; bqR[bqT] = 0; bqT++;
+  bCol[0][0] = 0; bRow[0][0] = 0;
+
+  int targetBerryC = -1, targetBerryR = -1;
+  while (bqH < bqT && targetBerryC == -1) {
+    uint8_t c = bqC[bqH];
+    uint8_t r = bqR[bqH];
+    bqH++;
+    if (berryMaze.getCell(c, r) & MAZE_ITEM_BERRY) {
+      targetBerryC = c; targetBerryR = r;
+      break;
+    }
+    uint8_t cell = berryMaze.getCell(c, r);
+    if (!(cell & MAZE_WALL_NORTH) && r > 0 && bCol[r - 1][c] == -1 && !(berryMaze.getCell(c, r - 1) & MAZE_ITEM_PITFALL) && !(c == MAZE_COLS - 1 && r - 1 == MAZE_ROWS - 1)) {
+      bCol[r - 1][c] = c; bRow[r - 1][c] = r; bqC[bqT] = c; bqR[bqT] = r - 1; bqT++;
+    }
+    if (!(cell & MAZE_WALL_EAST) && c < MAZE_COLS - 1 && bCol[r][c + 1] == -1 && !(berryMaze.getCell(c + 1, r) & MAZE_ITEM_PITFALL) && !(c + 1 == MAZE_COLS - 1 && r == MAZE_ROWS - 1)) {
+      bCol[r][c + 1] = c; bRow[r][c + 1] = r; bqC[bqT] = c + 1; bqR[bqT] = r; bqT++;
+    }
+    if (!(cell & MAZE_WALL_SOUTH) && r < MAZE_ROWS - 1 && bCol[r + 1][c] == -1 && !(berryMaze.getCell(c, r + 1) & MAZE_ITEM_PITFALL) && !(c == MAZE_COLS - 1 && r + 1 == MAZE_ROWS - 1)) {
+      bCol[r + 1][c] = c; bRow[r + 1][c] = r; bqC[bqT] = c; bqR[bqT] = r + 1; bqT++;
+    }
+    if (!(cell & MAZE_WALL_WEST) && c > 0 && bCol[r][c - 1] == -1 && !(berryMaze.getCell(c - 1, r) & MAZE_ITEM_PITFALL) && !(c - 1 == MAZE_COLS - 1 && r == MAZE_ROWS - 1)) {
+      bCol[r][c - 1] = c; bRow[r][c - 1] = r; bqC[bqT] = c - 1; bqR[bqT] = r; bqT++;
+    }
+  }
+
+  uint8_t bpathC[49], bpathR[49];
+  int bpathLen = 0;
+  int bcurrC = targetBerryC, bcurrR = targetBerryR;
+  while (!(bcurrC == 0 && bcurrR == 0) && bpathLen < 49 && bcurrC >= 0 && bcurrR >= 0) {
+    bpathC[bpathLen] = bcurrC;
+    bpathR[bpathLen] = bcurrR;
+    bpathLen++;
+    int prevC = bCol[bcurrR][bcurrC];
+    int prevR = bRow[bcurrR][bcurrC];
+    bcurrC = prevC;
+    bcurrR = prevR;
+  }
+  for (int i = 0; i < bpathLen / 2; i++) {
+    uint8_t tc = bpathC[i]; bpathC[i] = bpathC[bpathLen - 1 - i]; bpathC[bpathLen - 1 - i] = tc;
+    uint8_t tr = bpathR[i]; bpathR[i] = bpathR[bpathLen - 1 - i]; bpathR[bpathLen - 1 - i] = tr;
+  }
+
+  // Fast forward time to 10 seconds before collecting berry
+  unsigned long btSim = 11020; // 10.0 seconds of gameplay
+  berryMaze.update(btSim);
+
+  for (int p = 0; p < bpathLen && berryMaze.getBerriesCollected() == 0; p++) {
+    float targetX = (float)(MazeLogic::ORIGIN_X + bpathC[p] * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
+    float targetY = (float)(MazeLogic::ORIGIN_Y + bpathR[p] * MazeLogic::CELL_SIZE + MazeLogic::CELL_SIZE * 0.5f);
+    for (int step = 0; step < 50; step++) {
+      float dx = targetX - berryMaze.getBallX();
+      float dy = targetY - berryMaze.getBallY();
+      float tx = (dx > 2.0f) ? 0.9f : ((dx < -2.0f) ? -0.9f : 0.0f);
+      float ty = (dy > 2.0f) ? 0.9f : ((dy < -2.0f) ? -0.9f : 0.0f);
+      berryMaze.setTilt(tx, ty);
+      btSim += 20;
+      berryMaze.update(btSim);
+      if (berryMaze.getBerriesCollected() > 0) break;
+      if (fabs(dx) <= 5.0f && fabs(dy) <= 5.0f) break;
+    }
+  }
+
+  uint16_t rawElapsed = (uint16_t)((btSim - 1020) / 1000);
+  CHECK(berryMaze.getBerriesCollected() >= 1, "Maze: collects berry along path");
+  CHECK((berryMaze.getCell(targetBerryC, targetBerryR) & MAZE_ITEM_BERRY) == 0, "Maze: berry bit cleared from cell after pickup");
+  CHECK(berryMaze.getElapsedSeconds() == rawElapsed - 2, "Maze: berry bonus reduces elapsed time by 2s");
 }
 
 int main() {

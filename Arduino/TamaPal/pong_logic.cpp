@@ -64,6 +64,11 @@ void PongLogic::movePaddle(float deltaY) {
   clampPaddle();
 }
 
+void PongLogic::setPaddleY(float y) {
+  paddleY = y;
+  clampPaddle();
+}
+
 void PongLogic::clampPaddle() {
   const float minY = (float)(FIELD_TOP + 2);
   const float maxY = (float)(FIELD_BOTTOM - PADDLE_HEIGHT - 2);

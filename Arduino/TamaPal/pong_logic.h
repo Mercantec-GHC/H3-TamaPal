@@ -44,6 +44,7 @@ public:
   // Update paddle position via IMU tilt (-1.0f .. +1.0f) or direct delta
   void setPaddleTilt(float tiltY);
   void movePaddle(float deltaY);
+  void setPaddleY(float y);
 
   // Physics simulation step
   void update(unsigned long currentTimeMs);

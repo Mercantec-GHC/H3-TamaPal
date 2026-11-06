@@ -176,8 +176,29 @@ void UiMazeRenderer::repairMazeRegion(const MazeLogic& maze, int16_t centerPxX, 
   if (minR < 0) minR = 0;
   if (maxR >= MAZE_ROWS) maxR = MAZE_ROWS - 1;
 
+  uint16_t iceBg = color565(18, 44, 82);
+
   for (int r = minR; r <= maxR; r++) {
     for (int c = minC; c <= maxC; c++) {
+      int left = MazeLogic::ORIGIN_X + c * MazeLogic::CELL_SIZE;
+      int top  = MazeLogic::ORIGIN_Y + r * MazeLogic::CELL_SIZE;
+
+      if (maze.getCell(c, r) & MAZE_ITEM_ICE) {
+        int iceLeft   = left + 2;
+        int iceTop    = top + 2;
+        int iceRight  = left + MazeLogic::CELL_SIZE - 2;
+        int iceBottom = top + MazeLogic::CELL_SIZE - 2;
+
+        int clipL = (centerPxX - 5 > iceLeft) ? (centerPxX - 5) : iceLeft;
+        int clipT = (centerPxY - 8 > iceTop) ? (centerPxY - 8) : iceTop;
+        int clipR = (centerPxX + 5 < iceRight) ? (centerPxX + 5) : iceRight;
+        int clipB = (centerPxY + 5 < iceBottom) ? (centerPxY + 5) : iceBottom;
+
+        if (clipR >= clipL && clipB >= clipT) {
+          carrier->display.fillRect(clipL, clipT, clipR - clipL + 1, clipB - clipT + 1, iceBg);
+        }
+      }
+
       drawSingleCellWalls(maze, (uint8_t)c, (uint8_t)r);
       drawSingleCellItems(maze, (uint8_t)c, (uint8_t)r);
     }
@@ -262,24 +283,12 @@ void UiMazeRenderer::drawMiniLumi(int x, int y, float vx, float vy) {
 }
 
 void UiMazeRenderer::eraseMiniLumi(int x, int y, const MazeLogic& maze) {
+  (void)maze;
   if (!carrier) return;
 
   uint16_t nativeBg = color565(8, 12, 26);
-  uint16_t iceBg    = color565(18, 44, 82);
-
-  // Check if cell under (x, y) is Ice
-  int c = (x - MazeLogic::ORIGIN_X) / MazeLogic::CELL_SIZE;
-  int r = (y - MazeLogic::ORIGIN_Y) / MazeLogic::CELL_SIZE;
-  uint16_t clearColor = nativeBg;
-
-  if (c >= 0 && c < MAZE_COLS && r >= 0 && r < MAZE_ROWS) {
-    if (maze.getCell(c, r) & MAZE_ITEM_ICE) {
-      clearColor = iceBg;
-    }
-  }
-
-  // Clear 12x14 box covering ball and sprout
-  carrier->display.fillRect(x - 5, y - 8, 11, 14, clearColor);
+  // Clear 11x14 box covering ball and sprout with base floor color
+  carrier->display.fillRect(x - 5, y - 8, 11, 14, nativeBg);
 }
 
 void UiMazeRenderer::drawVictoryScreen(const MazeLogic& maze) {

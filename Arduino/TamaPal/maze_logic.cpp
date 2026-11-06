@@ -504,12 +504,14 @@ uint16_t MazeLogic::getElapsedSeconds(unsigned long currentMs) const {
 
   unsigned long rawMs = (endMs - startTimeMs) + totalPausedMs;
   unsigned long berryBonusMs = (unsigned long)berriesCollected * 2000UL;
+  uint16_t sec = 0;
   if (rawMs > berryBonusMs) {
-    rawMs -= berryBonusMs;
-  } else {
-    rawMs = 0;
+    sec = (uint16_t)((rawMs - berryBonusMs) / 1000UL);
   }
-  return (uint16_t)(rawMs / 1000UL);
+  if (state == MAZE_STATE_VICTORY && sec == 0) {
+    return 1;
+  }
+  return sec;
 }
 
 uint16_t MazeLogic::getBestSeconds() const {
