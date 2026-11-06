@@ -49,6 +49,12 @@ void PetLogic::setVitals(float hunger, float warmth, float energy, float happine
   energyVal = clamp0100(energy);
   happinessVal = clamp0100(happiness);
   disciplineVal = clamp0100(discipline);
+  if (getOverallHealth() == 0) {
+    alive = false;
+    if (deathCause == DEATH_NONE) {
+      deathCause = DEATH_HUNGER;
+    }
+  }
 }
 
 bool PetLogic::feed() {

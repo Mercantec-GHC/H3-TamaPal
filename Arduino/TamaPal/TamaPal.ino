@@ -351,24 +351,21 @@ void loop() {
       Serial.print(petLogic.getDeathCauseName());
       Serial.print(F(" - "));
       Serial.println(petLogic.getDeathEpitaph());
-      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
-        uiPet.updateHomeDisplay(petLogic, now, true);
-      }
+      menuLogic.setScreen(SCREEN_HOME, now);
+      uiPet.updateHomeDisplay(petLogic, now, true);
       syncPetStateToBackend(true);
       demoCause = (demoCause % 6) + 1; // Cycle next death cause (1..6)
     } else if (c == 'r' || c == 'R') {
       if (!petLogic.isAlive()) {
         soundLed.playSound(SOUND_REBIRTH);
-        storagePet.logGraveRecord(petLogic);
         petLogic.rebirth();
         storagePet.savePet(petLogic);
         Serial.print(F("[LIVSCYKLUS] Rebirth via Serial! Ny generation: "));
         Serial.println((unsigned int)petLogic.getGeneration());
-        if (menuLogic.getActiveScreen() == SCREEN_HOME) {
-          uiMenu.drawInitialScreen();
-          uiMenu.drawMenuBar(menuLogic, true);
-          uiPet.updateHomeDisplay(petLogic, now, true);
-        }
+        menuLogic.setScreen(SCREEN_HOME, now);
+        uiMenu.drawInitialScreen();
+        uiMenu.drawMenuBar(menuLogic, true);
+        uiPet.updateHomeDisplay(petLogic, now, true);
         syncPetStateToBackend(true);
       }
     }
@@ -541,7 +538,6 @@ void loop() {
       if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
         if (carrier.Buttons.onTouchDown(TOUCH2)) {
           soundLed.playSound(SOUND_REBIRTH);
-          storagePet.logGraveRecord(petLogic);
           petLogic.rebirth();
           storagePet.savePet(petLogic);
           syncPetStateToBackend(true);
@@ -607,9 +603,8 @@ void loop() {
     Serial.print(petLogic.getDeathCauseName());
     Serial.print(F(" - "));
     Serial.println(petLogic.getDeathEpitaph());
-    if (menuLogic.getActiveScreen() == SCREEN_HOME) {
-      uiPet.updateHomeDisplay(petLogic, now, true);
-    }
+    menuLogic.setScreen(SCREEN_HOME, now);
+    uiPet.updateHomeDisplay(petLogic, now, true);
     syncPetStateToBackend(true);
   }
 
