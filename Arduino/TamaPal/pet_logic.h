@@ -59,12 +59,25 @@ public:
   // Direct vital setter for test verification
   void setVitals(float hunger, float warmth, float energy, float happiness, float discipline);
 
+  // Minigame records and character age (persisted to MicroSD)
+  uint16_t getHighScorePong() const;
+  void setHighScorePong(uint16_t score);
+  uint16_t getHighScoreMaze() const;
+  void setHighScoreMaze(uint16_t score);
+  uint32_t getAgeMinutes() const;
+  void setAgeMinutes(uint32_t mins);
+
 private:
   float hungerVal;
   float warmthVal;
   float energyVal;
   float happinessVal;
   float disciplineVal;
+
+  uint32_t ageMinutes;
+  uint16_t highScorePong;
+  uint16_t highScoreMaze;
+  uint8_t ageTickCount;
 
   PetStage currentStage;
   PetOutfit currentOutfit;

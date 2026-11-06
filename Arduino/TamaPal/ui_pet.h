@@ -11,7 +11,7 @@
 #include "pet_logic.h"
 
 // Distinct emotional & action states for Lumi's facial expressions and posture
-enum LumiExpression {
+enum LumiExpression : uint8_t {
   EXPR_SUPER_HAPPY = 0, // Overall health >= 80%: Sparkling eyes, cat-smile, perky ears
   EXPR_CONTENT,         // Normal state: Glossy anime eyes with dual catchlights, warm smile
   EXPR_SLEEPING,        // Asleep: Peaceful closed eyes (- -), slow breath, floating Zzz
@@ -27,7 +27,7 @@ enum LumiExpression {
 };
 
 // Ambient sky weather / time-of-day visual state
-enum SkyWeatherMode {
+enum SkyWeatherMode : uint8_t {
   SKY_DAY_SUNNY = 0,    // Warm sun with pulsing ray dots + fairies
   SKY_NIGHT_STARRY,     // Crescent moon + twinkling stars + dimmed fairies
   SKY_WINTER_SNOW       // Drifting pixel snowflakes + frosty sparkles + fairies
@@ -58,21 +58,22 @@ public:
 
 private:
   MKRIoTCarrier* carrier;
+  const char* lastMoodText;
+  unsigned long lastAnimTickMs;
 
-  bool stageInitialized;
-  int lastDrawnCx;
-  int lastDrawnCy;
-  int lastNaviX;
-  int lastNaviY;
-  int lastSmallFairyY;
-  int lastZzzPhase;
-  bool lastBlinking;
+  int16_t lastDrawnCx;
+  int16_t lastDrawnCy;
+  int16_t lastNaviX;
+  int16_t lastNaviY;
+  int16_t lastSmallFairyY;
+  int16_t lastZzzPhase;
+
   LumiExpression lastExpression;
   PetStage lastStage;
   PetOutfit lastOutfit;
   SkyWeatherMode lastWeather;
-  const char* lastMoodText;
-  unsigned long lastAnimTickMs;
+  bool stageInitialized;
+  bool lastBlinking;
 
   // Draw seamless Kokiri forest glade platform and flora (no colored background box)
   void drawForestStage(SkyWeatherMode weather);

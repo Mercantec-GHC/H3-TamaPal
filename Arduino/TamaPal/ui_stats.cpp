@@ -8,13 +8,13 @@
 
 UiStatsRenderer::UiStatsRenderer()
   : carrier(nullptr),
+    lastMoodText(nullptr),
     lastHunger(-1),
     lastWarmth(-1),
     lastEnergy(-1),
     lastHappiness(-1),
     lastDiscipline(-1),
     isInitialized(false) {
-  lastMood[0] = '\0';
 }
 
 void UiStatsRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
@@ -44,7 +44,7 @@ void UiStatsRenderer::drawInitialScreen() {
   lastEnergy = -1;
   lastHappiness = -1;
   lastDiscipline = -1;
-  lastMood[0] = '\0';
+  lastMoodText = nullptr;
   isInitialized = true;
 
   // Bottom navigation hint
@@ -55,7 +55,7 @@ void UiStatsRenderer::drawInitialScreen() {
   carrier->display.print(hint);
 }
 
-void UiStatsRenderer::drawSingleBar(int y, const char* label, int val, int& lastVal, uint16_t barColor, bool force) {
+void UiStatsRenderer::drawSingleBar(int y, const char* label, int val, int16_t& lastVal, uint16_t barColor, bool force) {
   if (carrier == nullptr) return;
 
   uint16_t bgColor = color565(8, 12, 26);
@@ -129,7 +129,7 @@ void UiStatsRenderer::updateDisplay(const PetLogic& pet, bool forceRedraw) {
 
   // 6. Mood Status String (Row Y = 176)
   const char* currentMood = pet.getMoodStatusDanish();
-  if (forceRedraw || strcmp(currentMood, lastMood) != 0) {
+  if (forceRedraw || currentMood != lastMoodText) {
     // Clear status text area cleanly
     carrier->display.fillRect(24, 174, 192, 14, bgColor);
 
@@ -151,8 +151,7 @@ void UiStatsRenderer::updateDisplay(const PetLogic& pet, bool forceRedraw) {
     carrier->display.setCursor((SCREEN_WIDTH - moodWidth) / 2, 176);
     carrier->display.print(currentMood);
 
-    strncpy(lastMood, currentMood, sizeof(lastMood) - 1);
-    lastMood[sizeof(lastMood) - 1] = '\0';
+    lastMoodText = currentMood;
   }
 }
 

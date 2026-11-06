@@ -111,8 +111,10 @@ void syncPetStateToBackend(bool forceImmediate) {
   }
   lastPetStatePublishTimeMs = now;
 
-  // 1. Save to local MicroSD card (persists even if Wi-Fi / MQTT is offline!)
-  storagePet.savePet(petLogic);
+  // 1. Save to local MicroSD card (avoid SPI access during active controller gameplay)
+  if (forceImmediate || menuLogic.getActiveScreen() != SCREEN_CONTROLLER) {
+    storagePet.savePet(petLogic);
+  }
 
   // 2. Publish to MQTT broker if connected
   if (netMqtt.isConnected()) {
@@ -520,8 +522,10 @@ void loop() {
     }
   }
 
-  // 5. NETWORK & MQTT (Keep connection alive and sync Lumi's 5 vitals every 30s)
-  netMqtt.update(now);
+  // 5. NETWORK & MQTT (Update connection if in Controller mode or already connected)
+  if (currentScreen == SCREEN_CONTROLLER || netMqtt.isConnected()) {
+    netMqtt.update(now);
+  }
   syncPetStateToBackend(false);
 
   // 6. SCREEN-SPECIFIC RUNTIME LOOPS

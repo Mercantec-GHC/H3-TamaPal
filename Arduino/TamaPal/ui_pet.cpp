@@ -338,7 +338,7 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
 
   // Sweat drops for overheating
   if (expr == EXPR_OVERHEATING) {
-    int dropY = eyeY - 8 + ((int)(millis() / 180) % 5);
+    int dropY = eyeY - 5 + ((int)(lastAnimTickMs / 180) % 4);
     uint16_t dropCyan = color565(90, 220, 255);
     uint16_t dropBlue = color565(25, 125, 215);
 
@@ -472,7 +472,7 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   // If Baby is overheating, pacifier drops out so Baby can pant with tongue!
   // Otherwise, Baby wears a cute pacifier/dummy that chatters when freezing!
   if (stage == STAGE_BABY && expr != EXPR_EATING && expr != EXPR_OVERHEATING && expr != EXPR_DEAD) {
-    int paciDx = (expr == EXPR_FREEZING && (((int)(millis() / 50)) % 2 == 0)) ? -1 : 0;
+    int paciDx = (expr == EXPR_FREEZING && (((int)(lastAnimTickMs / 50)) % 2 == 0)) ? -1 : 0;
 
     // Cute Baby Pacifier (Dummy)
     uint16_t paciShield = color565(255, 220, 70);  // Bright sunny yellow shield
@@ -548,7 +548,7 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
 
     case EXPR_FREEZING: {
       // Rapid shivering teeth chattering (alternates every 70 ms)
-      bool chatterOpen = (((int)(millis() / 70)) % 2 == 0);
+      bool chatterOpen = (((int)(lastAnimTickMs / 70)) % 2 == 0);
       if (chatterOpen) {
         carrier->display.fillRect(cx - 3, mouthY, 7, 3, mouthDark);
         carrier->display.drawFastHLine(cx - 2, mouthY + 1, 5, 0xFFFF); // Visible chattering white teeth
@@ -567,7 +567,7 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
 
     case EXPR_OVERHEATING: {
       // Heavy panting mouth with protruding tongue heaving in rhythm
-      bool pantingBeat = (((int)(millis() / 120)) % 2 == 0);
+      bool pantingBeat = (((int)(lastAnimTickMs / 120)) % 2 == 0);
       int tLen = pantingBeat ? 6 : 4;
       carrier->display.fillRoundRect(cx - 4, mouthY, 8, 6, 2, mouthDark);
       carrier->display.fillRoundRect(cx - 2, mouthY + 3, 5, tLen, 1, tonguePink);
@@ -1503,6 +1503,7 @@ void UiPetRenderer::drawActionScene(const PetLogic& pet,
   uint16_t nativeBg = color565(8, 12, 26);
 
   // 1. Draw the seamless stage with Lumi performing the action
+  lastAnimTickMs = nowMs;
   drawForestStage(weather);
   int actionCy = (actionExpr == EXPR_PLAYING || actionExpr == EXPR_EATING) ? (LUMI_BASE_CY - 3) : LUMI_BASE_CY;
   drawLumiCharacter(LUMI_BASE_CX, actionCy, actionExpr, false, pet.getStageEnum(), pet.getOutfitEnum(), nativeBg);

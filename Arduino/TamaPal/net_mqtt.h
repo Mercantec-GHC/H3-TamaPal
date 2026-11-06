@@ -7,7 +7,6 @@
 
 #include <WiFiNINA.h>
 #include <ArduinoMqttClient.h>
-#include <ArduinoJson.h>
 #include "settings.h"
 #include "tilt_logic.h"
 
@@ -56,20 +55,25 @@ public:
   int getPlayerId() const;
 
 private:
+  // Objects & pointers
   WiFiClient wifiClient;
   MqttClient mqttClient;
   GameEventCallback onEventCallback;
   PetRewardCallback onRewardCallback;
 
-  int playerId;
-  char topicInput[64];
-  char topicEvent[64];
-  char topicReward[64];
-  char topicPetState[64];
-  char clientMqttId[64];
-
+  // Timers
   unsigned long lastPublishTime;
   unsigned long lastReconnectAttempt;
+
+  // Small integer and compressed string buffers (zero dynamic heap)
+  int16_t playerId;
+  char topicInput[44];
+  char topicEvent[44];
+  char topicReward[48];
+  char topicPetState[48];
+  char clientMqttId[28];
+
+  // Boolean flags
   bool connectingState;
   bool lastReportedWifiConnected;
   bool hasPublishedFirstPacket;

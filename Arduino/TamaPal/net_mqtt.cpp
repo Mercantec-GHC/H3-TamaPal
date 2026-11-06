@@ -38,9 +38,9 @@ NetMqttClient::NetMqttClient()
   : mqttClient(wifiClient),
     onEventCallback(nullptr),
     onRewardCallback(nullptr),
-    playerId(1),
     lastPublishTime(0),
     lastReconnectAttempt(0),
+    playerId(1),
     connectingState(false),
     lastReportedWifiConnected(false),
     hasPublishedFirstPacket(false) {
@@ -244,6 +244,39 @@ void NetMqttClient::attemptConnection(unsigned long now) {
   }
 }
 
+// Static stack-based JSON field extractors (zero heap allocations, 0 bytes malloc)
+static bool extractJsonStringValue(const char* json, const char* key, char* outVal, size_t maxLen) {
+  if (json == nullptr || key == nullptr || outVal == nullptr || maxLen == 0) return false;
+  outVal[0] = '\0';
+
+  const char* pos = strstr(json, key);
+  if (pos == nullptr) return false;
+
+  pos += strlen(key);
+  // Skip whitespace, colon, and quotes
+  while (*pos == ' ' || *pos == '\t' || *pos == ':') pos++;
+  if (*pos != '\"') return false;
+  pos++; // skip opening quote
+
+  size_t idx = 0;
+  while (*pos != '\"' && *pos != '\0' && idx < maxLen - 1) {
+    outVal[idx++] = *pos++;
+  }
+  outVal[idx] = '\0';
+  return (idx > 0);
+}
+
+static int extractJsonIntValue(const char* json, const char* key, int defaultVal) {
+  if (json == nullptr || key == nullptr) return defaultVal;
+
+  const char* pos = strstr(json, key);
+  if (pos == nullptr) return defaultVal;
+
+  pos += strlen(key);
+  while (*pos == ' ' || *pos == '\t' || *pos == ':') pos++;
+  return atoi(pos);
+}
+
 void NetMqttClient::pollIncomingEvents() {
   int messageSize = mqttClient.parseMessage();
   if (messageSize <= 0) return;
@@ -264,25 +297,23 @@ void NetMqttClient::pollIncomingEvents() {
   Serial.print(F("[MQTT RX] Modtaget besked: "));
   Serial.println(buffer);
 
-  // Parse JSON using battle-tested ArduinoJson v7
-  JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, buffer);
-  if (error) {
-    Serial.print(F("[MQTT RX] JSON parsing fejlede: "));
-    Serial.println(error.f_str());
+  // Stack-based zero-allocation JSON extraction (no ArduinoJson or String heap usage)
+  char typeStr[24];
+  if (!extractJsonStringValue(buffer, "\"type\"", typeStr, sizeof(typeStr))) {
+    Serial.println(F("[MQTT RX] FEJL: Intet 'type'-felt fundet i JSON!"));
     return;
   }
 
-  String currentTopic = mqttClient.messageTopic();
-  if (currentTopic.indexOf(F("/reward")) >= 0) {
-    const char* typeStr = doc["type"];
-    int amount = doc["amount"] | 0;
-    if (typeStr != nullptr && onRewardCallback != nullptr) {
+  // Check if packet has amount (reward) or is a pet reward action
+  if (strstr(buffer, "\"amount\"") != nullptr ||
+      strcmp(typeStr, "happy_boost") == 0 ||
+      strcmp(typeStr, "energy_boost") == 0) {
+    int amount = extractJsonIntValue(buffer, "\"amount\"", 0);
+    if (onRewardCallback != nullptr) {
       onRewardCallback(typeStr, amount);
     }
   } else {
-    const char* typeStr = doc["type"];
-    if (typeStr != nullptr && onEventCallback != nullptr) {
+    if (onEventCallback != nullptr) {
       GameEvent event = TiltLogic::parseEventType(typeStr);
       if (event != EVENT_NONE) {
         onEventCallback(event);

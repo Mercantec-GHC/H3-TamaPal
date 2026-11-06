@@ -25,16 +25,16 @@ public:
 
 private:
   MKRIoTCarrier* carrier;
+  const char* lastMoodText;
 
-  int lastHunger;
-  int lastWarmth;
-  int lastEnergy;
-  int lastHappiness;
-  int lastDiscipline;
-  char lastMood[32];
+  int16_t lastHunger;
+  int16_t lastWarmth;
+  int16_t lastEnergy;
+  int16_t lastHappiness;
+  int16_t lastDiscipline;
   bool isInitialized;
 
-  void drawSingleBar(int y, const char* label, int val, int& lastVal, uint16_t barColor, bool force);
+  void drawSingleBar(int y, const char* label, int val, int16_t& lastVal, uint16_t barColor, bool force);
 
   static inline uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
     return ((uint16_t)(r & 0xF8) << 8) | ((uint16_t)(g & 0xFC) << 3) | (b >> 3);

@@ -32,6 +32,11 @@ void PetLogic::reset() {
   lightStartTimeMs = 0;
   ambientTemp = 22.0f;
   ambientLux = 150;
+
+  ageMinutes = 0;
+  highScorePong = 0;
+  highScoreMaze = 0;
+  ageTickCount = 0;
 }
 
 void PetLogic::setVitals(float hunger, float warmth, float energy, float happiness, float discipline) {
@@ -174,6 +179,10 @@ void PetLogic::update(unsigned long currentTimeMs) {
     lastDecayTimeMs += elapsedIntervals * PET_DECAY_INTERVAL_MS;
 
     float intervals = (float)elapsedIntervals;
+    unsigned long totalTicks = (unsigned long)ageTickCount + elapsedIntervals;
+    ageMinutes += (totalTicks / 6);
+    ageTickCount = (uint8_t)(totalTicks % 6);
+
     if (isAsleep) {
       // Recover energy while sleeping
       energyVal = clamp0100(energyVal + (PET_SLEEP_ENERGY_RECOVERY * intervals));
@@ -323,5 +332,34 @@ void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char
            getHappiness(),
            getDiscipline(),
            isAlive() ? "true" : "false");
+}
+
+uint16_t PetLogic::getHighScorePong() const {
+  return highScorePong;
+}
+
+void PetLogic::setHighScorePong(uint16_t score) {
+  if (score > highScorePong) {
+    highScorePong = score;
+  }
+}
+
+uint16_t PetLogic::getHighScoreMaze() const {
+  return highScoreMaze;
+}
+
+void PetLogic::setHighScoreMaze(uint16_t score) {
+  if (score > highScoreMaze) {
+    highScoreMaze = score;
+  }
+}
+
+uint32_t PetLogic::getAgeMinutes() const {
+  return ageMinutes;
+}
+
+void PetLogic::setAgeMinutes(uint32_t mins) {
+  ageMinutes = mins;
+  ageTickCount = 0;
 }
 

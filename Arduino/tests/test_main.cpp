@@ -461,6 +461,43 @@ void testPetStorageSerialization() {
   CHECK(!StoragePet::deserializeState("HUNGER=999\nWARMTH=50\nENERGY=50\nHAPPINESS=50\nDISCIPLINE=50\nASLEEP=0\n", h, w, e, hap, d, asleep), "Fails on out-of-range value (999)");
   CHECK(!StoragePet::deserializeState(nullptr, h, w, e, hap, d, asleep), "Fails safely on nullptr");
   CHECK(!StoragePet::deserializeState("", h, w, e, hap, d, asleep), "Fails safely on empty string");
+
+  // Test minigame high scores, age minutes and FNV-1a hash
+  pet.setHighScorePong(42);
+  pet.setHighScoreMaze(108);
+  pet.setAgeMinutes(15);
+  // Setting a lower score should keep highest record
+  pet.setHighScorePong(10);
+  CHECK(pet.getHighScorePong() == 42, "HighScorePong retains highest record (42)");
+  CHECK(pet.getHighScoreMaze() == 108, "HighScoreMaze is 108");
+  CHECK(pet.getAgeMinutes() == 15, "AgeMinutes is 15");
+
+  char extBuffer[160];
+  StoragePet::serializeState(extBuffer, sizeof(extBuffer), pet);
+  CHECK(strstr(extBuffer, "PONG=42\n") != NULL, "Serialized text contains PONG=42");
+  CHECK(strstr(extBuffer, "MAZE=108\n") != NULL, "Serialized text contains MAZE=108");
+  CHECK(strstr(extBuffer, "AGE=15\n") != NULL, "Serialized text contains AGE=15");
+
+  uint16_t rPong = 0, rMaze = 0;
+  uint32_t rAge = 0;
+  CHECK(StoragePet::deserializeState(extBuffer, h, w, e, hap, d, asleep, stage, outfit, rPong, rMaze, rAge), "Deserializes extended state with high scores & age");
+  CHECK(rPong == 42, "Restored Pong record is 42");
+  CHECK(rMaze == 108, "Restored Maze record is 108");
+  CHECK(rAge == 15, "Restored Age is 15 minutes");
+
+  uint32_t hash1 = StoragePet::computeHash(extBuffer);
+  uint32_t hash2 = StoragePet::computeHash(extBuffer);
+  CHECK(hash1 != 0, "FNV-1a hash is non-zero");
+  CHECK(hash1 == hash2, "FNV-1a hash is deterministic");
+
+  // Test age minute accumulation in PetLogic::update()
+  PetLogic agePet;
+  CHECK(agePet.getAgeMinutes() == 0, "Initial age is 0 minutes");
+  agePet.update(0); // Initialize decay timer
+  agePet.update(60000); // 6 intervals of 10s = 60s -> 1 minute
+  CHECK(agePet.getAgeMinutes() == 1, "Age reaches 1 minute after 60s");
+  agePet.update(120000); // Another 60s -> 2 minutes
+  CHECK(agePet.getAgeMinutes() == 2, "Age reaches 2 minutes after 120s");
 }
 
 void testPetWardrobeAndThermoregulation() {

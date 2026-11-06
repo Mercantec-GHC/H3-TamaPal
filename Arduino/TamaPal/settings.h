@@ -87,7 +87,7 @@ const unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000;
 // ============================================================================
 
 // Which screen is currently visible to the player
-enum ScreenType {
+enum ScreenType : uint8_t {
   SCREEN_HOME = 0,         // Main screen: Lumi character + top menu bar
   SCREEN_STATS,            // Fullscreen statistics dashboard (5 vital bars)
   SCREEN_CHOOSE_PLAYER,    // Select Player 1 (Venstre) vs Player 2 (Hoejre)
@@ -96,7 +96,7 @@ enum ScreenType {
 };
 
 // The 5 icons in the top navigation menu
-enum MenuIcon {
+enum MenuIcon : uint8_t {
   ICON_FOOD = 0,           // 0: Mad (Feed berry to Lumi)
   ICON_PLAY,               // 1: Leg (Play minigame / pet)
   ICON_SCOLD,              // 2: Skaeld ud (Discipline when complaining)
@@ -106,7 +106,7 @@ enum MenuIcon {
 };
 
 // Hardware touch buttons on the Arduino Oplà MKR Carrier
-enum TouchPad {
+enum TouchPad : uint8_t {
   TOUCH_PAD_PREV = 0,      // TOUCH0: Move menu selection left (<)
   TOUCH_PAD_NEXT = 1,      // TOUCH1: Move menu selection right (>)
   TOUCH_PAD_OK = 2,        // TOUCH2: Confirm / select action (in Pong: serve ball)
@@ -115,7 +115,7 @@ enum TouchPad {
 };
 
 // Sound effect types for buzzer
-enum SoundType {
+enum SoundType : uint8_t {
   SOUND_NONE = 0,
   SOUND_CLICK,             // Soft click when browsing icons (20 ms)
   SOUND_CONFIRM,           // Cheerful 2-tone chirp on OK selection
@@ -126,7 +126,7 @@ enum SoundType {
 };
 
 // Events received from backend over MQTT (tamapal/opla-1/event)
-enum GameEvent {
+enum GameEvent : uint8_t {
   EVENT_NONE = 0,
   EVENT_HIT,               // Paddle hit the ball (+1 point)
   EVENT_MISS,              // Missed ball (-1 life)
@@ -167,7 +167,7 @@ const int PET_CRITICAL_THRESHOLD = 20;
 // ============================================================================
 // LIFECYCLE STAGES (GDD 4 livsstadier: Baby -> Teen -> Adult -> Old)
 // ============================================================================
-enum PetStage {
+enum PetStage : uint8_t {
   STAGE_BABY = 0, // Round egg-like mochi baby with paci/dummy, tiny ears & sprout
   STAGE_TEEN,     // Adventurous Kokiri teen with 2 leaves & perky ears (default)
   STAGE_ADULT,    // Business look with briefcase & tie/vest
@@ -177,7 +177,7 @@ enum PetStage {
 // ============================================================================
 // WARDROBE OUTFITS (Garderobe: standard sommer vs varm vinterpaaklaedning)
 // ============================================================================
-enum PetOutfit {
+enum PetOutfit : uint8_t {
   OUTFIT_DEFAULT = 0, // Natural mochi look (summer / standard)
   OUTFIT_WINTER  = 1  // Winter beanie with pompom + cozy warm scarf
 };

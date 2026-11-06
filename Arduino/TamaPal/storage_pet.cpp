@@ -16,7 +16,18 @@
 #endif
 
 StoragePet::StoragePet()
-  : cardInitialized(false) {
+  : lastSavedHash(0),
+    cardInitialized(false) {
+}
+
+uint32_t StoragePet::computeHash(const char* str) {
+  uint32_t hash = 2166136261u;
+  if (str == nullptr) return hash;
+  while (*str) {
+    hash ^= (uint8_t)*str++;
+    hash *= 16777619u;
+  }
+  return hash;
 }
 
 bool StoragePet::begin() {
@@ -38,10 +49,14 @@ bool StoragePet::isCardReady() const {
   return cardInitialized;
 }
 
+uint32_t StoragePet::getLastSavedHash() const {
+  return lastSavedHash;
+}
+
 void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pet) {
   if (buffer == nullptr || bufSize == 0) return;
   snprintf(buffer, bufSize,
-           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\n",
+           "HUNGER=%d\nWARMTH=%d\nENERGY=%d\nHAPPINESS=%d\nDISCIPLINE=%d\nASLEEP=%d\nSTAGE=%d\nOUTFIT=%d\nPONG=%u\nMAZE=%u\nAGE=%lu\n",
            pet.getHunger(),
            pet.getWarmth(),
            pet.getEnergy(),
@@ -49,7 +64,10 @@ void StoragePet::serializeState(char* buffer, size_t bufSize, const PetLogic& pe
            pet.getDiscipline(),
            pet.isSleeping() ? 1 : 0,
            (int)pet.getStageEnum(),
-           (int)pet.getOutfitEnum());
+           (int)pet.getOutfitEnum(),
+           (unsigned int)pet.getHighScorePong(),
+           (unsigned int)pet.getHighScoreMaze(),
+           (unsigned long)pet.getAgeMinutes());
 }
 
 bool StoragePet::deserializeState(const char* text,
@@ -85,11 +103,32 @@ bool StoragePet::deserializeState(const char* text,
                                  bool& asleep,
                                  PetStage& stage,
                                  PetOutfit& outfit) {
+  uint16_t dummyPong = 0;
+  uint16_t dummyMaze = 0;
+  uint32_t dummyAge = 0;
+  return deserializeState(text, hunger, warmth, energy, happiness, discipline, asleep, stage, outfit, dummyPong, dummyMaze, dummyAge);
+}
+
+bool StoragePet::deserializeState(const char* text,
+                                 float& hunger,
+                                 float& warmth,
+                                 float& energy,
+                                 float& happiness,
+                                 float& discipline,
+                                 bool& asleep,
+                                 PetStage& stage,
+                                 PetOutfit& outfit,
+                                 uint16_t& pong,
+                                 uint16_t& maze,
+                                 uint32_t& age) {
   if (text == nullptr || text[0] == '\0') return false;
 
   int h = -1, w = -1, e = -1, hap = -1, d = -1, s = -1;
   int st = (int)STAGE_BABY;       // Default to baby if not present in legacy file
   int outf = (int)OUTFIT_DEFAULT; // Default to natural fur if not present in legacy file
+  int pVal = 0;
+  int mVal = 0;
+  long aVal = 0;
   const char* p = text;
 
   // Robust line-by-line parser supporting arbitrary line order
@@ -110,6 +149,12 @@ bool StoragePet::deserializeState(const char* text,
       st = atoi(p + 6);
     } else if (strncmp(p, "OUTFIT=", 7) == 0) {
       outf = atoi(p + 7);
+    } else if (strncmp(p, "PONG=", 5) == 0) {
+      pVal = atoi(p + 5);
+    } else if (strncmp(p, "MAZE=", 5) == 0) {
+      mVal = atoi(p + 5);
+    } else if (strncmp(p, "AGE=", 4) == 0) {
+      aVal = atol(p + 4);
     }
 
     const char* nextLine = strchr(p, '\n');
@@ -125,7 +170,8 @@ bool StoragePet::deserializeState(const char* text,
       d < 0 || d > 100 ||
       s < 0 || s > 1 ||
       st < 0 || st > 3 ||
-      outf < 0 || outf > 1) {
+      outf < 0 || outf > 1 ||
+      pVal < 0 || mVal < 0 || aVal < 0) {
     return false;
   }
 
@@ -137,6 +183,9 @@ bool StoragePet::deserializeState(const char* text,
   asleep = (s == 1);
   stage = (PetStage)st;
   outfit = (PetOutfit)outf;
+  pong = (uint16_t)pVal;
+  maze = (uint16_t)mVal;
+  age = (uint32_t)aVal;
   return true;
 }
 
@@ -144,8 +193,13 @@ bool StoragePet::savePet(const PetLogic& pet) {
 #if defined(ARDUINO)
   if (!cardInitialized) return false;
 
-  char buffer[128];
+  char buffer[160];
   serializeState(buffer, sizeof(buffer), pet);
+
+  uint32_t currentHash = computeHash(buffer);
+  if (currentHash == lastSavedHash) {
+    return true; // Zero SPI bus traffic when pet state is identical
+  }
 
   // Remove stale file before writing to prevent appending
   if (SD.exists(PET_STORAGE_FILENAME)) {
@@ -160,6 +214,7 @@ bool StoragePet::savePet(const PetLogic& pet) {
 
   file.print(buffer);
   file.close();
+  lastSavedHash = currentHash;
   Serial.println(F("[STORAGE] Lumi gemt paa MicroSD-kort."));
   return true;
 #else
@@ -183,7 +238,7 @@ bool StoragePet::loadPet(PetLogic& pet) {
     return false;
   }
 
-  char buffer[128];
+  char buffer[160];
   int bytesRead = 0;
   while (file.available() && bytesRead < (int)(sizeof(buffer) - 1)) {
     buffer[bytesRead++] = (char)file.read();
@@ -195,11 +250,18 @@ bool StoragePet::loadPet(PetLogic& pet) {
   bool asleep = false;
   PetStage stage = STAGE_BABY;
   PetOutfit outfit = OUTFIT_DEFAULT;
-  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit)) {
+  uint16_t pong = 0;
+  uint16_t maze = 0;
+  uint32_t age = 0;
+  if (deserializeState(buffer, h, w, e, hap, d, asleep, stage, outfit, pong, maze, age)) {
     pet.setVitals(h, w, e, hap, d);
     pet.setSleeping(asleep);
     pet.setStage(stage);
     pet.setOutfit(outfit);
+    pet.setHighScorePong(pong);
+    pet.setHighScoreMaze(maze);
+    pet.setAgeMinutes(age);
+    lastSavedHash = computeHash(buffer);
     Serial.print(F("[STORAGE] SUCCES: Indlaeste Lumi fra MicroSD! Sult: "));
     Serial.print((int)h);
     Serial.print(F("%, Energi: "));
@@ -207,7 +269,10 @@ bool StoragePet::loadPet(PetLogic& pet) {
     Serial.print(F("%, Stadie: "));
     Serial.print(pet.getStage());
     Serial.print(F(", Toej: "));
-    Serial.println(pet.getOutfit());
+    Serial.print(pet.getOutfit());
+    Serial.print(F(", Alder: "));
+    Serial.print((unsigned long)age);
+    Serial.println(F(" min"));
     return true;
   } else {
     Serial.println(F("[STORAGE] ADVARSEL: lumi.txt data var ugyldig, starter forfra."));

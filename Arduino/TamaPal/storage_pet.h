@@ -27,6 +27,7 @@ public:
 
   // Status query
   bool isCardReady() const;
+  uint32_t getLastSavedHash() const;
 
   // Pure logic helpers for unit testing (zero hardware dependencies)
   static void serializeState(char* buffer, size_t bufSize, const PetLogic& pet);
@@ -54,8 +55,24 @@ public:
                                bool& asleep,
                                PetStage& stage,
                                PetOutfit& outfit);
+  static bool deserializeState(const char* text,
+                               float& hunger,
+                               float& warmth,
+                               float& energy,
+                               float& happiness,
+                               float& discipline,
+                               bool& asleep,
+                               PetStage& stage,
+                               PetOutfit& outfit,
+                               uint16_t& pong,
+                               uint16_t& maze,
+                               uint32_t& age);
+
+  // FNV-1a non-cryptographic hash for dirty checking before SPI writes
+  static uint32_t computeHash(const char* str);
 
 private:
+  uint32_t lastSavedHash;
   bool cardInitialized;
 };
 
