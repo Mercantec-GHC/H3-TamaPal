@@ -25,8 +25,9 @@ public:
   // Games selection menu
   void drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore, bool fullRedraw = true);
 
-  // House menu & Wardrobe selection screens
-  void drawHouseMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool isSleeping, bool fullRedraw = true);
+  // House menu (Garderobe, Soevn & Mindelund) & Wardrobe selection screens
+  void drawHouseMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool isSleeping, bool fullRedraw = true,
+                     uint16_t graveCount = 0, uint16_t generation = 1, uint16_t pongHigh = 0, uint16_t mazeHigh = 0);
   void drawWardrobeMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool fullRedraw = true);
 
   // Helper screens

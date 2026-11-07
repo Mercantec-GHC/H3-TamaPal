@@ -36,6 +36,7 @@ private:
   uint8_t lastBerries;
   uint8_t lastCollectedBerries;
   uint16_t lastSeconds;
+  uint8_t lastAnimPhase;
   MazeState lastState;
   bool isInitialized;
 
@@ -43,6 +44,7 @@ private:
   void drawCellItems(const MazeLogic& maze);
   void drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8_t r);
   void drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8_t r);
+  void animateHazardsAndPortal(const MazeLogic& maze, uint8_t phase);
   void repairMazeRegion(const MazeLogic& maze, int16_t centerPxX, int16_t centerPxY);
   void drawHud(const MazeLogic& maze, bool force);
   void drawMiniLumi(int x, int y, float vx, float vy);

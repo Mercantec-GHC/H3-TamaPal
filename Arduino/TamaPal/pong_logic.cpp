@@ -40,10 +40,16 @@ void PongLogic::startNewGame(uint16_t existingHighScore) {
 void PongLogic::resetBall() {
   ballX = PADDLE_X + PADDLE_WIDTH + 4;
   ballY = paddleY + (PADDLE_HEIGHT - BALL_SIZE) * 0.5f;
-  // Smooth progressive base speed: starts gentle at score 0, scales slightly if respawning mid-game
-  float scoreBonus = (float)score * 0.04f;
-  if (scoreBonus > 0.70f) scoreBonus = 0.70f;
-  ballVx = 1.60f + scoreBonus;
+  // Preserve progressive rally speed when respawning mid-game so acceleration is felt throughout the match
+  float speed = 1.60f;
+  for (uint16_t hit = 0; hit < score && hit < 30; hit++) {
+    float midProgress = (float)hit / 12.0f;
+    if (midProgress > 1.0f) midProgress = 1.0f;
+    float accelRate = 0.05f - (0.045f * midProgress); // +5.0% at start -> +0.5% at mid-game
+    speed *= (1.0f + accelRate);
+  }
+  if (speed > 5.2f) speed = 5.2f;
+  ballVx = speed;
   ballVy = 0.65f;
 }
 
@@ -147,11 +153,17 @@ void PongLogic::update(unsigned long currentTimeMs) {
     pendingSound = SOUND_CLICK;
   }
 
-  // 2. Right wall collision (keep 1px left of right wall at FIELD_RIGHT - 2)
+  // 2. Right Bot Paddle collision (keep 1px left of right paddle at FIELD_RIGHT - 2)
+  // Accelerates ball on every hit: +5.0% at start of game, smoothly decaying to +0.5% by mid-game (score >= 12)
   const float maxBallX = (float)(FIELD_RIGHT - 2 - BALL_SIZE);
   if (ballX >= maxBallX) {
     ballX = maxBallX;
-    ballVx = -fabs(ballVx);
+    float midProgress = (float)score / 12.0f;
+    if (midProgress > 1.0f) midProgress = 1.0f;
+    float accelRate = 0.05f - (0.045f * midProgress); // 5.0% -> 0.5%
+    float nextSpeed = fabs(ballVx) * (1.0f + accelRate);
+    if (nextSpeed > 5.2f) nextSpeed = 5.2f;
+    ballVx = -nextSpeed;
     wallHitFlag = true;
     pendingSound = SOUND_CLICK;
   }
@@ -170,9 +182,12 @@ void PongLogic::update(unsigned long currentTimeMs) {
       if (relHit < -1.0f) relHit = -1.0f;
       if (relHit > 1.0f)  relHit = 1.0f;
 
-      // Smooth progressive acceleration on each paddle hit (+6% per hit, capped at 5.0f)
-      float currentSpeed = -ballVx * 1.06f;
-      if (currentSpeed > 5.0f) currentSpeed = 5.0f;
+      // Decaying progressive acceleration per hit: +5.0% at start (score 0), decaying to +0.5% at mid-game (score >= 12)
+      float midProgress = (float)score / 12.0f;
+      if (midProgress > 1.0f) midProgress = 1.0f;
+      float accelRate = 0.05f - (0.045f * midProgress); // 5.0% -> 0.5%
+      float currentSpeed = -ballVx * (1.0f + accelRate);
+      if (currentSpeed > 5.2f) currentSpeed = 5.2f;
       ballVx = currentSpeed;
 
       // Vertical spin/angle proportional to current speed so early rally bounces stay smooth

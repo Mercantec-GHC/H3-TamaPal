@@ -41,14 +41,17 @@ const unsigned long ACTION_MESSAGE_DURATION_MS = 1500;
   #define SECRET_USE_CASE false
 #endif
 
-// Capacitive touch sensitivity thresholds:
+// Capacitive touch sensitivity thresholds (uint8_t 0..255 in QTouch):
 // Lower value = MORE sensitive (for plastic case, penetrates plastic dielectric)
 // Higher value = LESS sensitive (for bare PCB, prevents hovering finger ghost taps)
-const int TOUCH_SENSITIVITY_BARE_BOARD = 200; // Bare PCB without case
-const int TOUCH_SENSITIVITY_WITH_CASE  = 60;  // Board mounted in plastic enclosure
+const int TOUCH_SENSITIVITY_BARE_BOARD = 242; // Bare PCB: requires firm skin contact, ignores air hover
+const int TOUCH_SENSITIVITY_WITH_CASE  = 75;  // Board mounted in plastic enclosure
 
 // Minimum pause between button triggers in milliseconds (prevents accidental double-taps)
 const unsigned long TOUCH_COOLDOWN_MS = 180;
+
+// First-touch contact filter for Pong paddle buttons (ignores 1-30ms air-hover spikes)
+const unsigned long PONG_BUTTON_DEBOUNCE_MS = 35;
 
 // Start with sound enabled (can be toggled at any time by pressing TOUCH0 + TOUCH4 together)
 const bool START_WITH_SOUND_MUTED = false;
@@ -159,11 +162,11 @@ enum GameEvent : uint8_t {
 // Interval between natural stat decay updates in milliseconds
 const unsigned long PET_DECAY_INTERVAL_MS = 10000; // Decay tick every 10 seconds
 
-// Decay amounts per tick
-const float PET_DECAY_HUNGER = 0.5f;     // Hunger drops 0.5% every 10 sec
-const float PET_DECAY_ENERGY = 0.3f;     // Energy drops 0.3% every 10 sec awake
-const float PET_DECAY_HAPPINESS = 0.4f;  // Happiness drops 0.4% every 10 sec
-const float PET_DECAY_DISCIPLINE = 0.2f; // Discipline drops 0.2% every 10 sec
+// Decay amounts per tick (6 ticks = 1 Tamagotchi day -> ~10 days average lifespan if neglected, 100 days max)
+const float PET_DECAY_HUNGER = 1.35f;     // Hunger drops ~8.1% per day (~10 days to starvation death)
+const float PET_DECAY_ENERGY = 1.15f;     // Energy drops ~6.9% per day awake
+const float PET_DECAY_HAPPINESS = 1.20f;  // Happiness drops ~7.2% per day
+const float PET_DECAY_DISCIPLINE = 0.60f; // Discipline drops ~3.6% per day
 
 // Energy recovery per tick while sleeping (6.0% every 10 sec = full recovery in ~2.5 min)
 const float PET_SLEEP_ENERGY_RECOVERY = 6.0f;

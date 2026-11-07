@@ -102,8 +102,6 @@ uint32_t frameCount = 0;
 unsigned long lastTouchTimeMs = 0;
 
 // Non-blocking Mute toggle state (prevents multi-trigger and screen blinking)
-bool combo04Fired = false;
-unsigned long combo04StartTime = 0;
 bool touch3HoldFired = false;
 unsigned long touch3StartTime = 0;
 unsigned long muteMessageEndTimeMs = 0;
@@ -172,31 +170,9 @@ void setCaseMode(bool enableCase, bool reinitHardware = false) {
   }
 }
 
-// Non-blocking Mute toggle gesture processing
+// Non-blocking Mute toggle gesture processing (Hold TOUCH3 alone for 1.2 seconds on HOME screen)
 void processMuteGestures(unsigned long now, bool touch0, bool touch3, bool touch4, ScreenType currentScreen) {
-  // GESTURE 1: TOUCH0 + TOUCH4 combo (Hold both for 300 ms on HOME)
-  if (currentScreen == SCREEN_HOME && touch0 && touch4) {
-    if (combo04StartTime == 0) {
-      combo04StartTime = now;
-    } else if (!combo04Fired && (now - combo04StartTime >= 300)) {
-      soundLed.toggleMute();
-      combo04Fired = true;
-      muteMessageEndTimeMs = now + 1400; // Toast visible for 1.4 seconds
-
-      if (soundLed.isMuted()) {
-        uiMenu.drawPlaceholderScreen("LYD: SLUKKET", "Lyd er slaaet fra");
-      } else {
-        uiMenu.drawPlaceholderScreen("LYD: TAENDT", "Lyd er slaaet til");
-        soundLed.playSound(SOUND_CONFIRM);
-      }
-    }
-  } else if (!touch0 && !touch4) {
-    // Reset ONLY when BOTH fingers are lifted off
-    combo04Fired = false;
-    combo04StartTime = 0;
-  }
-
-  // GESTURE 2: Hold TOUCH3 alone for 1.2 seconds on HOME screen
+  // Hold TOUCH3 alone for 1.2 seconds on HOME screen to toggle Mute cleanly
   if (currentScreen == SCREEN_HOME && touch3 && !touch0 && !touch4) {
     if (touch3StartTime == 0) {
       touch3StartTime = now;
@@ -277,6 +253,11 @@ void setup() {
   // Initialize MicroSD card persistence and restore Lumi if file exists
   storagePet.begin();
   if (storagePet.loadPet(petLogic)) {
+    if (!petLogic.isAlive() && petLogic.getAgeMinutes() < 10) {
+      // Auto-recover if Lumi died prematurely under legacy fast-minute decay
+      petLogic.rebirth();
+      storagePet.savePet(petLogic);
+    }
     Serial.println(F("[STORAGE] Lumi fortsætter fra gemt tilstand på MicroSD-kort!"));
   }
 
@@ -582,42 +563,50 @@ void loop() {
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
         menuLogic.onButtonOk(now);
-        lastTouchTimeMs = now;
+        lastTouchTimeMs = now + 250;
       } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
         menuLogic.onButtonBack();
-        lastTouchTimeMs = now;
+        lastTouchTimeMs = now + 250;
       }
     }
   } else if (currentScreen == SCREEN_HOUSE_MENU) {
-    // House sub-menu: 1. Garderobe (Skab) / 2. Sengetid (Soevn)
+    // House sub-menu: 1. Garderobe (Skab), 2. Sengetid (Soevn), 3. Mindelund (Kirkegaard med SD statistik)
     if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
       if (carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.onButtonPrev();
-        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false,
+                             storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                             petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
         menuLogic.onButtonNext();
-        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false,
+                             storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                             petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
         uint8_t opt = menuLogic.getSelectedHouseOption();
         if (opt == 0) {
-          // Open Wardrobe
+          // 1. Open Wardrobe (pre-select current outfit)
+          menuLogic.selectWardrobeOption((uint8_t)petLogic.getOutfitEnum());
           menuLogic.openWardrobeMenu();
           uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), true);
-        } else {
-          // Toggle Sleep / Sengetid
+        } else if (opt == 1) {
+          // 2. Toggle Manual Sleep / Sengetid and immediately go to SCREEN_HOME to show Lumi sleeping!
           bool newSleeping = !petLogic.isSleeping();
-          petLogic.setSleeping(newSleeping);
+          petLogic.setManualSleep(newSleeping);
           soundLed.playSound(SOUND_CONFIRM);
           if (newSleeping) {
-            soundLed.setMoodColor(80, 140, 255); // Calming blue
+            soundLed.setMoodColor(80, 140, 255); // Calming nocturnal blue
           } else {
-            soundLed.setMoodColor(100, 255, 120); // Fresh green
+            soundLed.setMoodColor(100, 255, 120); // Fresh awake green
           }
           storagePet.savePet(petLogic);
           syncPetStateToBackend(true);
-          uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+          menuLogic.setScreen(SCREEN_HOME, now);
+        } else {
+          // 3. Open Graveyard / Mindelund with ancestor chronicles from MicroSD card
+          menuLogic.openMemorial(storagePet.getGraveRecordCount(), SCREEN_HOUSE_MENU);
         }
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
@@ -626,7 +615,7 @@ void loop() {
       }
     }
   } else if (currentScreen == SCREEN_WARDROBE) {
-    // Wardrobe dressing room: choose standard vs winter outfit
+    // Wardrobe dressing room: choose standard vs winter outfit, then immediately return to SCREEN_HOME!
     if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
       if (carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.onButtonPrev();
@@ -643,12 +632,15 @@ void loop() {
         soundLed.flashColor(255, 230, 80, 300);
         storagePet.savePet(petLogic);
         syncPetStateToBackend(true);
-        uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), false);
+        // Immediately return to SCREEN_HOME so the user sees Lumi wearing the selected outfit!
+        menuLogic.setScreen(SCREEN_HOME, now);
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
         menuLogic.onButtonBack();
         if (menuLogic.getActiveScreen() == SCREEN_HOUSE_MENU) {
-          uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true);
+          uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true,
+                               storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                               petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         }
         lastTouchTimeMs = now;
       }
@@ -686,15 +678,29 @@ void loop() {
       }
     } else {
       // Smooth 50 Hz button paddle control in READY, BALL_LOST, and PLAYING states:
-      // TOUCH0 = Op (Up, -Y), TOUCH1 = Ned (Down, +Y)
+      // TOUCH1 (01, top-left) = Op (Up, -Y), TOUCH0 (00, bottom-left) = Ned (Down, +Y)
+      // Debounce timer ignores brief air-hover spikes (< 35 ms)
+      static unsigned long paddleTouch1StartMs = 0;
+      static unsigned long paddleTouch0StartMs = 0;
+      if (touch1) {
+        if (paddleTouch1StartMs == 0) paddleTouch1StartMs = now;
+      } else {
+        paddleTouch1StartMs = 0;
+      }
+      if (touch0) {
+        if (paddleTouch0StartMs == 0) paddleTouch0StartMs = now;
+      } else {
+        paddleTouch0StartMs = 0;
+      }
+
       static unsigned long lastPaddleBtnMs = 0;
       if (now - lastPaddleBtnMs >= 20) {
         lastPaddleBtnMs = now;
-        if (touch0) {
-          pongLogic.movePaddle(-3.8f); // Up (Op)
+        if (touch1 && (now - paddleTouch1StartMs >= PONG_BUTTON_DEBOUNCE_MS)) {
+          pongLogic.movePaddle(-3.8f); // Up (Op - button 01)
         }
-        if (touch1) {
-          pongLogic.movePaddle(3.8f);  // Down (Ned)
+        if (touch0 && (now - paddleTouch0StartMs >= PONG_BUTTON_DEBOUNCE_MS)) {
+          pongLogic.movePaddle(3.8f);  // Down (Ned - button 00)
         }
       }
 
@@ -704,17 +710,29 @@ void loop() {
           lastTouchTimeMs = now;
         } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
           menuLogic.onButtonBack();
-          lastTouchTimeMs = now;
+          lastTouchTimeMs = now + 250;
         }
-      } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
-        if (pongLogic.getScore() > 0) {
-          if (pongLogic.getScore() > petLogic.getHighScorePong()) {
-            petLogic.setHighScorePong(pongLogic.getScore());
-            storagePet.savePet(petLogic);
+      } else if (pongLogic.getState() == PONG_STATE_PLAYING) {
+        // While ball is actively in play: accidental tap of TOUCH3 does NOT exit!
+        // Require holding TOUCH3 for 1.2s to forfeit/exit early:
+        static unsigned long pongTouch3HoldMs = 0;
+        if (touch3) {
+          if (pongTouch3HoldMs == 0) {
+            pongTouch3HoldMs = now;
+          } else if (now - pongTouch3HoldMs >= 1200) {
+            pongTouch3HoldMs = 0;
+            if (pongLogic.getScore() > 0) {
+              if (pongLogic.getScore() > petLogic.getHighScorePong()) {
+                petLogic.setHighScorePong(pongLogic.getScore());
+                storagePet.savePet(petLogic);
+              }
+            }
+            menuLogic.onButtonBack();
+            lastTouchTimeMs = now + 250;
           }
+        } else {
+          pongTouch3HoldMs = 0;
         }
-        menuLogic.onButtonBack(); // Exit game early
-        lastTouchTimeMs = now;
       }
     }
   } else if (currentScreen == SCREEN_MINIGAME_MAZE) {
@@ -755,18 +773,39 @@ void loop() {
           // TOUCH3: Return to games menu
           menuLogic.onButtonBack();
         }
-        lastTouchTimeMs = now;
+        lastTouchTimeMs = now + 250;
       }
     } else {
-      // During active play: TOUCH2 toggles Pause, TOUCH3 exits back to menu
+      // During active play:
+      // TOUCH2 toggles Pause (playing -> paused or paused -> playing)
       if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH2)) {
         bool shouldPause = (mazeLogic.getState() != MAZE_STATE_PAUSED);
         mazeLogic.setPaused(shouldPause, now);
         soundLed.playSound(SOUND_CLICK);
         lastTouchTimeMs = now;
-      } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
-        menuLogic.onButtonBack();
-        lastTouchTimeMs = now;
+      }
+      // If game is PAUSED: TOUCH3 exits cleanly back to games menu
+      else if (mazeLogic.getState() == MAZE_STATE_PAUSED) {
+        if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+          menuLogic.onButtonBack();
+          lastTouchTimeMs = now + 250;
+        }
+      }
+      // While actively rolling: accidental tap of TOUCH3 does NOT exit!
+      // Must hold TOUCH3 for 1.2s to force exit without pausing:
+      else {
+        static unsigned long mazeTouch3HoldMs = 0;
+        if (touch3) {
+          if (mazeTouch3HoldMs == 0) {
+            mazeTouch3HoldMs = now;
+          } else if (now - mazeTouch3HoldMs >= 1200) {
+            mazeTouch3HoldMs = 0;
+            menuLogic.onButtonBack();
+            lastTouchTimeMs = now + 250;
+          }
+        } else {
+          mazeTouch3HoldMs = 0;
+        }
       }
     }
   } else if (currentScreen == SCREEN_NAME_ENTRY) {
@@ -817,7 +856,7 @@ void loop() {
     }
   } else {
     // Normal menu screens (HOME, STATS, ACTION):
-    bool inAnyCombo = (touch0 && touch4) || (touch0 && touch1) || (touch1 && touch3) || combo04Fired || combo01Fired || combo13Fired || touch3HoldFired;
+    bool inAnyCombo = (touch0 && touch1) || (touch1 && touch3) || combo01Fired || combo13Fired || touch3HoldFired;
 
     if (currentScreen == SCREEN_HOME && !petLogic.isAlive()) {
       // While Lumi is a ghost/cenotaph:
@@ -830,14 +869,14 @@ void loop() {
           soundLed.playSound(SOUND_CONFIRM);
           Serial.print(F("[LIVSCYKLUS] Aabner arkade-navngivning foer Generation: "));
           Serial.println((unsigned int)(petLogic.getGeneration() + 1));
-          lastTouchTimeMs = now;
+          lastTouchTimeMs = now + 250;
         } else if (carrier.Buttons.onTouchDown(TOUCH4)) {
           menuLogic.openMemorial(storagePet.getGraveRecordCount(), SCREEN_HOME);
-          lastTouchTimeMs = now;
+          lastTouchTimeMs = now + 250;
         }
       }
     } else if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
-      if (!touch4 && carrier.Buttons.onTouchDown(TOUCH0)) {
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.onButtonPrev(); // Previous icon (<)
         lastTouchTimeMs = now;
       }
@@ -852,21 +891,19 @@ void loop() {
             lastTouchTimeMs = now;
           } else {
             menuLogic.onButtonOk(now); // OK / Select
-            lastTouchTimeMs = now;
+            lastTouchTimeMs = now + 250;
           }
         } else {
           menuLogic.onButtonOk(now); // OK / Select
-          lastTouchTimeMs = now;
+          lastTouchTimeMs = now + 250;
         }
       }
       else if (carrier.Buttons.onTouchDown(TOUCH3)) {
         menuLogic.onButtonBack(); // Back to Home
-        lastTouchTimeMs = now;
+        lastTouchTimeMs = now + 250;
       }
-      else if (!touch0 && carrier.Buttons.onTouchDown(TOUCH4)) {
-        menuLogic.onButtonStatsShortcut(); // Quick toggle Stats
-        lastTouchTimeMs = now;
-      }
+      // Note: TOUCH4 shortcut for STATS is completely removed per user request!
+      // Users access stats cleanly by navigating to the STATUS icon and pressing TOUCH2 (OK).
     }
   }
 
@@ -879,8 +916,50 @@ void loop() {
   // 3. LOGIC LAYER: Advance animations and countdown timers
   bool wasAlive = petLogic.isAlive();
   menuLogic.update(now);
-  if (!showcaseDirector.isActive() || currentScreen != SCREEN_HATCHING) {
-    petLogic.update(now);
+  if (!showcaseDirector.isActive()) {
+    if (petLogic.isHatching()) {
+      petLogic.update(now); // Hatching animation completes in 2.8 real seconds
+    } else if (currentScreen == SCREEN_HOME || currentScreen == SCREEN_STATS || currentScreen == SCREEN_ACTION) {
+      // Real-time Tamagotchi biological clock: 1 virtual age unit = 1 real day (1,440x scale).
+      // Maximum lifespan = 100 days (STAGE_OLD at 100 dage), average neglected lifespan = ~10 days.
+      // Paused automatically while playing minigames or in menus so Lumi never dies in the background!
+      unsigned long bioClockMs = 10000UL + (now / 1440UL);
+      petLogic.update(bioClockMs);
+
+      // Active sleep energy recovery: while Lumi is sleeping, recover +2% energy every 2.5 seconds
+      // and automatically wake up once 100% energy is reached (if put to sleep when energy < 100%)!
+      static unsigned long lastSleepRechargeMs = 0;
+      static bool sleepStartedBelowFull = false;
+      static bool wasSleepingPrev = false;
+      if (petLogic.isSleeping()) {
+        if (!wasSleepingPrev) {
+          sleepStartedBelowFull = (petLogic.getEnergy() < 100);
+          lastSleepRechargeMs = now;
+        } else if (now - lastSleepRechargeMs >= 2500) {
+          lastSleepRechargeMs = now;
+          if (petLogic.getEnergy() < 100) {
+            float nextE = (float)petLogic.getEnergy() + 2.0f;
+            if (nextE > 100.0f) nextE = 100.0f;
+            petLogic.setVitals((float)petLogic.getHunger(), (float)petLogic.getWarmth(),
+                               nextE, (float)petLogic.getHappiness(), (float)petLogic.getDiscipline());
+          }
+          if (sleepStartedBelowFull && petLogic.getEnergy() >= 100) {
+            // Full 100% energy recovery achieved -> wake up refreshed!
+            petLogic.setManualSleep(false);
+            soundLed.playSound(SOUND_CONFIRM);
+            storagePet.savePet(petLogic);
+            syncPetStateToBackend(true);
+            if (currentScreen == SCREEN_HOME) {
+              uiPet.updateHomeDisplay(petLogic, now, true);
+            }
+          }
+        }
+        wasSleepingPrev = petLogic.isSleeping();
+      } else {
+        wasSleepingPrev = false;
+        sleepStartedBelowFull = false;
+      }
+    }
   }
   soundLed.update(now);
 
@@ -1041,8 +1120,10 @@ void loop() {
         break;
 
       case SCREEN_HOUSE_MENU:
-        Serial.println(F("[UI] Skærm: LUMIS HUS (1. Garderobe, 2. Sengetid)"));
-        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true);
+        Serial.println(F("[UI] Skærm: LUMIS HUS (1. Garderobe, 2. Sengetid, 3. Mindelund)"));
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true,
+                             storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                             petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         soundLed.setMoodColor(255, 180, 80); // Warm cozy home glow
         break;
 
@@ -1215,11 +1296,11 @@ void loop() {
     }
 
     // 6b. Read touch buttons for gameplay
-    // TOUCH0 = Up (Pong)
-    // TOUCH1 = Down (Pong)
+    // TOUCH1 (01, top-left) = Up (Pong)
+    // TOUCH0 (00, bottom-left) = Down (Pong)
     // TOUCH2 = Action / Serve (Pong & Labyrinth)
-    bool btnUp     = carrier.Buttons.getTouch(TOUCH0);
-    bool btnDown   = carrier.Buttons.getTouch(TOUCH1);
+    bool btnUp     = carrier.Buttons.getTouch(TOUCH1);
+    bool btnDown   = carrier.Buttons.getTouch(TOUCH0);
     bool btnAction = carrier.Buttons.getTouch(TOUCH2);
 
     // Detect immediate edge change (pressed or released) to eliminate 50ms tap latency
@@ -1250,13 +1331,17 @@ void loop() {
     // 6a. Step physics (Paddle is controlled purely via TOUCH0/TOUCH1 buttons, no IMU interference)
     pongLogic.update(now);
 
-    // 6c. Handle sound & LEDs
+    // 6c. Handle sound, LEDs, and visual cues (cheering mascot & wall sparks)
     SoundType pongSnd = pongLogic.popSoundEffect();
     if (pongSnd != SOUND_NONE) {
       soundLed.playSound(pongSnd);
     }
     if (pongLogic.popPaddleHit()) {
       soundLed.flashColor(0, 255, 220, 100); // 100 ms cyan flash on paddle hit
+      uiPong.triggerCheer();                  // Lumi cheerleader mascot celebrates!
+    }
+    if (pongLogic.popWallHit()) {
+      uiPong.triggerWallSparks(pongLogic.getBallX(), pongLogic.getBallY(), pongLogic.getBallVx(), pongLogic.getBallVy());
     }
 
     // 6d. Update display (zero-flicker delta-rendering)

@@ -26,6 +26,8 @@ void PetLogic::reset() {
   currentStage = STAGE_BABY;     // Starts as cute egg baby
   currentOutfit = OUTFIT_DEFAULT; // Natural fur mode
   isAsleep = false;
+  manualSleep = false;
+  manualSleepUntilFull = false;
   alive = true;
   deathCause = DEATH_NONE;
   generation = 1;
@@ -73,6 +75,7 @@ bool PetLogic::feed() {
   if (hungerVal >= 100.0f) return false; // Already completely full
 
   hungerVal = clamp0100(hungerVal + PET_FEED_RESTORE);
+  energyVal = clamp0100(energyVal + 8.0f); // Nutritious Deku Berry also gives a +8% energy snack boost
   happinessVal = clamp0100(happinessVal + 5.0f);
   hasPoop = true;
   poopTimeMs = 0;
@@ -127,8 +130,24 @@ void PetLogic::toggleSleep() {
 
 void PetLogic::setSleeping(bool sleep) {
   isAsleep = sleep;
+  if (!sleep) {
+    manualSleep = false;
+    manualSleepUntilFull = false;
+  }
   darkStartTimeMs = 0;
   lightStartTimeMs = 0;
+}
+
+void PetLogic::setManualSleep(bool sleep) {
+  isAsleep = sleep;
+  manualSleep = sleep;
+  manualSleepUntilFull = sleep && (energyVal < 100.0f);
+  darkStartTimeMs = 0;
+  lightStartTimeMs = 0;
+}
+
+bool PetLogic::isManualSleeping() const {
+  return isAsleep && manualSleep;
 }
 
 void PetLogic::setAmbientTemperature(float celsius) {
@@ -170,7 +189,7 @@ void PetLogic::setAmbientLight(int lux, unsigned long nowMs) {
   if (nowMs == 0) {
     if (ambientLux < SENSOR_DARK_LUX_THRESHOLD && !isAsleep) {
       isAsleep = true;
-    } else if (ambientLux >= SENSOR_LIGHT_LUX_THRESHOLD && isAsleep) {
+    } else if (ambientLux >= SENSOR_LIGHT_LUX_THRESHOLD && isAsleep && !manualSleep) {
       isAsleep = false;
     }
     return;
@@ -186,12 +205,15 @@ void PetLogic::setAmbientLight(int lux, unsigned long nowMs) {
     }
   }
   // Light state timing (uncovered room light for SENSOR_LIGHT_WAKE_DELAY_MS = 2000 ms)
+  // Never wake Lumi from light if the user explicitly put Lumi to sleep via House -> Sleep!
   else if (ambientLux >= SENSOR_LIGHT_LUX_THRESHOLD) {
     darkStartTimeMs = 0;
-    if (lightStartTimeMs == 0) {
-      lightStartTimeMs = nowMs;
-    } else if (isAsleep && (nowMs - lightStartTimeMs >= SENSOR_LIGHT_WAKE_DELAY_MS)) {
-      isAsleep = false;
+    if (!manualSleep) {
+      if (lightStartTimeMs == 0) {
+        lightStartTimeMs = nowMs;
+      } else if (isAsleep && (nowMs - lightStartTimeMs >= SENSOR_LIGHT_WAKE_DELAY_MS)) {
+        isAsleep = false;
+      }
     }
   } else {
     // Intermediate lighting resets both delay counters
@@ -212,11 +234,11 @@ void PetLogic::update(unsigned long currentTimeMs) {
   if (!alive) return; // Simulation stops if Lumi is deceased
 
   // If pet loaded with poop from SD, initialize poop timer on first active frame
-  if (hasPoop && poopTimeMs == 0) {
+  if (hasPoop && (poopTimeMs == 0 || currentTimeMs < poopTimeMs)) {
     poopTimeMs = currentTimeMs;
   }
 
-  if (!decayInitialized) {
+  if (!decayInitialized || currentTimeMs < lastDecayTimeMs) {
     lastDecayTimeMs = currentTimeMs;
     decayInitialized = true;
     return;
@@ -228,14 +250,32 @@ void PetLogic::update(unsigned long currentTimeMs) {
 
     float intervals = (float)elapsedIntervals;
     unsigned long totalTicks = (unsigned long)ageTickCount + elapsedIntervals;
-    ageMinutes += (totalTicks / 6);
+    unsigned long addedDays = totalTicks / 6;
+    ageMinutes += addedDays;
     ageTickCount = (uint8_t)(totalTicks % 6);
+
+    // Automatic lifecycle stage evolution across the 100-day lifespan (Baby -> Teen -> Adult -> Old)
+    if (addedDays > 0) {
+      if (ageMinutes >= 70 && currentStage < STAGE_OLD) {
+        currentStage = STAGE_OLD;
+      } else if (ageMinutes >= 30 && currentStage < STAGE_ADULT) {
+        currentStage = STAGE_ADULT;
+      } else if (ageMinutes >= 10 && currentStage < STAGE_TEEN) {
+        currentStage = STAGE_TEEN;
+      }
+    }
 
     if (isAsleep) {
       // Recover energy while sleeping
       energyVal = clamp0100(energyVal + (PET_SLEEP_ENERGY_RECOVERY * intervals));
       // Hunger decays slower while asleep (half rate)
       hungerVal = clamp0100(hungerVal - (PET_DECAY_HUNGER * 0.5f * intervals));
+      // If put to sleep manually while tired, automatically wake up once 100% full energy is restored
+      if (manualSleep && manualSleepUntilFull && energyVal >= 100.0f) {
+        isAsleep = false;
+        manualSleep = false;
+        manualSleepUntilFull = false;
+      }
     } else {
       // Normal daytime awake decay (O(1) calculation, zero lag even after long pauses)
       energyVal = clamp0100(energyVal - (PET_DECAY_ENERGY * intervals));
@@ -516,6 +556,7 @@ uint8_t PetLogic::getHatchingPhase(unsigned long nowMs) const {
 
 bool PetLogic::pet(unsigned long nowMs) {
   if (!alive || hatchingActive) return false;
+  if ( manualSleep && isAsleep ) return false; // Do not wake Lumi during manual sleep
   if (lastPetTimeMs > 0 && (nowMs - lastPetTimeMs < 1500)) return false; // Cooldown 1.5s
   lastPetTimeMs = nowMs;
   pettingActiveUntilMs = nowMs + 1800;

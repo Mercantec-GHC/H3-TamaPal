@@ -182,6 +182,46 @@ void MazeLogic::carvePassagesDfs(uint32_t& rng) {
       grid[r][c] &= ~MAZE_VISITED;
     }
   }
+
+  // Open 2 extra internal walls between interior 2-wall corridor cells to create WIDE chambers/plazas
+  // (Preserves all 3-wall dead ends for Berries & Black Holes while mixing wide 40px rooms with 20px/13px corridors)
+  uint8_t wideOpened = 0;
+  for (uint8_t r = 1; r < MAZE_ROWS - 2 && wideOpened < 2; r++) {
+    for (uint8_t c = 1; c < MAZE_COLS - 2 && wideOpened < 2; c++) {
+      uint8_t w1 = 0;
+      if (grid[r][c] & MAZE_WALL_NORTH) w1++;
+      if (grid[r][c] & MAZE_WALL_EAST)  w1++;
+      if (grid[r][c] & MAZE_WALL_SOUTH) w1++;
+      if (grid[r][c] & MAZE_WALL_WEST)  w1++;
+      if (w1 != 2) continue;
+
+      if (grid[r][c] & MAZE_WALL_EAST) {
+        uint8_t w2 = 0;
+        if (grid[r][c + 1] & MAZE_WALL_NORTH) w2++;
+        if (grid[r][c + 1] & MAZE_WALL_EAST)  w2++;
+        if (grid[r][c + 1] & MAZE_WALL_SOUTH) w2++;
+        if (grid[r][c + 1] & MAZE_WALL_WEST)  w2++;
+        if (w2 == 2) {
+          grid[r][c]     &= ~MAZE_WALL_EAST;
+          grid[r][c + 1] &= ~MAZE_WALL_WEST;
+          wideOpened++;
+          continue;
+        }
+      }
+      if (grid[r][c] & MAZE_WALL_SOUTH) {
+        uint8_t w2 = 0;
+        if (grid[r + 1][c] & MAZE_WALL_NORTH) w2++;
+        if (grid[r + 1][c] & MAZE_WALL_EAST)  w2++;
+        if (grid[r + 1][c] & MAZE_WALL_SOUTH) w2++;
+        if (grid[r + 1][c] & MAZE_WALL_WEST)  w2++;
+        if (w2 == 2) {
+          grid[r][c]     &= ~MAZE_WALL_SOUTH;
+          grid[r + 1][c] &= ~MAZE_WALL_NORTH;
+          wideOpened++;
+        }
+      }
+    }
+  }
 }
 
 void MazeLogic::placeItemsAndTraps(uint32_t& rng) {
@@ -216,7 +256,7 @@ void MazeLogic::placeItemsAndTraps(uint32_t& rng) {
     uint8_t tr = deadRow[i]; deadRow[i] = deadRow[j]; deadRow[j] = tr;
   }
 
-  // Distribute items among dead ends (always reserve at least 1 dead end for a pitfall trap):
+  // Distribute items among dead ends (always reserve at least 1 dead end for a Black Hole trap):
   // 1. Up to 3 Deku Berries (exploration rewards)
   uint8_t berriesToPlace = (deadCount >= 4) ? 3 : ((deadCount >= 3) ? 2 : 1);
   for (uint8_t i = 0; i < berriesToPlace && i < deadCount; i++) {
@@ -224,25 +264,26 @@ void MazeLogic::placeItemsAndTraps(uint32_t& rng) {
     totalBerries++;
   }
 
-  // 2. Up to 2 Pitfall Holes (traps in false dead ends)
-  uint8_t trapsToPlace = (deadCount >= berriesToPlace + 2) ? 2 : 1;
+  // 2. Up to 3 Black Holes (MAZE_ITEM_PITFALL) with gravitational pull
+  uint8_t trapsToPlace = (deadCount >= berriesToPlace + 3) ? 3 : ((deadCount >= berriesToPlace + 2) ? 2 : 1);
   for (uint8_t i = berriesToPlace; i < berriesToPlace + trapsToPlace && i < deadCount; i++) {
     grid[deadRow[i]][deadCol[i]] |= MAZE_ITEM_PITFALL;
   }
 
-  // 3. Place 1-2 Ice patches in corridors (cells with exactly 2 walls)
-  uint8_t icePlaced = 0;
-  for (uint8_t r = 1; r < MAZE_ROWS - 1 && icePlaced < 2; r++) {
-    for (uint8_t c = 1; c < MAZE_COLS - 1 && icePlaced < 2; c++) {
+  // 3. Place 2-3 Narrow Pinch Passages (MAZE_ITEM_ICE / MAZE_ITEM_NARROW) on straight corridors
+  uint8_t narrowPlaced = 0;
+  for (uint8_t r = 0; r < MAZE_ROWS && narrowPlaced < 3; r++) {
+    for (uint8_t c = 0; c < MAZE_COLS && narrowPlaced < 3; c++) {
+      if ((c == 0 && r == 0) || (c == MAZE_COLS - 1 && r == MAZE_ROWS - 1)) continue;
       if (!(grid[r][c] & MAZE_ITEM_MASK)) {
-        uint8_t wallCount = 0;
-        if (grid[r][c] & MAZE_WALL_NORTH) wallCount++;
-        if (grid[r][c] & MAZE_WALL_EAST)  wallCount++;
-        if (grid[r][c] & MAZE_WALL_SOUTH) wallCount++;
-        if (grid[r][c] & MAZE_WALL_WEST)  wallCount++;
-        if (wallCount == 2 && (nextRandom(rng) % 3 == 0)) {
+        uint8_t cell = grid[r][c];
+        bool horizCorridor = (cell & MAZE_WALL_NORTH) && (cell & MAZE_WALL_SOUTH) &&
+                             !(cell & MAZE_WALL_EAST) && !(cell & MAZE_WALL_WEST);
+        bool vertCorridor  = (cell & MAZE_WALL_EAST) && (cell & MAZE_WALL_WEST) &&
+                             !(cell & MAZE_WALL_NORTH) && !(cell & MAZE_WALL_SOUTH);
+        if ((horizCorridor || vertCorridor) && (nextRandom(rng) % 2 == 0)) {
           grid[r][c] |= MAZE_ITEM_ICE;
-          icePlaced++;
+          narrowPlaced++;
         }
       }
     }
@@ -316,7 +357,7 @@ void MazeLogic::update(unsigned long currentTimeMs) {
     return;
   }
 
-  // 1. Determine cell under ball to check surface properties (e.g. Ice)
+  // 1. Determine cell under ball
   int curCol = (int)((ballX - ORIGIN_X) / CELL_SIZE);
   int curRow = (int)((ballY - ORIGIN_Y) / CELL_SIZE);
   if (curCol < 0) curCol = 0;
@@ -324,13 +365,46 @@ void MazeLogic::update(unsigned long currentTimeMs) {
   if (curRow < 0) curRow = 0;
   if (curRow >= MAZE_ROWS) curRow = MAZE_ROWS - 1;
 
-  bool onIce = (grid[curRow][curCol] & MAZE_ITEM_ICE) != 0;
-  float friction = onIce ? 0.98f : 0.86f;
-  float accelScale = onIce ? 0.40f : 0.30f;
+  float friction = 0.86f;
+  float accelScale = 0.30f;
 
   // 2. Accelerometer integration
   ballVx = (ballVx + currentTiltX * accelScale * speedFactor) * friction;
   ballVy = (ballVy + currentTiltY * accelScale * speedFactor) * friction;
+
+  // 2b. Black Hole (MAZE_ITEM_PITFALL) gravitational pull:
+  // Exerts a clearly felt gravitational attraction within a 38 px radius (~2 cells),
+  // pulling a stationary or lightly tilted ball into the hole unless the player tilts strongly (> 45-60%)!
+  for (uint8_t pr = 0; pr < MAZE_ROWS; pr++) {
+    for (uint8_t pc = 0; pc < MAZE_COLS; pc++) {
+      if (grid[pr][pc] & MAZE_ITEM_PITFALL) {
+        float pitX = ORIGIN_X + pc * CELL_SIZE + CELL_SIZE * 0.5f;
+        float pitY = ORIGIN_Y + pr * CELL_SIZE + CELL_SIZE * 0.5f;
+        float gdx = pitX - ballX;
+        float gdy = pitY - ballY;
+        float distSq = gdx * gdx + gdy * gdy;
+        if (distSq > 1.0f && distSq < 1444.0f) { // Within 38 px gravitational horizon
+          bool connected = ((int)pc == curCol && (int)pr == curRow);
+          if (!connected) {
+            uint8_t pCell = grid[pr][pc];
+            if ((int)pc == curCol && (int)pr == curRow + 1 && !(pCell & MAZE_WALL_NORTH)) connected = true;
+            if ((int)pc == curCol && (int)pr + 1 == curRow && !(pCell & MAZE_WALL_SOUTH)) connected = true;
+            if ((int)pc == curCol + 1 && (int)pr == curRow && !(pCell & MAZE_WALL_WEST))  connected = true;
+            if ((int)pc + 1 == curCol && (int)pr == curRow && !(pCell & MAZE_WALL_EAST))  connected = true;
+          }
+          float dist = sqrtf(distSq);
+          float normDist = dist / 38.0f;
+          // Close range (~10px): 0.21f accel (~70% tilt needed); Medium range (~22px): 0.14f accel (~45% tilt needed)
+          float basePull = (0.12f + 0.09f * (1.0f - normDist)) * (1.0f - normDist * 0.55f);
+          if (connected) {
+            basePull *= 1.35f; // Extra suction when inside cell or facing open doorway
+          }
+          ballVx += (gdx / dist) * basePull * speedFactor;
+          ballVy += (gdy / dist) * basePull * speedFactor;
+        }
+      }
+    }
+  }
 
   // Cap max velocity
   const float maxV = 4.2f;
@@ -400,9 +474,12 @@ void MazeLogic::resolveWallCollisions() {
   float cellBottom = cellTop + (float)CELL_SIZE;
 
   // Collision against cell walls (smooth sliding at low impact speed, soft bounce on fast impact):
+  // Narrow Pinch Passages (MAZE_ITEM_ICE / MAZE_ITEM_NARROW) protrude 2.5px inward from each side wall!
+  const float wallPad = (grid[row][c] & MAZE_ITEM_ICE) ? (r + 3.5f) : (r + 1.0f);
+
   // North Wall
   if (grid[row][c] & MAZE_WALL_NORTH) {
-    float minY = cellTop + r + 1.0f;
+    float minY = cellTop + wallPad;
     if (ballY < minY) {
       ballY = minY;
       if (ballVy < 0.0f) {
@@ -418,7 +495,7 @@ void MazeLogic::resolveWallCollisions() {
 
   // South Wall
   if (grid[row][c] & MAZE_WALL_SOUTH) {
-    float maxY = cellBottom - r - 1.0f;
+    float maxY = cellBottom - wallPad;
     if (ballY > maxY) {
       ballY = maxY;
       if (ballVy > 0.0f) {
@@ -434,7 +511,7 @@ void MazeLogic::resolveWallCollisions() {
 
   // West Wall
   if (grid[row][c] & MAZE_WALL_WEST) {
-    float minX = cellLeft + r + 1.0f;
+    float minX = cellLeft + wallPad;
     if (ballX < minX) {
       ballX = minX;
       if (ballVx < 0.0f) {
@@ -450,7 +527,7 @@ void MazeLogic::resolveWallCollisions() {
 
   // East Wall
   if (grid[row][c] & MAZE_WALL_EAST) {
-    float maxX = cellRight - r - 1.0f;
+    float maxX = cellRight - wallPad;
     if (ballX > maxX) {
       ballX = maxX;
       if (ballVx > 0.0f) {
