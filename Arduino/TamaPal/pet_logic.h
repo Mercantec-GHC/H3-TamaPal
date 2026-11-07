@@ -24,6 +24,8 @@ public:
   void applyGameReward(uint16_t score);                 // Minigame completion reward (happiness up, slight energy burn)
   void toggleSleep();
   void setSleeping(bool sleep);
+  void setManualSleep(bool sleep);
+  bool isManualSleeping() const;
 
   // Environmental sensor updates (ambient room temperature & light from MKR Carrier)
   void setAmbientTemperature(float celsius);
@@ -118,6 +120,8 @@ private:
   PetStage currentStage;
   PetOutfit currentOutfit;
   bool isAsleep;
+  bool manualSleep;
+  bool manualSleepUntilFull;
   bool alive;
   DeathCause deathCause;
   uint16_t generation;

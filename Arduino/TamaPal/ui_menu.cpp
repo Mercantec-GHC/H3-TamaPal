@@ -498,8 +498,9 @@ void UiMenuRenderer::drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore,
   carrier->display.print(buf);
 }
 
-// Draw cozy House sub-menu (Garderobe & Soevn)
-void UiMenuRenderer::drawHouseMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool isSleeping, bool fullRedraw) {
+// Draw cozy House sub-menu (1. Garderobe, 2. Sengetid/Soevn, 3. Mindelund/Grav med MicroSD statistik)
+void UiMenuRenderer::drawHouseMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool isSleeping, bool fullRedraw,
+                                   uint16_t graveCount, uint16_t generation, uint16_t pongHigh, uint16_t mazeHigh) {
   if (carrier == nullptr) return;
 
   uint16_t bgDark    = color565(8, 12, 26);
@@ -515,71 +516,94 @@ void UiMenuRenderer::drawHouseMenu(uint8_t selectedOption, PetOutfit currentOutf
 
   if (fullRedraw) {
     carrier->display.fillScreen(bgDark);
+    carrier->display.drawCircle(120, 120, 114, color565(20, 42, 78));
 
     // 1. Header
     carrier->display.setTextSize(2);
     carrier->display.setTextColor(goldText, bgDark);
     const char* title = "LUMIS HUS";
     int tw = strlen(title) * 12;
-    carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 22);
+    carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 18);
     carrier->display.print(title);
 
     // Bottom controls hint
     carrier->display.setTextSize(1);
     carrier->display.setTextColor(hintText, bgDark);
-    const char* bottomHint = "T0/T1:Skift | OK | T3:Tilbage";
+    const char* bottomHint = "T0/T1:Skift | OK | T3:Ud";
     int bw = strlen(bottomHint) * 6;
-    carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
+    carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 196);
     carrier->display.print(bottomHint);
   }
 
-  // Card 0: Garderobe (Y = 56, H = 54, W = 196)
+  // Card 0: 1. Garderobe (X=34, Y=40, W=172, H=46)
   bool selGarderobe = (selectedOption == 0);
   uint16_t bgCard0  = selGarderobe ? selCardBg : cardBg;
   uint16_t brdCard0 = selGarderobe ? selBorder : unselBrd;
 
-  carrier->display.fillRoundRect(22, 56, 196, 54, 6, bgCard0);
-  carrier->display.drawRoundRect(22, 56, 196, 54, 6, brdCard0);
-  if (selGarderobe) {
-    carrier->display.drawRoundRect(21, 55, 198, 56, 7, color565(0, 140, 200));
-  }
+  carrier->display.fillRoundRect(34, 40, 172, 46, 6, bgCard0);
+  carrier->display.drawRoundRect(34, 40, 172, 46, 6, brdCard0);
 
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(selGarderobe ? color565(0, 240, 255) : whiteText, bgCard0);
-  carrier->display.setCursor(34, 66);
+  carrier->display.setCursor(42, 47);
   carrier->display.print(selGarderobe ? "> 1. GARDEROBE (SKAB)" : "  1. GARDEROBE (SKAB)");
 
-  carrier->display.setTextColor(hintText, bgCard0);
-  carrier->display.setCursor(46, 80);
-  carrier->display.print("Skift toej og vinterhue");
-
   carrier->display.setTextColor(currentOutfit == OUTFIT_WINTER ? cyanText : greenText, bgCard0);
-  carrier->display.setCursor(46, 94);
+  carrier->display.setCursor(52, 60);
   carrier->display.print(currentOutfit == OUTFIT_WINTER ? "Aktiv: Vinterhue PAA" : "Aktiv: Standard toej");
 
-  // Card 1: Sengetid / Soevn (Y = 118, H = 54, W = 196)
-  bool selSleep   = (selectedOption == 1);
+  carrier->display.setTextColor(hintText, bgCard0);
+  carrier->display.setCursor(52, 72);
+  carrier->display.print("[Tryk OK for at klæde]");
+
+  // Card 1: 2. Sengetid / Soevn (X=34, Y=92, W=172, H=46)
+  bool selSleep     = (selectedOption == 1);
   uint16_t bgCard1  = selSleep ? selCardBg : cardBg;
   uint16_t brdCard1 = selSleep ? selBorder : unselBrd;
 
-  carrier->display.fillRoundRect(22, 118, 196, 54, 6, bgCard1);
-  carrier->display.drawRoundRect(22, 118, 196, 54, 6, brdCard1);
-  if (selSleep) {
-    carrier->display.drawRoundRect(21, 117, 198, 56, 7, color565(0, 140, 200));
-  }
+  carrier->display.fillRoundRect(34, 92, 172, 46, 6, bgCard1);
+  carrier->display.drawRoundRect(34, 92, 172, 46, 6, brdCard1);
 
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(selSleep ? color565(0, 240, 255) : whiteText, bgCard1);
-  carrier->display.setCursor(34, 128);
+  carrier->display.setCursor(42, 99);
   carrier->display.print(selSleep ? "> 2. SENGETID (SOEVN)" : "  2. SENGETID (SOEVN)");
 
-  carrier->display.setTextColor(hintText, bgCard1);
-  carrier->display.setCursor(46, 142);
-  carrier->display.print("Hvil & genoplad energi");
-
   carrier->display.setTextColor(isSleeping ? cyanText : greenText, bgCard1);
-  carrier->display.setCursor(46, 156);
-  carrier->display.print(isSleeping ? "Status: SOVER Zzz [Tryk OK]" : "Status: VAAGEN [Tryk OK]");
+  carrier->display.setCursor(52, 112);
+  carrier->display.print(isSleeping ? "Status: SOVER Zzz" : "Status: VAAGEN");
+
+  carrier->display.setTextColor(hintText, bgCard1);
+  carrier->display.setCursor(52, 124);
+  carrier->display.print(isSleeping ? "[OK: Vaek Lumi nu]" : "[OK: Sov til 100% ener]");
+
+  // Card 2: 3. Mindelund / Kirkegaard (X=34, Y=144, W=172, H=46)
+  bool selGrave     = (selectedOption == 2);
+  uint16_t bgCard2  = selGrave ? selCardBg : cardBg;
+  uint16_t brdCard2 = selGrave ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(34, 144, 172, 46, 6, bgCard2);
+  carrier->display.drawRoundRect(34, 144, 172, 46, 6, brdCard2);
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selGrave ? color565(0, 240, 255) : whiteText, bgCard2);
+  carrier->display.setCursor(42, 151);
+  carrier->display.print(selGrave ? "> 3. MINDELUND (GRAV)" : "  3. MINDELUND (GRAV)");
+
+  char sdBuf[32];
+  snprintf(sdBuf, sizeof(sdBuf), "SD: %u grave | Gen %u", (unsigned int)graveCount, (unsigned int)generation);
+  carrier->display.setTextColor(goldText, bgCard2);
+  carrier->display.setCursor(52, 164);
+  carrier->display.print(sdBuf);
+
+  if (mazeHigh > 0) {
+    snprintf(sdBuf, sizeof(sdBuf), "Pong:%u | Lab:%us [OK]", (unsigned int)pongHigh, (unsigned int)mazeHigh);
+  } else {
+    snprintf(sdBuf, sizeof(sdBuf), "Pong:%u | Lab:--s [OK]", (unsigned int)pongHigh);
+  }
+  carrier->display.setTextColor(hintText, bgCard2);
+  carrier->display.setCursor(52, 176);
+  carrier->display.print(sdBuf);
 }
 
 // Draw Wardrobe dressing room screen

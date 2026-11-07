@@ -277,6 +277,11 @@ void setup() {
   // Initialize MicroSD card persistence and restore Lumi if file exists
   storagePet.begin();
   if (storagePet.loadPet(petLogic)) {
+    if (!petLogic.isAlive() && petLogic.getAgeMinutes() < 10) {
+      // Auto-recover if Lumi died prematurely under legacy fast-minute decay
+      petLogic.rebirth();
+      storagePet.savePet(petLogic);
+    }
     Serial.println(F("[STORAGE] Lumi fortsætter fra gemt tilstand på MicroSD-kort!"));
   }
 
@@ -589,35 +594,43 @@ void loop() {
       }
     }
   } else if (currentScreen == SCREEN_HOUSE_MENU) {
-    // House sub-menu: 1. Garderobe (Skab) / 2. Sengetid (Soevn)
+    // House sub-menu: 1. Garderobe (Skab), 2. Sengetid (Soevn), 3. Mindelund (Kirkegaard med SD statistik)
     if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
       if (carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.onButtonPrev();
-        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false,
+                             storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                             petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
         menuLogic.onButtonNext();
-        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false,
+                             storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                             petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
         uint8_t opt = menuLogic.getSelectedHouseOption();
         if (opt == 0) {
-          // Open Wardrobe
+          // 1. Open Wardrobe (pre-select current outfit)
+          menuLogic.selectWardrobeOption((uint8_t)petLogic.getOutfitEnum());
           menuLogic.openWardrobeMenu();
           uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), true);
-        } else {
-          // Toggle Sleep / Sengetid
+        } else if (opt == 1) {
+          // 2. Toggle Manual Sleep / Sengetid and immediately go to SCREEN_HOME to show Lumi sleeping!
           bool newSleeping = !petLogic.isSleeping();
-          petLogic.setSleeping(newSleeping);
+          petLogic.setManualSleep(newSleeping);
           soundLed.playSound(SOUND_CONFIRM);
           if (newSleeping) {
-            soundLed.setMoodColor(80, 140, 255); // Calming blue
+            soundLed.setMoodColor(80, 140, 255); // Calming nocturnal blue
           } else {
-            soundLed.setMoodColor(100, 255, 120); // Fresh green
+            soundLed.setMoodColor(100, 255, 120); // Fresh awake green
           }
           storagePet.savePet(petLogic);
           syncPetStateToBackend(true);
-          uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+          menuLogic.setScreen(SCREEN_HOME, now);
+        } else {
+          // 3. Open Graveyard / Mindelund with ancestor chronicles from MicroSD card
+          menuLogic.openMemorial(storagePet.getGraveRecordCount(), SCREEN_HOUSE_MENU);
         }
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
@@ -626,7 +639,7 @@ void loop() {
       }
     }
   } else if (currentScreen == SCREEN_WARDROBE) {
-    // Wardrobe dressing room: choose standard vs winter outfit
+    // Wardrobe dressing room: choose standard vs winter outfit, then immediately return to SCREEN_HOME!
     if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
       if (carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.onButtonPrev();
@@ -643,12 +656,15 @@ void loop() {
         soundLed.flashColor(255, 230, 80, 300);
         storagePet.savePet(petLogic);
         syncPetStateToBackend(true);
-        uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), false);
+        // Immediately return to SCREEN_HOME so the user sees Lumi wearing the selected outfit!
+        menuLogic.setScreen(SCREEN_HOME, now);
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
         menuLogic.onButtonBack();
         if (menuLogic.getActiveScreen() == SCREEN_HOUSE_MENU) {
-          uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true);
+          uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true,
+                               storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                               petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         }
         lastTouchTimeMs = now;
       }
@@ -879,8 +895,50 @@ void loop() {
   // 3. LOGIC LAYER: Advance animations and countdown timers
   bool wasAlive = petLogic.isAlive();
   menuLogic.update(now);
-  if (!showcaseDirector.isActive() || currentScreen != SCREEN_HATCHING) {
-    petLogic.update(now);
+  if (!showcaseDirector.isActive()) {
+    if (petLogic.isHatching()) {
+      petLogic.update(now); // Hatching animation completes in 2.8 real seconds
+    } else if (currentScreen == SCREEN_HOME || currentScreen == SCREEN_STATS || currentScreen == SCREEN_ACTION) {
+      // Real-time Tamagotchi biological clock: 1 virtual age unit = 1 real day (1,440x scale).
+      // Maximum lifespan = 100 days (STAGE_OLD at 100 dage), average neglected lifespan = ~10 days.
+      // Paused automatically while playing minigames or in menus so Lumi never dies in the background!
+      unsigned long bioClockMs = 10000UL + (now / 1440UL);
+      petLogic.update(bioClockMs);
+
+      // Active sleep energy recovery: while Lumi is sleeping, recover +2% energy every 2.5 seconds
+      // and automatically wake up once 100% energy is reached (if put to sleep when energy < 100%)!
+      static unsigned long lastSleepRechargeMs = 0;
+      static bool sleepStartedBelowFull = false;
+      static bool wasSleepingPrev = false;
+      if (petLogic.isSleeping()) {
+        if (!wasSleepingPrev) {
+          sleepStartedBelowFull = (petLogic.getEnergy() < 100);
+          lastSleepRechargeMs = now;
+        } else if (now - lastSleepRechargeMs >= 2500) {
+          lastSleepRechargeMs = now;
+          if (petLogic.getEnergy() < 100) {
+            float nextE = (float)petLogic.getEnergy() + 2.0f;
+            if (nextE > 100.0f) nextE = 100.0f;
+            petLogic.setVitals((float)petLogic.getHunger(), (float)petLogic.getWarmth(),
+                               nextE, (float)petLogic.getHappiness(), (float)petLogic.getDiscipline());
+          }
+          if (sleepStartedBelowFull && petLogic.getEnergy() >= 100) {
+            // Full 100% energy recovery achieved -> wake up refreshed!
+            petLogic.setManualSleep(false);
+            soundLed.playSound(SOUND_CONFIRM);
+            storagePet.savePet(petLogic);
+            syncPetStateToBackend(true);
+            if (currentScreen == SCREEN_HOME) {
+              uiPet.updateHomeDisplay(petLogic, now, true);
+            }
+          }
+        }
+        wasSleepingPrev = petLogic.isSleeping();
+      } else {
+        wasSleepingPrev = false;
+        sleepStartedBelowFull = false;
+      }
+    }
   }
   soundLed.update(now);
 
@@ -1041,8 +1099,10 @@ void loop() {
         break;
 
       case SCREEN_HOUSE_MENU:
-        Serial.println(F("[UI] Skærm: LUMIS HUS (1. Garderobe, 2. Sengetid)"));
-        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true);
+        Serial.println(F("[UI] Skærm: LUMIS HUS (1. Garderobe, 2. Sengetid, 3. Mindelund)"));
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true,
+                             storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                             petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         soundLed.setMoodColor(255, 180, 80); // Warm cozy home glow
         break;
 

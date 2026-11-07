@@ -53,7 +53,7 @@ void MenuLogic::onButtonPrev() {
     return;
   }
   if (activeScreen == SCREEN_HOUSE_MENU) {
-    selectedHouseOption = (selectedHouseOption == 0) ? 1 : 0;
+    selectedHouseOption = (selectedHouseOption == 0) ? 2 : (selectedHouseOption - 1);
     pendingSound = SOUND_CLICK;
     return;
   }
@@ -82,7 +82,7 @@ void MenuLogic::onButtonNext() {
     return;
   }
   if (activeScreen == SCREEN_HOUSE_MENU) {
-    selectedHouseOption = (selectedHouseOption == 0) ? 1 : 0;
+    selectedHouseOption = (selectedHouseOption >= 2) ? 0 : (selectedHouseOption + 1);
     pendingSound = SOUND_CLICK;
     return;
   }
@@ -119,6 +119,9 @@ void MenuLogic::onButtonOk(unsigned long currentTimeMs) {
     pendingSound = SOUND_CONFIRM;
     if (selectedHouseOption == 0) {
       activeScreen = SCREEN_WARDROBE;
+    } else if (selectedHouseOption == 2) {
+      memorialReturnScreen = SCREEN_HOUSE_MENU;
+      activeScreen = SCREEN_MEMORIAL;
     }
     return;
   }
@@ -323,7 +326,7 @@ uint8_t MenuLogic::getSelectedHouseOption() const {
 }
 
 void MenuLogic::selectHouseOption(uint8_t optionIndex) {
-  selectedHouseOption = (optionIndex > 1) ? 1 : optionIndex;
+  selectedHouseOption = (optionIndex > 2) ? 2 : optionIndex;
 }
 
 void MenuLogic::openHouseMenu() {
