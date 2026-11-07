@@ -95,74 +95,74 @@ void SoundLedController::playSound(SoundType sound) {
 
   switch (sound) {
     case SOUND_CLICK:
-      carrier->Buzzer.sound(1200);   // Crisp click tone
-      toneEndTimeMs = now + 18;      // Turn off after 18 ms
+      carrier->Buzzer.sound(520);    // Warm, gentle tactile click (was 1200 Hz shrill beep)
+      toneEndTimeMs = now + 8;       // Ultra-short 8 ms tap for quiet Switch/iOS haptic feel
       isBuzzerPlaying = true;
       break;
 
     case SOUND_CONFIRM:
-      carrier->Buzzer.sound(1760);   // Bright A6 chirp
-      toneEndTimeMs = now + 40;      // Turn off after 40 ms
+      carrier->Buzzer.sound(659);    // Soft melodic E5 blip (was 1760 Hz piercing alarm siren)
+      toneEndTimeMs = now + 20;      // Gentle 20 ms chirp
       isBuzzerPlaying = true;
       break;
 
     case SOUND_BACK:
-      carrier->Buzzer.sound(440);    // Warm A4 low tone
-      toneEndTimeMs = now + 35;
+      carrier->Buzzer.sound(370);    // Soft low pop
+      toneEndTimeMs = now + 15;      // Quiet 15 ms
       isBuzzerPlaying = true;
       break;
 
     case SOUND_HIT:
-      carrier->Buzzer.sound(1400);   // High ping for paddle hit
-      toneEndTimeMs = now + 65;
+      carrier->Buzzer.sound(784);    // Mellow G5 paddle pop (was 1400 Hz)
+      toneEndTimeMs = now + 25;      // Crisp 25 ms
       isBuzzerPlaying = true;
       break;
 
     case SOUND_MISS:
       carrier->Buzzer.sound(220);    // Low buzz for miss
-      toneEndTimeMs = now + 150;
+      toneEndTimeMs = now + 100;
       isBuzzerPlaying = true;
       break;
 
     case SOUND_GAMEOVER:
-      carrier->Buzzer.sound(330);    // Low tone for game over
-      toneEndTimeMs = now + 250;
+      carrier->Buzzer.sound(294);    // Warm D4 tone for game over
+      toneEndTimeMs = now + 180;
       isBuzzerPlaying = true;
       break;
 
     case SOUND_DEATH:
       carrier->Buzzer.sound(180);    // Low somber requiem drone
-      toneEndTimeMs = now + 400;
+      toneEndTimeMs = now + 300;
       isBuzzerPlaying = true;
       break;
 
     case SOUND_REBIRTH:
-      carrier->Buzzer.sound(1975);   // High joyful B6 chime
-      toneEndTimeMs = now + 250;
+      carrier->Buzzer.sound(988);    // Warm B5 chime (was 1975 Hz piercing whistle)
+      toneEndTimeMs = now + 120;
       isBuzzerPlaying = true;
       break;
 
     case SOUND_PURR:
-      carrier->Buzzer.sound(1046);   // Sweet C6 cuddle tone
-      toneEndTimeMs = now + 65;
+      carrier->Buzzer.sound(523);    // Warm C5 cuddle purr (was 1046 Hz)
+      toneEndTimeMs = now + 40;
       isBuzzerPlaying = true;
       break;
 
     case SOUND_CRACK:
-      carrier->Buzzer.sound(1600);   // Sharp crack snap
-      toneEndTimeMs = now + 22;
+      carrier->Buzzer.sound(587);    // Soft snap (was 1600 Hz)
+      toneEndTimeMs = now + 12;
       isBuzzerPlaying = true;
       break;
 
     case SOUND_BUBBLES:
-      carrier->Buzzer.sound(1350);   // Splashy bubble chirp
-      toneEndTimeMs = now + 50;
+      carrier->Buzzer.sound(740);    // Soft bubbly blip (was 1350 Hz)
+      toneEndTimeMs = now + 25;
       isBuzzerPlaying = true;
       break;
 
     case SOUND_HEAL:
-      carrier->Buzzer.sound(2093);   // High C7 healing bell
-      toneEndTimeMs = now + 180;
+      carrier->Buzzer.sound(1046);   // Sweet C6 bell (was 2093 Hz shrill C7)
+      toneEndTimeMs = now + 70;
       isBuzzerPlaying = true;
       break;
 
@@ -173,8 +173,8 @@ void SoundLedController::playSound(SoundType sound) {
       break;
 
     case SOUND_FANFARE:
-      carrier->Buzzer.sound(1760);   // Celebratory retro fanfare
-      toneEndTimeMs = now + 350;
+      carrier->Buzzer.sound(880);    // Warm A5 fanfare (was 1760 Hz piercing tone)
+      toneEndTimeMs = now + 150;
       isBuzzerPlaying = true;
       break;
 
