@@ -107,7 +107,37 @@ void UiMenuRenderer::drawIconPlay(int centerX, int centerY, bool isSelected) {
   carrier->display.drawPixel(centerX - 3, centerY - 4, color565(255, 255, 255));
 }
 
-// Icon 2: Medicin (Apothecary medicine bottle with healing red cross +)
+// Icon 2: Hjem (Lumis Hus: Cozy house with terracotta roof, chimney & door)
+void UiMenuRenderer::drawIconHouse(int centerX, int centerY, bool isSelected) {
+  if (carrier == nullptr) return;
+
+  uint16_t roofColor  = isSelected ? color565(255, 120, 60) : color565(200, 80, 40);   // Terracotta roof
+  uint16_t wallColor  = isSelected ? color565(255, 230, 180) : color565(200, 180, 140); // Cozy wooden wall
+  uint16_t doorColor  = color565(110, 60, 30);                                          // Dark brown door
+  uint16_t winColor   = isSelected ? color565(0, 240, 255) : color565(255, 220, 80);    // Glowing cyan/yellow window
+
+  // Triangular roof
+  carrier->display.drawPixel(centerX, centerY - 6, roofColor);
+  carrier->display.drawFastHLine(centerX - 1, centerY - 5, 3, roofColor);
+  carrier->display.drawFastHLine(centerX - 2, centerY - 4, 5, roofColor);
+  carrier->display.drawFastHLine(centerX - 3, centerY - 3, 7, roofColor);
+  carrier->display.drawFastHLine(centerX - 4, centerY - 2, 9, roofColor);
+  carrier->display.drawFastHLine(centerX - 5, centerY - 1, 11, roofColor);
+
+  // Chimney on right
+  carrier->display.drawFastVLine(centerX + 3, centerY - 6, 3, color565(150, 60, 30));
+
+  // House body
+  carrier->display.fillRect(centerX - 4, centerY, 9, 6, wallColor);
+
+  // Door in center
+  carrier->display.fillRect(centerX - 1, centerY + 2, 3, 4, doorColor);
+
+  // Window on left
+  carrier->display.drawPixel(centerX - 3, centerY + 2, winColor);
+}
+
+// Icon 3: Medicin (Apothecary medicine bottle with healing red cross +)
 void UiMenuRenderer::drawIconMedicin(int centerX, int centerY, bool isSelected) {
   uint16_t capColor    = isSelected ? color565(200, 150, 90)  : color565(140, 100, 60); // Wood cork / cap
   uint16_t liquidColor = isSelected ? color565(220, 245, 255) : color565(160, 190, 210); // Clear medical liquid
@@ -325,6 +355,7 @@ void UiMenuRenderer::drawMenuBar(const MenuLogic& menu, bool forceRedrawAll) {
     switch (icon) {
       case ICON_FOOD:    drawIconFood(iconCenterX, iconCenterY, isSelected); break;
       case ICON_PLAY:    drawIconPlay(iconCenterX, iconCenterY, isSelected); break;
+      case ICON_HOUSE:   drawIconHouse(iconCenterX, iconCenterY, isSelected); break;
       case ICON_MEDICIN: drawIconMedicin(iconCenterX, iconCenterY, isSelected); break;
       case ICON_SCOLD:   drawIconScold(iconCenterX, iconCenterY, isSelected); break;
       case ICON_STATS:   drawIconStats(iconCenterX, iconCenterY, isSelected); break;
@@ -466,4 +497,184 @@ void UiMenuRenderer::drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore,
   }
   carrier->display.print(buf);
 }
+
+// Draw cozy House sub-menu (Garderobe & Soevn)
+void UiMenuRenderer::drawHouseMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool isSleeping, bool fullRedraw) {
+  if (carrier == nullptr) return;
+
+  uint16_t bgDark    = color565(8, 12, 26);
+  uint16_t cardBg    = color565(14, 22, 44);
+  uint16_t selCardBg = color565(22, 36, 72);
+  uint16_t selBorder = color565(0, 240, 255);
+  uint16_t unselBrd  = color565(40, 60, 100);
+  uint16_t goldText  = color565(255, 215, 60);
+  uint16_t whiteText = 0xFFFF;
+  uint16_t hintText  = color565(110, 150, 195);
+  uint16_t cyanText  = color565(0, 220, 255);
+  uint16_t greenText = color565(80, 255, 120);
+
+  if (fullRedraw) {
+    carrier->display.fillScreen(bgDark);
+
+    // 1. Header
+    carrier->display.setTextSize(2);
+    carrier->display.setTextColor(goldText, bgDark);
+    const char* title = "LUMIS HUS";
+    int tw = strlen(title) * 12;
+    carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 22);
+    carrier->display.print(title);
+
+    // Bottom controls hint
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(hintText, bgDark);
+    const char* bottomHint = "T0/T1:Skift | OK | T3:Tilbage";
+    int bw = strlen(bottomHint) * 6;
+    carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
+    carrier->display.print(bottomHint);
+  }
+
+  // Card 0: Garderobe (Y = 56, H = 54, W = 196)
+  bool selGarderobe = (selectedOption == 0);
+  uint16_t bgCard0  = selGarderobe ? selCardBg : cardBg;
+  uint16_t brdCard0 = selGarderobe ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(22, 56, 196, 54, 6, bgCard0);
+  carrier->display.drawRoundRect(22, 56, 196, 54, 6, brdCard0);
+  if (selGarderobe) {
+    carrier->display.drawRoundRect(21, 55, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selGarderobe ? color565(0, 240, 255) : whiteText, bgCard0);
+  carrier->display.setCursor(34, 66);
+  carrier->display.print(selGarderobe ? "> 1. GARDEROBE (SKAB)" : "  1. GARDEROBE (SKAB)");
+
+  carrier->display.setTextColor(hintText, bgCard0);
+  carrier->display.setCursor(46, 80);
+  carrier->display.print("Skift toej og vinterhue");
+
+  carrier->display.setTextColor(currentOutfit == OUTFIT_WINTER ? cyanText : greenText, bgCard0);
+  carrier->display.setCursor(46, 94);
+  carrier->display.print(currentOutfit == OUTFIT_WINTER ? "Aktiv: Vinterhue PAA" : "Aktiv: Standard toej");
+
+  // Card 1: Sengetid / Soevn (Y = 118, H = 54, W = 196)
+  bool selSleep   = (selectedOption == 1);
+  uint16_t bgCard1  = selSleep ? selCardBg : cardBg;
+  uint16_t brdCard1 = selSleep ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(22, 118, 196, 54, 6, bgCard1);
+  carrier->display.drawRoundRect(22, 118, 196, 54, 6, brdCard1);
+  if (selSleep) {
+    carrier->display.drawRoundRect(21, 117, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selSleep ? color565(0, 240, 255) : whiteText, bgCard1);
+  carrier->display.setCursor(34, 128);
+  carrier->display.print(selSleep ? "> 2. SENGETID (SOEVN)" : "  2. SENGETID (SOEVN)");
+
+  carrier->display.setTextColor(hintText, bgCard1);
+  carrier->display.setCursor(46, 142);
+  carrier->display.print("Hvil & genoplad energi");
+
+  carrier->display.setTextColor(isSleeping ? cyanText : greenText, bgCard1);
+  carrier->display.setCursor(46, 156);
+  carrier->display.print(isSleeping ? "Status: SOVER Zzz [Tryk OK]" : "Status: VAAGEN [Tryk OK]");
+}
+
+// Draw Wardrobe dressing room screen
+void UiMenuRenderer::drawWardrobeMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool fullRedraw) {
+  if (carrier == nullptr) return;
+
+  uint16_t bgDark    = color565(8, 12, 26);
+  uint16_t cardBg    = color565(14, 22, 44);
+  uint16_t selCardBg = color565(22, 36, 72);
+  uint16_t selBorder = color565(0, 240, 255);
+  uint16_t unselBrd  = color565(40, 60, 100);
+  uint16_t goldText  = color565(255, 215, 60);
+  uint16_t whiteText = 0xFFFF;
+  uint16_t hintText  = color565(110, 150, 195);
+  uint16_t greenText = color565(80, 255, 120);
+
+  if (fullRedraw) {
+    carrier->display.fillScreen(bgDark);
+
+    // 1. Header
+    carrier->display.setTextSize(2);
+    carrier->display.setTextColor(goldText, bgDark);
+    const char* title = "GARDEROBE";
+    int tw = strlen(title) * 12;
+    carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 22);
+    carrier->display.print(title);
+
+    // Bottom controls hint
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(hintText, bgDark);
+    const char* bottomHint = "T0/T1:Skift | OK:Tag paa | T3:Exit";
+    int bw = strlen(bottomHint) * 6;
+    carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
+    carrier->display.print(bottomHint);
+  }
+
+  // Card 0: Standard toej (Y = 56, H = 54, W = 196)
+  bool selStd   = (selectedOption == 0);
+  uint16_t bg0  = selStd ? selCardBg : cardBg;
+  uint16_t brd0 = selStd ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(22, 56, 196, 54, 6, bg0);
+  carrier->display.drawRoundRect(22, 56, 196, 54, 6, brd0);
+  if (selStd) {
+    carrier->display.drawRoundRect(21, 55, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selStd ? color565(0, 240, 255) : whiteText, bg0);
+  carrier->display.setCursor(34, 66);
+  carrier->display.print(selStd ? "> 1. STANDARDTOEJ" : "  1. STANDARDTOEJ");
+
+  carrier->display.setTextColor(hintText, bg0);
+  carrier->display.setCursor(46, 80);
+  carrier->display.print("Hue & toerklaede AF");
+
+  if (currentOutfit == OUTFIT_DEFAULT) {
+    carrier->display.setTextColor(greenText, bg0);
+    carrier->display.setCursor(46, 94);
+    carrier->display.print("[AKTIV PAA LUMI]");
+  } else {
+    carrier->display.setTextColor(hintText, bg0);
+    carrier->display.setCursor(46, 94);
+    carrier->display.print("[Tryk OK for at vaelge]");
+  }
+
+  // Card 1: Vintertoej (Y = 118, H = 54, W = 196)
+  bool selWin   = (selectedOption == 1);
+  uint16_t bg1  = selWin ? selCardBg : cardBg;
+  uint16_t brd1 = selWin ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(22, 118, 196, 54, 6, bg1);
+  carrier->display.drawRoundRect(22, 118, 196, 54, 6, brd1);
+  if (selWin) {
+    carrier->display.drawRoundRect(21, 117, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selWin ? color565(0, 240, 255) : whiteText, bg1);
+  carrier->display.setCursor(34, 128);
+  carrier->display.print(selWin ? "> 2. VINTERTOEJ" : "  2. VINTERTOEJ");
+
+  carrier->display.setTextColor(hintText, bg1);
+  carrier->display.setCursor(46, 142);
+  carrier->display.print("Strikket hue & toerklaede");
+
+  if (currentOutfit == OUTFIT_WINTER) {
+    carrier->display.setTextColor(greenText, bg1);
+    carrier->display.setCursor(46, 156);
+    carrier->display.print("[AKTIV PAA LUMI]");
+  } else {
+    carrier->display.setTextColor(hintText, bg1);
+    carrier->display.setCursor(46, 156);
+    carrier->display.print("[Tryk OK for at vaelge]");
+  }
+}
+
 

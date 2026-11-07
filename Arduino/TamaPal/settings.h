@@ -15,11 +15,11 @@ const int SCREEN_WIDTH = 240;
 const int SCREEN_HEIGHT = 240;
 
 // Top menu horizontal bar settings
-// Spacing 30 px ensures the 5 icons span X=48..192 (144 px total), matching the circular cutout perfectly!
+// Spacing 22 px ensures the 7 icons span X=54..186 (132 px total), matching the circular cutout perfectly!
 const int MENU_BAR_CENTER_Y = 36;
 const int MENU_ICON_SIZE = 24;         // Width & height of each icon in pixels
-const int MENU_ICON_SPACING = 24;      // Distance between centers of neighboring icons (Centers: 60, 84, 108, 132, 156, 180)
-const int MENU_TOTAL_WIDTH = 144;      // Fits safely within the round bezel
+const int MENU_ICON_SPACING = 22;      // Distance between centers of neighboring icons (Centers: 54, 76, 98, 120, 142, 164, 186)
+const int MENU_TOTAL_WIDTH = 132;      // Fits safely within the round bezel
 
 // Sliding frame animation speed (Lerp factor: 0.25 = 25% closer to target each frame)
 const float MENU_SLIDE_SPEED = 0.25f;
@@ -98,18 +98,21 @@ enum ScreenType : uint8_t {
   SCREEN_MINIGAME_MAZE,    // Procedural Marble Maze minigame on Oplà display
   SCREEN_MEMORIAL,         // Hall of Fame / Mindelund ancestral memorial gallery
   SCREEN_HATCHING,         // Egg hatching newborn cinematic sequence
-  SCREEN_NAME_ENTRY        // Arcade 4-letter pet name entry screen
+  SCREEN_NAME_ENTRY,       // Arcade 4-letter pet name entry screen
+  SCREEN_HOUSE_MENU,       // Cozy house sub-menu: 1. Garderobe (Skab) / 2. Soevn (Seng)
+  SCREEN_WARDROBE          // Wardrobe dressing room: choose standard vs winter outfit
 };
 
-// The 6 icons in the top navigation menu
+// The 7 icons in the top navigation menu
 enum MenuIcon : uint8_t {
   ICON_FOOD = 0,           // 0: Mad (Feed berry to Lumi)
   ICON_PLAY,               // 1: Leg (Play minigame / pet)
-  ICON_MEDICIN,            // 2: Medicin (Heal sickness with berries)
-  ICON_SCOLD,              // 3: Skaeld ud (Discipline when complaining)
-  ICON_STATS,              // 4: Statistik (Open 5 vitals dashboard)
-  ICON_CONNECT,            // 5: Forbind (Connect to Pong multiplayer)
-  ICON_TOTAL_COUNT         // Helper constant = 6 total icons
+  ICON_HOUSE,              // 2: Hjem / Hus (Lumis Hus: Garderobe & Soevn)
+  ICON_MEDICIN,            // 3: Medicin (Heal sickness with berries)
+  ICON_SCOLD,              // 4: Skaeld ud (Discipline when complaining)
+  ICON_STATS,              // 5: Statistik (Open 5 vitals dashboard)
+  ICON_CONNECT,            // 6: Forbind (Connect to Pong multiplayer)
+  ICON_TOTAL_COUNT         // Helper constant = 7 total icons
 };
 
 // Hardware touch buttons on the Arduino Oplà MKR Carrier
@@ -162,8 +165,8 @@ const float PET_DECAY_ENERGY = 0.3f;     // Energy drops 0.3% every 10 sec awake
 const float PET_DECAY_HAPPINESS = 0.4f;  // Happiness drops 0.4% every 10 sec
 const float PET_DECAY_DISCIPLINE = 0.2f; // Discipline drops 0.2% every 10 sec
 
-// Energy recovery per tick while sleeping
-const float PET_SLEEP_ENERGY_RECOVERY = 2.0f; // Recovers 2% every 10 sec
+// Energy recovery per tick while sleeping (6.0% every 10 sec = full recovery in ~2.5 min)
+const float PET_SLEEP_ENERGY_RECOVERY = 6.0f;
 
 // Action increments
 const float PET_FEED_RESTORE = 25.0f;

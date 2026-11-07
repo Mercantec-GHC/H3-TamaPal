@@ -10,6 +10,8 @@ MenuLogic::MenuLogic()
     memorialReturnScreen(SCREEN_HOME),
     selectedIcon(ICON_FOOD),
     selectedGame(0),
+    selectedHouseOption(0),
+    selectedWardrobeOption(0),
     memorialIndex(0),
     playerId(1),
     cursorPositionX(0.0f),
@@ -21,11 +23,11 @@ MenuLogic::MenuLogic()
   cursorPositionX = targetPositionX;
 }
 
-// Calculate the center X position on screen for any given icon index (0..5)
-// Formula: center of screen (120) + offset from visual middle (between icon 2 and 3: 2.5)
+// Calculate the center X position on screen for any given icon index (0..6)
+// Formula: center of screen (120) + offset from visual middle (icon 3: offset = 0)
 float MenuLogic::calculateIconCenterX(MenuIcon icon) {
   const float screenCenterX = SCREEN_WIDTH / 2.0f; // 120.0f
-  const float offsetFromCenter = (float)icon - 2.5f;
+  const float offsetFromCenter = (float)icon - 3.0f;
   return screenCenterX + (offsetFromCenter * MENU_ICON_SPACING);
 }
 
@@ -34,6 +36,7 @@ const char* MenuLogic::getIconLabelDanish(MenuIcon icon) {
   switch (icon) {
     case ICON_FOOD:     return "MAD";
     case ICON_PLAY:     return "LEG";
+    case ICON_HOUSE:    return "HJEM";
     case ICON_MEDICIN:  return "MEDICIN";
     case ICON_SCOLD:    return "SKAELD UD";
     case ICON_STATS:    return "STATISTIK";
@@ -42,17 +45,27 @@ const char* MenuLogic::getIconLabelDanish(MenuIcon icon) {
   }
 }
 
-// TOUCH0: Move cursor to the previous icon (wrap around 0 -> 4)
+// TOUCH0: Move cursor to the previous icon (wrap around 0 -> 6)
 void MenuLogic::onButtonPrev() {
   if (activeScreen == SCREEN_GAMES_MENU) {
     selectedGame = (selectedGame == 0) ? 1 : 0;
     pendingSound = SOUND_CLICK;
     return;
   }
+  if (activeScreen == SCREEN_HOUSE_MENU) {
+    selectedHouseOption = (selectedHouseOption == 0) ? 1 : 0;
+    pendingSound = SOUND_CLICK;
+    return;
+  }
+  if (activeScreen == SCREEN_WARDROBE) {
+    selectedWardrobeOption = (selectedWardrobeOption == 0) ? 1 : 0;
+    pendingSound = SOUND_CLICK;
+    return;
+  }
   if (activeScreen != SCREEN_HOME) return;
 
   if (selectedIcon == 0) {
-    selectedIcon = (MenuIcon)(ICON_TOTAL_COUNT - 1); // 0 -> 4
+    selectedIcon = (MenuIcon)(ICON_TOTAL_COUNT - 1);
   } else {
     selectedIcon = (MenuIcon)(selectedIcon - 1);
   }
@@ -61,17 +74,27 @@ void MenuLogic::onButtonPrev() {
   pendingSound = SOUND_CLICK;
 }
 
-// TOUCH1: Move cursor to the next icon (wrap around 4 -> 0)
+// TOUCH1: Move cursor to the next icon (wrap around 6 -> 0)
 void MenuLogic::onButtonNext() {
   if (activeScreen == SCREEN_GAMES_MENU) {
     selectedGame = (selectedGame == 0) ? 1 : 0;
     pendingSound = SOUND_CLICK;
     return;
   }
+  if (activeScreen == SCREEN_HOUSE_MENU) {
+    selectedHouseOption = (selectedHouseOption == 0) ? 1 : 0;
+    pendingSound = SOUND_CLICK;
+    return;
+  }
+  if (activeScreen == SCREEN_WARDROBE) {
+    selectedWardrobeOption = (selectedWardrobeOption == 0) ? 1 : 0;
+    pendingSound = SOUND_CLICK;
+    return;
+  }
   if (activeScreen != SCREEN_HOME) return;
 
   if (selectedIcon >= ICON_TOTAL_COUNT - 1) {
-    selectedIcon = (MenuIcon)0; // 4 -> 0
+    selectedIcon = (MenuIcon)0;
   } else {
     selectedIcon = (MenuIcon)(selectedIcon + 1);
   }
@@ -92,6 +115,19 @@ void MenuLogic::onButtonOk(unsigned long currentTimeMs) {
     return;
   }
 
+  if (activeScreen == SCREEN_HOUSE_MENU) {
+    pendingSound = SOUND_CONFIRM;
+    if (selectedHouseOption == 0) {
+      activeScreen = SCREEN_WARDROBE;
+    }
+    return;
+  }
+
+  if (activeScreen == SCREEN_WARDROBE) {
+    pendingSound = SOUND_CONFIRM;
+    return;
+  }
+
   if (activeScreen == SCREEN_HOME) {
     pendingSound = SOUND_CONFIRM;
 
@@ -101,8 +137,11 @@ void MenuLogic::onButtonOk(unsigned long currentTimeMs) {
       activeScreen = SCREEN_CHOOSE_PLAYER;
     } else if (selectedIcon == ICON_PLAY) {
       activeScreen = SCREEN_GAMES_MENU;
+    } else if (selectedIcon == ICON_HOUSE) {
+      activeScreen = SCREEN_HOUSE_MENU;
+      selectedHouseOption = 0;
     } else {
-      // Food or Scold opens temporary action overlay
+      // Food, Medicin or Scold opens temporary action overlay
       activeScreen = SCREEN_ACTION;
       actionStartTimeMs = currentTimeMs;
     }
@@ -190,6 +229,11 @@ void MenuLogic::onButtonBack() {
   if (activeScreen == SCREEN_HATCHING) {
     return; // Cannot cancel cinematic egg hatching sequence
   }
+  if (activeScreen == SCREEN_WARDROBE) {
+    activeScreen = SCREEN_HOUSE_MENU;
+    pendingSound = SOUND_BACK;
+    return;
+  }
   if (activeScreen == SCREEN_MINIGAME_PONG || activeScreen == SCREEN_MINIGAME_MAZE) {
     activeScreen = SCREEN_GAMES_MENU;
     pendingSound = SOUND_BACK;
@@ -273,4 +317,32 @@ SoundType MenuLogic::popSoundEffect() {
   pendingSound = SOUND_NONE;
   return effect;
 }
+
+uint8_t MenuLogic::getSelectedHouseOption() const {
+  return selectedHouseOption;
+}
+
+void MenuLogic::selectHouseOption(uint8_t optionIndex) {
+  selectedHouseOption = (optionIndex > 1) ? 1 : optionIndex;
+}
+
+void MenuLogic::openHouseMenu() {
+  activeScreen = SCREEN_HOUSE_MENU;
+  selectedHouseOption = 0;
+  pendingSound = SOUND_CONFIRM;
+}
+
+uint8_t MenuLogic::getSelectedWardrobeOption() const {
+  return selectedWardrobeOption;
+}
+
+void MenuLogic::selectWardrobeOption(uint8_t outfitIndex) {
+  selectedWardrobeOption = (outfitIndex > 1) ? 1 : outfitIndex;
+}
+
+void MenuLogic::openWardrobeMenu() {
+  activeScreen = SCREEN_WARDROBE;
+  pendingSound = SOUND_CONFIRM;
+}
+
 

@@ -39,26 +39,28 @@ void testNavigationWrapping() {
   printf("\n--- Test: Navigation and Wrapping ---\n");
   MenuLogic menu;
 
-  // Move right: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0 (wrap)
+  // Move right: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 0 (wrap)
   menu.onButtonNext();
   CHECK(menu.getSelectedIcon() == ICON_PLAY, "Next moves from 0 to 1 (PLAY)");
 
-  menu.onButtonNext(); // 2 (MEDICIN)
-  CHECK(menu.getSelectedIcon() == ICON_MEDICIN, "Next moves from 1 to 2 (MEDICIN)");
-  menu.onButtonNext(); // 3 (SCOLD)
-  menu.onButtonNext(); // 4 (STATS)
-  menu.onButtonNext(); // 5 (CONNECT)
+  menu.onButtonNext(); // 2 (HOUSE)
+  CHECK(menu.getSelectedIcon() == ICON_HOUSE, "Next moves from 1 to 2 (HOUSE)");
+  menu.onButtonNext(); // 3 (MEDICIN)
+  CHECK(menu.getSelectedIcon() == ICON_MEDICIN, "Next moves from 2 to 3 (MEDICIN)");
+  menu.onButtonNext(); // 4 (SCOLD)
+  menu.onButtonNext(); // 5 (STATS)
+  menu.onButtonNext(); // 6 (CONNECT)
   CHECK(menu.getSelectedIcon() == ICON_CONNECT, "Reached last icon (CONNECT)");
 
   menu.onButtonNext(); // Wrap to 0
-  CHECK(menu.getSelectedIcon() == ICON_FOOD, "Next from 5 wraps to 0 (FOOD)");
+  CHECK(menu.getSelectedIcon() == ICON_FOOD, "Next from 6 wraps to 0 (FOOD)");
 
-  // Move left: 0 -> 5 (wrap)
+  // Move left: 0 -> 6 (wrap)
   menu.onButtonPrev();
-  CHECK(menu.getSelectedIcon() == ICON_CONNECT, "Prev from 0 wraps to 5 (CONNECT)");
+  CHECK(menu.getSelectedIcon() == ICON_CONNECT, "Prev from 0 wraps to 6 (CONNECT)");
 
   menu.onButtonPrev();
-  CHECK(menu.getSelectedIcon() == ICON_STATS, "Prev from 5 moves to 4 (STATS)");
+  CHECK(menu.getSelectedIcon() == ICON_STATS, "Prev from 6 moves to 5 (STATS)");
 }
 
 void testScreenSwitching() {
@@ -73,9 +75,10 @@ void testScreenSwitching() {
 
   // 2. Select STATS via icon + OK
   menu.onButtonNext(); // 1 (PLAY)
-  menu.onButtonNext(); // 2 (MEDICIN)
-  menu.onButtonNext(); // 3 (SCOLD)
-  menu.onButtonNext(); // 4 (STATS)
+  menu.onButtonNext(); // 2 (HOUSE)
+  menu.onButtonNext(); // 3 (MEDICIN)
+  menu.onButtonNext(); // 4 (SCOLD)
+  menu.onButtonNext(); // 5 (STATS)
   menu.onButtonOk(1000);
   CHECK(menu.getActiveScreen() == SCREEN_STATS, "OK on STATS icon opens SCREEN_STATS");
 
@@ -84,7 +87,7 @@ void testScreenSwitching() {
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "TOUCH3 returns from STATS to HOME");
 
   // 4. Select CONNECT -> SCREEN_CHOOSE_PLAYER -> selectPlayer(1) -> CONTROLLER
-  menu.onButtonNext(); // 5 (CONNECT)
+  menu.onButtonNext(); // 6 (CONNECT)
   menu.onButtonOk(1500);
   CHECK(menu.getActiveScreen() == SCREEN_CHOOSE_PLAYER, "OK on CONNECT icon opens SCREEN_CHOOSE_PLAYER");
   menu.selectPlayer(1);
@@ -101,6 +104,26 @@ void testScreenSwitching() {
   CHECK(menu.getPlayerId() == 2, "Player ID is 2");
   menu.onButtonBack();
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "TOUCH3 returns from CONTROLLER to HOME");
+
+  // 6. Test House Menu and Wardrobe navigation
+  menu.openHouseMenu();
+  CHECK(menu.getActiveScreen() == SCREEN_HOUSE_MENU, "openHouseMenu() opens SCREEN_HOUSE_MENU");
+  CHECK(menu.getSelectedHouseOption() == 0, "House option starts on 0 (GARDEROBE)");
+  menu.onButtonNext();
+  CHECK(menu.getSelectedHouseOption() == 1, "House option next moves to 1 (SOEVN)");
+  menu.onButtonPrev();
+  CHECK(menu.getSelectedHouseOption() == 0, "House option prev returns to 0 (GARDEROBE)");
+  menu.onButtonOk(3000);
+  CHECK(menu.getActiveScreen() == SCREEN_WARDROBE, "OK on GARDEROBE opens SCREEN_WARDROBE");
+  CHECK(menu.getSelectedWardrobeOption() == 0, "Wardrobe starts on 0 (STANDARD)");
+  menu.onButtonNext();
+  CHECK(menu.getSelectedWardrobeOption() == 1, "Wardrobe next moves to 1 (VINTERTOEJ)");
+  menu.onButtonPrev();
+  CHECK(menu.getSelectedWardrobeOption() == 0, "Wardrobe prev returns to 0 (STANDARD)");
+  menu.onButtonBack();
+  CHECK(menu.getActiveScreen() == SCREEN_HOUSE_MENU, "TOUCH3 returns from WARDROBE to HOUSE_MENU");
+  menu.onButtonBack();
+  CHECK(menu.getActiveScreen() == SCREEN_HOME, "TOUCH3 returns from HOUSE_MENU to HOME");
 }
 
 void testActionScreenTimeout() {

@@ -588,6 +588,71 @@ void loop() {
         lastTouchTimeMs = now;
       }
     }
+  } else if (currentScreen == SCREEN_HOUSE_MENU) {
+    // House sub-menu: 1. Garderobe (Skab) / 2. Sengetid (Soevn)
+    if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
+        menuLogic.onButtonPrev();
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+        menuLogic.onButtonNext();
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+        uint8_t opt = menuLogic.getSelectedHouseOption();
+        if (opt == 0) {
+          // Open Wardrobe
+          menuLogic.openWardrobeMenu();
+          uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), true);
+        } else {
+          // Toggle Sleep / Sengetid
+          bool newSleeping = !petLogic.isSleeping();
+          petLogic.setSleeping(newSleeping);
+          soundLed.playSound(SOUND_CONFIRM);
+          if (newSleeping) {
+            soundLed.setMoodColor(80, 140, 255); // Calming blue
+          } else {
+            soundLed.setMoodColor(100, 255, 120); // Fresh green
+          }
+          storagePet.savePet(petLogic);
+          syncPetStateToBackend(true);
+          uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), false);
+        }
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack();
+        lastTouchTimeMs = now;
+      }
+    }
+  } else if (currentScreen == SCREEN_WARDROBE) {
+    // Wardrobe dressing room: choose standard vs winter outfit
+    if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
+        menuLogic.onButtonPrev();
+        uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), false);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+        menuLogic.onButtonNext();
+        uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), false);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+        uint8_t chosen = menuLogic.getSelectedWardrobeOption();
+        petLogic.setOutfit((PetOutfit)chosen);
+        soundLed.playSound(SOUND_CONFIRM);
+        soundLed.flashColor(255, 230, 80, 300);
+        storagePet.savePet(petLogic);
+        syncPetStateToBackend(true);
+        uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), false);
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+        menuLogic.onButtonBack();
+        if (menuLogic.getActiveScreen() == SCREEN_HOUSE_MENU) {
+          uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true);
+        }
+        lastTouchTimeMs = now;
+      }
+    }
   } else if (currentScreen == SCREEN_MINIGAME_PONG) {
     // Solo Wall-Pong game on Oplà:
     if (pongLogic.getState() == PONG_STATE_READY || pongLogic.getState() == PONG_STATE_BALL_LOST) {
@@ -893,7 +958,7 @@ void loop() {
   if (currentScreen != previousScreen) {
     muteMessageEndTimeMs = 0; // Cancel any active mute toast when switching screens
 
-    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE || previousScreen == SCREEN_MEMORIAL || previousScreen == SCREEN_HATCHING || previousScreen == SCREEN_NAME_ENTRY) {
+    if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_HOUSE_MENU || previousScreen == SCREEN_WARDROBE || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE || previousScreen == SCREEN_MEMORIAL || previousScreen == SCREEN_HATCHING || previousScreen == SCREEN_NAME_ENTRY) {
       // Exiting a fullscreen view: restore mood LEDs and redraw full home UI
       soundLed.setMoodColor(0, 150, 220);
       if (currentScreen == SCREEN_HOME) {
@@ -911,6 +976,18 @@ void loop() {
       case SCREEN_HOME:
         Serial.println(F("[UI] Skærm: HOME (Lumi Tamagotchi)"));
         uiPet.updateHomeDisplay(petLogic, now, true);
+        break;
+
+      case SCREEN_HOUSE_MENU:
+        Serial.println(F("[UI] Skærm: LUMIS HUS (1. Garderobe, 2. Sengetid)"));
+        uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true);
+        soundLed.setMoodColor(255, 180, 80); // Warm cozy home glow
+        break;
+
+      case SCREEN_WARDROBE:
+        Serial.println(F("[UI] Skærm: GARDEROBE (Vaelg toej)"));
+        uiMenu.drawWardrobeMenu(menuLogic.getSelectedWardrobeOption(), petLogic.getOutfitEnum(), true);
+        soundLed.setMoodColor(0, 200, 240); // Cyan wardrobe glow
         break;
 
       case SCREEN_NAME_ENTRY:
@@ -1037,6 +1114,22 @@ void loop() {
         }
         syncPetStateToBackend(true); // Sync updated stats to backend immediately!
         break;
+    }
+  }
+
+  // 4b. TAMAPAL CALL (GDD: Kæledyret kalder med blødt bip og blink ved kritiske behov < 20% eller sygdom)
+  static unsigned long lastAttentionCallTimeMs = 0;
+  const unsigned long ATTENTION_CALL_INTERVAL_MS = 45000; // Call every 45 sec while in distress
+  if (petLogic.isAlive() && !petLogic.isSleeping() && !showcaseDirector.isActive() && currentScreen == SCREEN_HOME) {
+    if (petLogic.needsAttention() || petLogic.isSick() || petLogic.getHasPoop()) {
+      if (now - lastAttentionCallTimeMs >= ATTENTION_CALL_INTERVAL_MS) {
+        lastAttentionCallTimeMs = now;
+        soundLed.playSound(SOUND_CLICK); // Soft gentle 520 Hz tactile chirp
+        soundLed.flashColor(255, 70, 30, 400); // 400ms amber-red distress blink
+        Serial.println(F("[KALDER] *** Lumi kalder paa opmaerksomhed! Behov under 20% eller sygdom ***"));
+      }
+    } else {
+      lastAttentionCallTimeMs = now; // Reset timer when all vitals are healthy
     }
   }
 
@@ -1173,7 +1266,7 @@ void loop() {
     }
   } else if (currentScreen == SCREEN_NAME_ENTRY) {
     uiName.drawNameEntry(nameEntry, now, false);
-  } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_MEMORIAL) {
+  } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_HOUSE_MENU && currentScreen != SCREEN_WARDROBE && currentScreen != SCREEN_MEMORIAL) {
     // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME or title splash)
     if (!showcaseDirector.isActive() || showcaseDirector.getPhase() != SHOWCASE_TITLE_SPLASH) {
       if (petLogic.isAlive() || currentScreen != SCREEN_HOME) {

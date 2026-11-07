@@ -34,6 +34,16 @@ public:
   void openPongGame();
   void openMazeGame();
 
+  // House menu (Lumis Hus: Garderobe & Soevn) helpers
+  uint8_t getSelectedHouseOption() const;
+  void selectHouseOption(uint8_t optionIndex);
+  void openHouseMenu();
+
+  // Wardrobe helpers
+  uint8_t getSelectedWardrobeOption() const;
+  void selectWardrobeOption(uint8_t outfitIndex);
+  void openWardrobeMenu();
+
   // Memorial gallery navigation
   void openMemorial(uint16_t totalCount, ScreenType returnScreen = SCREEN_HOME);
   uint16_t getMemorialIndex() const;
@@ -66,6 +76,8 @@ private:
   ScreenType memorialReturnScreen;
   MenuIcon selectedIcon;
   uint8_t selectedGame;
+  uint8_t selectedHouseOption;
+  uint8_t selectedWardrobeOption;
   uint16_t memorialIndex;
   int playerId;
 
