@@ -3,7 +3,7 @@
 Hele projektet på én side: datoer, krav (DoD), status og åbne spørgsmål.
 Beskederne mellem delene står i `MESSAGES.md`. Aftaler skrives i Del 3 dér – sammen.
 
-Status: 6/11 (fredag). Ret filen, når noget ændrer sig.
+Status: 7/11 (lørdag). Ret filen, når noget ændrer sig.
 
 ## Datoer
 
@@ -14,11 +14,11 @@ Status: 6/11 (fredag). Ret filen, når noget ændrer sig.
 | man 9/11 | Kode-stop – derefter kun fejlrettelser | vores plan |
 | ons 11/11 | Fremlæggelse | Notion / AGENTS.md |
 
-## Status pr. del (6/11)
+## Status pr. del (7/11)
 
 | Del | Hvem | Status |
 |---|---|---|
-| Arduino | Oleh | **100% Færdig og testet** i `feature/arduino-death-rebirth`. Fuld Oplà controller (20 Hz input med `up`/`down`/`button`/`tiltX`/`tiltY`/`tilt`, event-feedback) + komplet Tamagotchi livscyklus (Baby, Teenager, Adult, 100-dages Vismand, fredelig død, kirkegårdsgalleri, arkade navneindtastning, garderobe m. termoregulering, to indbyggede spil: Mur-Pong og Labyrint, apotek m. bær, fejlsikker MicroSD m. `.bak`, autonom 70s teater-showcase via `TOUCH1+TOUCH3` 800ms). **479/479 enhedstests bestået (100% PASS)**. 0 kompileringsfejl/advarsler på SAMD21. |
+| Arduino | Oleh | **100% Færdig og testet** i `feature/arduino-death-rebirth`. Fuld Oplà controller (20 Hz input med `up`/`down`/`button`/`tiltX`/`tiltY`/`tilt`, event-feedback) + komplet Tamagotchi livscyklus (Baby, Teenager, Adult, 100-dages Vismand, fredelig død, kirkegårdsgalleri, arkade navneindtastning, garderobe m. termoregulering, to indbyggede spil: Mur-Pong og Labyrint, apotek m. bær, fejlsikker MicroSD m. `.bak`, autonom 72s teater-showcase via `TOUCH1+TOUCH3` 800ms m. 11 scener, screen shake, nova og celestial ascension). **Akustisk redesign af buzzer:** afdæmpet lydstyrke og bløde 520–659 Hz toner m. 8–20 ms micro-clicks (Switch/iOS haptic feel) mod skinger piezo-alarm. Udvidet `pet/state` MQTT-kontrakt m. `generation`, `ageMinutes`, `deathCause` og `epitaph` til backend-database. Batterisparende offline Tamagotchi-start. **501/501 enhedstests bestået (100% PASS)**. 0 kompileringsfejl/advarsler på SAMD21. |
 | Backend | Oliver | Projekt i `dev` (`Backend/BackendTamapal`, .NET 10). Mangler: SignalR-hub `/gamehub`, MQTT-klient der lytter på `StormLamaerne/Tamapal/+/input` og `.../pet/state`, game loop, CORS, database (Neon). |
 | Frontend | Andrii | Pong på falske data i `dev` (`fakeGame.js`). Næste: SignalR-klient (#10), når `/gamehub` findes. |
 
@@ -56,7 +56,7 @@ I DoD står den under Nice to Have. Forslag: highscore (navn + score) samt forf�
 1. **Afvikl alle enhedstests på Mac/Linux:**
    ```bash
    bash Arduino/tests/run_tests.sh
-   # Resultat: 479 of 479 tests passed!
+   # Resultat: 501 of 501 tests passed!
    ```
 2. **Kompilering af Oplà-firmware (SAMD21):**
    ```bash
