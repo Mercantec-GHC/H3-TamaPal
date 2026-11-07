@@ -38,10 +38,10 @@ enum MazeState : uint8_t {
 
 class MazeLogic {
 public:
-  // Coordinate and scale constants (in screen pixels)
-  static constexpr int16_t ORIGIN_X   = 36;
-  static constexpr int16_t ORIGIN_Y   = 36;
-  static constexpr int16_t CELL_SIZE  = 24;  // 7 * 24 = 168 px width/height
+  // Coordinate and scale constants (calibrated for circular ST7789 bezel, R <= 99 px, narrower 20px corridors)
+  static constexpr int16_t ORIGIN_X   = 50;
+  static constexpr int16_t ORIGIN_Y   = 50;
+  static constexpr int16_t CELL_SIZE  = 20;  // 7 * 20 = 140 px width/height (tighter winding passages)
   static constexpr int16_t BALL_RADIUS = 4;  // 9x9 px ball diameter (radius 4)
 
   MazeLogic();

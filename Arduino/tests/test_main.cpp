@@ -724,8 +724,9 @@ void testSoloPongLogic() {
     sweptPong.update(st);
     if (sweptPong.popWallHit()) break;
   }
-  // Ball is returning towards paddle. Let it get near x=39 (just in front of paddleRight=36)
-  for (int i = 0; i < 300 && sweptPong.getBallX() > 39.0f; i++) {
+  // Ball is returning towards paddle. Let it get near paddle face (just in front of paddleRight)
+  const float nearPaddleX = (float)(PongLogic::PADDLE_X + PongLogic::PADDLE_WIDTH + 3);
+  for (int i = 0; i < 300 && sweptPong.getBallX() > nearPaddleX; i++) {
     st += 10;
     sweptPong.movePaddle(sweptPong.getBallY() - sweptPong.getPaddleY());
     sweptPong.update(st);

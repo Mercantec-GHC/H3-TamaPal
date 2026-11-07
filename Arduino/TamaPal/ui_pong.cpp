@@ -30,10 +30,12 @@ void UiPongRenderer::drawInitialScreen(const PongLogic& pong) {
   uint16_t bumperGold   = color565(255, 180, 50);  // Neon gold right bumper wall
   uint16_t hintColor    = color565(95, 130, 175);  // Subtle navigation text
 
-  // 1. Clear display
+  // 1. Clear display and draw circular stadium bezel ring (R = 112..114)
   carrier->display.fillScreen(nativeBg);
+  carrier->display.drawCircle(120, 120, 114, color565(20, 42, 78));
+  carrier->display.drawCircle(120, 120, 112, color565(35, 80, 135));
 
-  // 2. Court walls
+  // 2. Court walls (calibrated inside circular viewport: X=42..198, Y=52..188)
   // Top neon rail
   carrier->display.drawFastHLine(PongLogic::FIELD_LEFT, PongLogic::FIELD_TOP,
                                 PongLogic::FIELD_RIGHT - PongLogic::FIELD_LEFT + 1, borderCyan);
@@ -57,12 +59,12 @@ void UiPongRenderer::drawInitialScreen(const PongLogic& pong) {
     carrier->display.drawPixel(PongLogic::FIELD_LEFT, y, color565(180, 50, 70));
   }
 
-  // 3. Bottom controls hint (pure button control: T0=Up, T1=Down, T2=OK/Serve, T3=Exit)
+  // 3. Bottom controls hint (calibrated at Y=196 inside circular bottom arc)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(hintColor, nativeBg);
-  const char* hint = "T0:Op T1:Ned | T2:OK T3:Exit";
+  const char* hint = "T0:Op T1:Ned T2:OK T3:Ud";
   int hintW = strlen(hint) * 6;
-  carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 214);
+  carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 196);
   carrier->display.print(hint);
 
   // 4. Force redraw of HUD, paddle, and ball
@@ -89,28 +91,28 @@ void UiPongRenderer::drawHud(const PongLogic& pong, bool force) {
   uint16_t scoreCyan = color565(210, 245, 255);
   uint16_t highGold  = color565(255, 215, 60);
 
-  // 1. Lives (Left)
+  // 1. Lives (Left, calibrated at X=58..78, Y=35 inside top circular arc)
   if (force || pong.getLives() != lastLives) {
     drawLives(pong.getLives());
     lastLives = pong.getLives();
   }
 
-  // 2. Score (Center)
+  // 2. Score (Center, Y=32)
   if (force || pong.getScore() != lastScore) {
     carrier->display.setTextSize(1);
     carrier->display.setTextColor(scoreCyan, nativeBg);
-    carrier->display.setCursor(95, 20);
+    carrier->display.setCursor(92, 32);
     char buf[16];
     snprintf(buf, sizeof(buf), "SCORE:%02u", pong.getScore());
     carrier->display.print(buf);
     lastScore = pong.getScore();
   }
 
-  // 3. High Score (Right)
+  // 3. High Score (Right, X=148, Y=32 -> ends at X=178, safely inside circular bezel)
   if (force || pong.getHighScore() != lastHighScore) {
     carrier->display.setTextSize(1);
     carrier->display.setTextColor(highGold, nativeBg);
-    carrier->display.setCursor(168, 20);
+    carrier->display.setCursor(148, 32);
     char buf[16];
     snprintf(buf, sizeof(buf), "HI:%02u", pong.getHighScore());
     carrier->display.print(buf);
@@ -125,13 +127,13 @@ void UiPongRenderer::drawLives(uint8_t lives) {
   uint16_t activeRed = color565(255, 65, 95);   // Glowing red heart/life dot
   uint16_t lostGray  = color565(55, 65, 85);    // Muted lost life
 
-  // Clear lives area
-  carrier->display.fillRect(32, 18, 36, 12, nativeBg);
+  // Clear lives area (calibrated inside top circle chord at Y=30..41)
+  carrier->display.fillRect(54, 30, 32, 12, nativeBg);
 
-  // Draw 3 life dots (radius 3)
+  // Draw 3 life dots (radius 3 at X=59, 68, 77, Y=35)
   for (int i = 0; i < 3; i++) {
-    int cx = 36 + (i * 10);
-    int cy = 24;
+    int cx = 59 + (i * 9);
+    int cy = 35;
     uint16_t col = (i < lives) ? activeRed : lostGray;
     carrier->display.fillCircle(cx, cy, 3, col);
     if (i < lives) {

@@ -81,18 +81,21 @@ void MazeLogic::carvePassagesDfs(uint32_t& rng) {
   // Explicit stack to prevent microcontroller recursion stack overflow
   uint8_t stackCol[MAZE_COLS * MAZE_ROWS];
   uint8_t stackRow[MAZE_COLS * MAZE_ROWS];
+  uint8_t stackDir[MAZE_COLS * MAZE_ROWS];
   int16_t stackTop = 0;
 
   // Start at Top-Left (0, 0)
   grid[0][0] |= MAZE_VISITED;
   stackCol[0] = 0;
   stackRow[0] = 0;
+  stackDir[0] = 255;
 
   while (stackTop >= 0) {
     uint8_t curC = stackCol[stackTop];
     uint8_t curR = stackRow[stackTop];
+    uint8_t lastDir = stackDir[stackTop];
 
-    // Find unvisited neighbors (North, East, South, West)
+    // Find unvisited neighbors (North=0, East=1, South=2, West=3)
     uint8_t unvisitedDir[4];
     uint8_t unvisitedCount = 0;
 
@@ -114,8 +117,31 @@ void MazeLogic::carvePassagesDfs(uint32_t& rng) {
     }
 
     if (unvisitedCount > 0) {
-      // Pick random neighbor
-      uint8_t pick = unvisitedDir[nextRandom(rng) % unvisitedCount];
+      // Turn-biased winding selection: heavily favor 90-degree turns and stepping inward away from outer borders
+      // so the labyrinth forms serpentine S-curves instead of straight perimeter highways!
+      uint8_t weightedPool[24];
+      uint8_t poolSize = 0;
+      bool onOuterBorder = (curC == 0 || curC == MAZE_COLS - 1 || curR == 0 || curR == MAZE_ROWS - 1);
+
+      for (uint8_t i = 0; i < unvisitedCount; i++) {
+        uint8_t dir = unvisitedDir[i];
+        uint8_t nC = (dir == 1) ? (curC + 1) : ((dir == 3) ? (curC - 1) : curC);
+        uint8_t nR = (dir == 2) ? (curR + 1) : ((dir == 0) ? (curR - 1) : curR);
+        bool nextInInterior = (nC > 0 && nC < MAZE_COLS - 1 && nR > 0 && nR < MAZE_ROWS - 1);
+
+        uint8_t weight = 1;
+        if (lastDir != 255 && dir != lastDir) {
+          weight += 3; // Strongly prefer turning 90 degrees over straight lines
+        }
+        if (onOuterBorder && nextInInterior) {
+          weight += 2; // Pull paths inward away from outer walls
+        }
+        for (uint8_t w = 0; w < weight && poolSize < 24; w++) {
+          weightedPool[poolSize++] = dir;
+        }
+      }
+
+      uint8_t pick = weightedPool[nextRandom(rng) % poolSize];
       uint8_t nextC = curC;
       uint8_t nextR = curR;
 
@@ -143,6 +169,7 @@ void MazeLogic::carvePassagesDfs(uint32_t& rng) {
       stackTop++;
       stackCol[stackTop] = nextC;
       stackRow[stackTop] = nextR;
+      stackDir[stackTop] = pick;
     } else {
       // Backtrack
       stackTop--;
@@ -189,10 +216,10 @@ void MazeLogic::placeItemsAndTraps(uint32_t& rng) {
     uint8_t tr = deadRow[i]; deadRow[i] = deadRow[j]; deadRow[j] = tr;
   }
 
-  // Distribute items among dead ends:
+  // Distribute items among dead ends (always reserve at least 1 dead end for a pitfall trap):
   // 1. Up to 3 Deku Berries (exploration rewards)
-  uint8_t berriesToPlace = (deadCount >= 3) ? 3 : (deadCount / 2);
-  for (uint8_t i = 0; i < berriesToPlace; i++) {
+  uint8_t berriesToPlace = (deadCount >= 4) ? 3 : ((deadCount >= 3) ? 2 : 1);
+  for (uint8_t i = 0; i < berriesToPlace && i < deadCount; i++) {
     grid[deadRow[i]][deadCol[i]] |= MAZE_ITEM_BERRY;
     totalBerries++;
   }

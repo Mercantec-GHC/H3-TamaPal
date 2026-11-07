@@ -28,16 +28,20 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
   uint16_t nativeBg = color565(8, 12, 26);
   carrier->display.fillScreen(nativeBg);
 
+  // Circular stadium bezel guide rings (R = 112..114) matching the round Oplà screen
+  carrier->display.drawCircle(120, 120, 114, color565(20, 42, 78));
+  carrier->display.drawCircle(120, 120, 112, color565(35, 80, 135));
+
   // 1. Draw static maze walls and floor tiles
   drawAllWalls(maze);
   drawCellItems(maze);
 
-  // 2. Bottom controls hint
+  // 2. Bottom controls hint (calibrated at Y=196 inside circular bottom arc)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(color565(95, 130, 175), nativeBg);
-  const char* hint = "Vip kortet | T2:Pause T3:Menu";
+  const char* hint = "Vip:Rul | T2:Pause T3:Ud";
   int hintW = strlen(hint) * 6;
-  carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 214);
+  carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 196);
   carrier->display.print(hint);
 
   // 3. Reset cached state and draw HUD
@@ -77,13 +81,15 @@ void UiMazeRenderer::drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8
     carrier->display.drawFastVLine(left, top, MazeLogic::CELL_SIZE + 1, wallCyan);
     carrier->display.drawFastVLine(left + 1, top, MazeLogic::CELL_SIZE + 1, wallCore);
   }
-  // East wall
+  // East wall (2px thick)
   if (cell & MAZE_WALL_EAST) {
     carrier->display.drawFastVLine(left + MazeLogic::CELL_SIZE, top, MazeLogic::CELL_SIZE + 1, wallCyan);
+    carrier->display.drawFastVLine(left + MazeLogic::CELL_SIZE - 1, top, MazeLogic::CELL_SIZE + 1, wallCore);
   }
-  // South wall
+  // South wall (2px thick)
   if (cell & MAZE_WALL_SOUTH) {
     carrier->display.drawFastHLine(left, top + MazeLogic::CELL_SIZE, MazeLogic::CELL_SIZE + 1, wallCyan);
+    carrier->display.drawFastHLine(left, top + MazeLogic::CELL_SIZE - 1, MazeLogic::CELL_SIZE + 1, wallCore);
   }
 }
 
@@ -212,25 +218,25 @@ void UiMazeRenderer::drawHud(const MazeLogic& maze, bool force) {
   uint16_t timeCyan   = color565(210, 245, 255);
   uint16_t goldRecord = color565(255, 215, 60);
 
-  // 1. Berries counter (Left, Y = 18)
+  // 1. Berries counter (Left, calibrated at X=58, Y=31 inside top circular arc)
   if (force || maze.getBerriesCollected() != lastBerries) {
-    carrier->display.fillRect(28, 16, 56, 12, nativeBg);
+    carrier->display.fillRect(56, 29, 40, 12, nativeBg);
     carrier->display.setTextSize(1);
     carrier->display.setTextColor(berryPink, nativeBg);
-    carrier->display.setCursor(28, 18);
+    carrier->display.setCursor(58, 31);
     char buf[16];
-    snprintf(buf, sizeof(buf), "* %u/%u", maze.getBerriesCollected(), maze.getTotalBerries());
+    snprintf(buf, sizeof(buf), "*%u/%u", maze.getBerriesCollected(), maze.getTotalBerries());
     carrier->display.print(buf);
     lastBerries = maze.getBerriesCollected();
   }
 
-  // 2. Elapsed Timer (Center, Y = 18)
+  // 2. Elapsed Timer (Center, X=102, Y=31)
   uint16_t currentSec = maze.getElapsedSeconds();
   if (force || currentSec != lastSeconds) {
-    carrier->display.fillRect(94, 16, 52, 12, nativeBg);
+    carrier->display.fillRect(98, 29, 44, 12, nativeBg);
     carrier->display.setTextSize(1);
     carrier->display.setTextColor(timeCyan, nativeBg);
-    carrier->display.setCursor(96, 18);
+    carrier->display.setCursor(102, 31);
     char buf[16];
     uint16_t m = currentSec / 60;
     uint16_t s = currentSec % 60;
@@ -239,12 +245,12 @@ void UiMazeRenderer::drawHud(const MazeLogic& maze, bool force) {
     lastSeconds = currentSec;
   }
 
-  // 3. Best record (Right, Y = 18)
+  // 3. Best record (Right, X=148, Y=31 -> ends at X=172, safely inside circular bezel)
   if (force) {
-    carrier->display.fillRect(158, 16, 54, 12, nativeBg);
+    carrier->display.fillRect(146, 29, 36, 12, nativeBg);
     carrier->display.setTextSize(1);
     carrier->display.setTextColor(goldRecord, nativeBg);
-    carrier->display.setCursor(158, 18);
+    carrier->display.setCursor(148, 31);
     char buf[16];
     if (maze.getBestSeconds() > 0) {
       snprintf(buf, sizeof(buf), "%us", maze.getBestSeconds());
@@ -367,10 +373,10 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
       return;
     }
     if (currentState == MAZE_STATE_PAUSED) {
-      carrier->display.fillRect(90, 16, 60, 12, nativeBg);
+      carrier->display.fillRect(98, 29, 44, 12, nativeBg);
       carrier->display.setTextSize(1);
       carrier->display.setTextColor(color565(255, 215, 60), nativeBg);
-      carrier->display.setCursor(93, 18);
+      carrier->display.setCursor(102, 31);
       carrier->display.print("PAUSE");
     } else if (lastState == MAZE_STATE_PAUSED) {
       lastSeconds = 9999; // Force timer redraw on resume

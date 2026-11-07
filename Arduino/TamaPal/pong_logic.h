@@ -19,16 +19,16 @@ enum PongState : uint8_t {
 
 class PongLogic {
 public:
-  // Field layout constants (tuned for 240x240 circular ST7789 display)
-  static constexpr int16_t FIELD_LEFT   = 28;
-  static constexpr int16_t FIELD_RIGHT  = 214;
-  static constexpr int16_t FIELD_TOP    = 38;
-  static constexpr int16_t FIELD_BOTTOM = 202;
+  // Field layout constants (calibrated to fit 100% inside the circular ST7789 bezel, R <= 103 px)
+  static constexpr int16_t FIELD_LEFT   = 42;
+  static constexpr int16_t FIELD_RIGHT  = 198;
+  static constexpr int16_t FIELD_TOP    = 52;
+  static constexpr int16_t FIELD_BOTTOM = 188;
 
   // Paddle constants
-  static constexpr int16_t PADDLE_X      = 32;
+  static constexpr int16_t PADDLE_X      = 46;
   static constexpr int16_t PADDLE_WIDTH  = 5;
-  static constexpr int16_t PADDLE_HEIGHT = 34;
+  static constexpr int16_t PADDLE_HEIGHT = 30;
 
   // Ball constants
   static constexpr int16_t BALL_SIZE = 5;
