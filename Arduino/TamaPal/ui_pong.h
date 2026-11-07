@@ -29,6 +29,7 @@ private:
   MKRIoTCarrier* carrier;
 
   int16_t lastPaddleY;
+  int16_t lastBotY;
   int16_t lastBallX;
   int16_t lastBallY;
   uint16_t lastScore;

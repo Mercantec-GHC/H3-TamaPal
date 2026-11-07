@@ -282,10 +282,12 @@ void MazeLogic::update(unsigned long currentTimeMs) {
   }
 
   unsigned long dtMs = currentTimeMs - lastUpdateMs;
+  if (dtMs < 10) {
+    return; // Wait until at least 10 ms of real wall-clock time has elapsed (prevents 30x turbo speed in fast loop())
+  }
   lastUpdateMs = currentTimeMs;
 
   if (dtMs > 100) dtMs = 100;
-  if (dtMs < 5) dtMs = 5;
 
   float speedFactor = (float)dtMs / 20.0f;
 

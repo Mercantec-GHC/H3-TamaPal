@@ -9,6 +9,7 @@
 UiPongRenderer::UiPongRenderer()
   : carrier(nullptr),
     lastPaddleY(-1),
+    lastBotY(-1),
     lastBallX(-1),
     lastBallY(-1),
     lastScore(9999),
@@ -27,7 +28,6 @@ void UiPongRenderer::drawInitialScreen(const PongLogic& pong) {
 
   uint16_t nativeBg     = color565(8, 12, 26);     // Dark seamless midnight background
   uint16_t borderCyan   = color565(0, 200, 255);   // Neon cyan boundary walls
-  uint16_t bumperGold   = color565(255, 180, 50);  // Neon gold right bumper wall
   uint16_t hintColor    = color565(95, 130, 175);  // Subtle navigation text
 
   // 1. Clear display and draw circular stadium bezel ring (R = 112..114)
@@ -48,15 +48,15 @@ void UiPongRenderer::drawInitialScreen(const PongLogic& pong) {
   carrier->display.drawFastHLine(PongLogic::FIELD_LEFT, PongLogic::FIELD_BOTTOM + 1,
                                 PongLogic::FIELD_RIGHT - PongLogic::FIELD_LEFT + 1, color565(0, 90, 140));
 
-  // Right solid neon bounce wall
-  carrier->display.fillRect(PongLogic::FIELD_RIGHT, PongLogic::FIELD_TOP,
-                            3, PongLogic::FIELD_BOTTOM - PongLogic::FIELD_TOP + 1, bumperGold);
-  carrier->display.drawFastVLine(PongLogic::FIELD_RIGHT + 1, PongLogic::FIELD_TOP + 2,
-                                PongLogic::FIELD_BOTTOM - PongLogic::FIELD_TOP - 3, 0xFFFF);
+  // Center court dotted net (X = 120)
+  for (int y = PongLogic::FIELD_TOP + 4; y < PongLogic::FIELD_BOTTOM - 2; y += 6) {
+    carrier->display.drawFastVLine(120, y, 3, color565(30, 55, 95));
+  }
 
-  // Left danger / goal line (subtle dotted red line)
+  // Left & Right goal lines (subtle dotted lines behind player & bot paddles)
   for (int y = PongLogic::FIELD_TOP + 2; y < PongLogic::FIELD_BOTTOM; y += 4) {
     carrier->display.drawPixel(PongLogic::FIELD_LEFT, y, color565(180, 50, 70));
+    carrier->display.drawPixel(PongLogic::FIELD_RIGHT + 3, y, color565(90, 75, 40));
   }
 
   // 3. Bottom controls hint (calibrated at Y=196 inside circular bottom arc)
@@ -67,8 +67,9 @@ void UiPongRenderer::drawInitialScreen(const PongLogic& pong) {
   carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 196);
   carrier->display.print(hint);
 
-  // 4. Force redraw of HUD, paddle, and ball
+  // 4. Force redraw of HUD, player paddle, bot paddle, and ball
   lastPaddleY   = -1;
+  lastBotY      = -1;
   lastBallX     = -1;
   lastBallY     = -1;
   lastScore     = 9999;
@@ -275,7 +276,18 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
         carrier->display.fillRect(lastBallX, lastBallY,
                                   PongLogic::BALL_SIZE, PongLogic::BALL_SIZE, nativeBg);
         if (lastBallX <= PongLogic::PADDLE_X + PongLogic::PADDLE_WIDTH + 1) {
-          lastPaddleY = -1; // Force paddle redraw if erased ball touched paddle
+          lastPaddleY = -1; // Force player paddle redraw if erased ball touched it
+        }
+        if (lastBallX + PongLogic::BALL_SIZE >= PongLogic::FIELD_RIGHT - 3) {
+          lastBotY = -1; // Force bot paddle redraw if erased ball touched it
+        }
+        // Restore center net if ball crossed X=120
+        if (lastBallX <= 120 && lastBallX + PongLogic::BALL_SIZE >= 120) {
+          for (int y = PongLogic::FIELD_TOP + 4; y < PongLogic::FIELD_BOTTOM - 2; y += 6) {
+            if (y >= lastBallY - 3 && y <= lastBallY + PongLogic::BALL_SIZE + 1) {
+              carrier->display.drawFastVLine(120, y, 3, color565(30, 55, 95));
+            }
+          }
         }
       }
 
@@ -287,7 +299,7 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     }
   }
 
-  // 3. Paddle delta-rendering (rendered after ball erase so paddle is never clipped by ball)
+  // 3. Player Paddle (Left, cyan) delta-rendering
   int16_t newPaddleY = (int16_t)pong.getPaddleY();
   if (newPaddleY != lastPaddleY) {
     if (lastPaddleY != -1) {
@@ -300,6 +312,27 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     carrier->display.drawFastVLine(PongLogic::PADDLE_X + 2, newPaddleY + 2,
                                   PongLogic::PADDLE_HEIGHT - 4, 0xFFFF);
     lastPaddleY = newPaddleY;
+  }
+
+  // 4. AI Bot Opponent Paddle (Right, coral-gold, tracks ball vertically to return shots)
+  int16_t targetBotY = (int16_t)(pong.getBallY() + (PongLogic::BALL_SIZE - PongLogic::PADDLE_HEIGHT) * 0.5f);
+  const int16_t minBotY = PongLogic::FIELD_TOP + 2;
+  const int16_t maxBotY = PongLogic::FIELD_BOTTOM - PongLogic::PADDLE_HEIGHT - 2;
+  if (targetBotY < minBotY) targetBotY = minBotY;
+  if (targetBotY > maxBotY) targetBotY = maxBotY;
+
+  if (targetBotY != lastBotY) {
+    const int16_t botX = PongLogic::FIELD_RIGHT - 2;
+    if (lastBotY != -1) {
+      carrier->display.fillRect(botX, lastBotY,
+                                PongLogic::PADDLE_WIDTH, PongLogic::PADDLE_HEIGHT, nativeBg);
+    }
+    uint16_t botGold = color565(255, 165, 50);
+    carrier->display.fillRoundRect(botX, targetBotY,
+                                  PongLogic::PADDLE_WIDTH, PongLogic::PADDLE_HEIGHT, 2, botGold);
+    carrier->display.drawFastVLine(botX + 2, targetBotY + 2,
+                                  PongLogic::PADDLE_HEIGHT - 4, color565(255, 235, 160));
+    lastBotY = targetBotY;
   }
 
   // Restore left danger dotted line if ball was near left boundary

@@ -1010,6 +1010,11 @@ void loop() {
   if (currentScreen != previousScreen) {
     muteMessageEndTimeMs = 0; // Cancel any active mute toast when switching screens
 
+    if (previousScreen == SCREEN_CONTROLLER) {
+      // Strictly disconnect Wi-Fi/MQTT when leaving multiplayer controller mode (100% offline in local pet/minigame modes)
+      netMqtt.disconnect();
+    }
+
     if (previousScreen == SCREEN_CONTROLLER || previousScreen == SCREEN_CHOOSE_PLAYER || previousScreen == SCREEN_STATS || previousScreen == SCREEN_GAMES_MENU || previousScreen == SCREEN_HOUSE_MENU || previousScreen == SCREEN_WARDROBE || previousScreen == SCREEN_MINIGAME_PONG || previousScreen == SCREEN_MINIGAME_MAZE || previousScreen == SCREEN_MEMORIAL || previousScreen == SCREEN_HATCHING || previousScreen == SCREEN_NAME_ENTRY) {
       // Exiting a fullscreen view: restore mood LEDs and redraw full home UI
       soundLed.setMoodColor(0, 150, 220);
@@ -1194,11 +1199,8 @@ void loop() {
     }
   }
 
-  // 5. NETWORK & MQTT (Forbindelsespolitik: bevidst batterispare-arkitektur)
-  // Oplà starter offline i lokal Tamagotchi-tilstand, saa batteriet ikke draenes unaedigt.
-  // Wi-Fi & MQTT aktiveres, naar brugeren gaar ind i multiplayer/controller (SCREEN_CONTROLLER).
-  // Naar forbindelsen er etableret, vedligeholdes den kontinuerligt og synkroniserer pet/state.
-  if (currentScreen == SCREEN_CONTROLLER || netMqtt.isConnected()) {
+  // 5. NETWORK & MQTT (Kun aktiv i multiplayer SCREEN_CONTROLLER — 100% offline i alle andre tilstande!)
+  if (currentScreen == SCREEN_CONTROLLER) {
     netMqtt.update(now);
   }
   syncPetStateToBackend(false);

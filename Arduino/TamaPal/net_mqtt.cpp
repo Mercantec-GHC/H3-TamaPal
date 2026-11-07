@@ -123,9 +123,15 @@ void NetMqttClient::attemptConnection(unsigned long now) {
     return;
   }
 
-  // Rate-limit connection attempts (use 20s backoff after 2 failed Wi-Fi attempts so UI never freezes)
-  unsigned long retryInterval = (wifiFailCount >= 2) ? 20000UL : MQTT_RECONNECT_INTERVAL_MS;
-  if (lastReconnectAttempt != 0 && (now - lastReconnectAttempt < retryInterval)) {
+  // Try Wi-Fi ONLY ONCE when entering SCREEN_CONTROLLER!
+  // If hotspot is off (wifiFailCount >= 1), do NOT keep retrying and blocking loop() every few seconds.
+  // Re-entering SCREEN_CONTROLLER resets wifiFailCount = 0 for a fresh attempt.
+  if (wifiFailCount >= 1) {
+    connectingState = false;
+    return;
+  }
+
+  if (lastReconnectAttempt != 0 && (now - lastReconnectAttempt < MQTT_RECONNECT_INTERVAL_MS)) {
     return;
   }
   lastReconnectAttempt = now;
@@ -138,6 +144,7 @@ void NetMqttClient::attemptConnection(unsigned long now) {
     #if defined(SECRET_WIFI_SSID) && defined(SECRET_WIFI_PASS)
     if (strlen(SECRET_WIFI_SSID) == 0) {
       Serial.println(F("[WiFi] FEJL: SECRET_WIFI_SSID er tom! Udfyld arduino_secrets.h."));
+      wifiFailCount = 1;
       connectingState = false;
       return;
     }
@@ -151,10 +158,8 @@ void NetMqttClient::attemptConnection(unsigned long now) {
     Serial.println(wifiStatusToString(wifiStatus));
 
     if (wifiStatus != WL_CONNECTED) {
-      if (wifiFailCount < 10) wifiFailCount++;
-      if (wifiFailCount >= 2) {
-        Serial.println(F("[WiFi] Tip: Hotspot ikke fundet. Venter 20s (tryk TOUCH 3 for at gaa tilbage)."));
-      }
+      wifiFailCount = 1;
+      Serial.println(F("[WiFi] Hotspot ikke tilgaengeligt. Stopper automatisk genforbindelse (tryk TOUCH 3 for at gaa tilbage)."));
       connectingState = false;
       return;
     }

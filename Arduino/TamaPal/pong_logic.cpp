@@ -84,18 +84,11 @@ void PongLogic::clampPaddle() {
 }
 
 void PongLogic::update(unsigned long currentTimeMs) {
-  unsigned long dtMs = (lastUpdateMs == 0) ? 20 : (currentTimeMs - lastUpdateMs);
-  lastUpdateMs = currentTimeMs;
-
-  if (dtMs > 100) dtMs = 100;
-  if (dtMs < 5) dtMs = 5;
-
-  float speedFactor = (float)dtMs / 20.0f;
-
   if (state == PONG_STATE_READY) {
     // Ball tracks the paddle center until served
     ballX = (float)(PADDLE_X + PADDLE_WIDTH + 4);
     ballY = paddleY + (PADDLE_HEIGHT - BALL_SIZE) * 0.5f;
+    lastUpdateMs = currentTimeMs;
     return;
   }
 
@@ -103,6 +96,7 @@ void PongLogic::update(unsigned long currentTimeMs) {
     // Keep ball positioned on paddle so player sees where next serve launches from
     ballX = (float)(PADDLE_X + PADDLE_WIDTH + 4);
     ballY = paddleY + (PADDLE_HEIGHT - BALL_SIZE) * 0.5f;
+    lastUpdateMs = currentTimeMs;
     if (stateTimerEndMs != 0 && currentTimeMs >= stateTimerEndMs) {
       resetBall();
       state = PONG_STATE_PLAYING;
@@ -114,6 +108,24 @@ void PongLogic::update(unsigned long currentTimeMs) {
   if (state == PONG_STATE_GAMEOVER) {
     return;
   }
+
+  // Rate-limit physics step to real-time wall clock (prevents 6000 Hz loop() from running ball 30x too fast!)
+  unsigned long dtMs = 20;
+  if (lastUpdateMs != 0) {
+    if (currentTimeMs < lastUpdateMs) {
+      lastUpdateMs = currentTimeMs;
+      return;
+    }
+    dtMs = currentTimeMs - lastUpdateMs;
+    if (dtMs < 10) {
+      return; // Wait until at least 10 ms of real time has elapsed
+    }
+  }
+  lastUpdateMs = currentTimeMs;
+
+  if (dtMs > 100) dtMs = 100;
+
+  float speedFactor = (float)dtMs / 20.0f;
 
   // Active gameplay simulation with swept collision tracking
   float prevBallX = ballX;
