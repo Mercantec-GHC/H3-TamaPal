@@ -44,6 +44,10 @@ struct ShowcaseAction {
   bool triggerCelestialAura;// Angelic rotating halo & spirit motes!
   bool triggerChaser;       // Circular running LED chaser!
   bool triggerBreathing;    // Soft pulsating LED breathing!
+  bool triggerMorph;        // Smooth multi-frame stage evolution morph!
+  bool triggerIrisWipe;     // Smooth circular iris transition between modes!
+  uint8_t actNumber;        // Current showcase act number (1..11)
+  const char* actTitle;     // Danish chapter title for top showcase header
   bool saveGrave;
   bool forceRedraw;
 };

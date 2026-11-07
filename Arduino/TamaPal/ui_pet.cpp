@@ -31,12 +31,20 @@ UiPetRenderer::UiPetRenderer()
     lastBlinking(false),
     lastPromptBlink(false),
     lastHadPoop(false),
+    lastWasBathing(false),
+    lastBubbleStep(-1),
     bathEndTimeMs(0),
     screenShakeEndTimeMs(0),
     novaStartTimeMs(0),
     novaDurationMs(0),
     lastNovaRadius(0),
-    celestialAuraActive(false) {}
+    morphStartTimeMs(0),
+    morphDurationMs(0),
+    lastMorphStep(-1),
+    lastMoteStep(-1),
+    celestialAuraActive(false),
+    lastShowcaseAct(0),
+    lastShowcaseTitle(nullptr) {}
 
 void UiPetRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
@@ -416,12 +424,9 @@ void UiPetRenderer::eraseOldCharacterRim(int oldCx, int oldCy, int newCx, int ne
   }
 }
 
-void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bodyColor) {
+void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bodyColor, bool wipeEyesOnly) {
   if (carrier == nullptr) return;
   (void)outfit;
-
-  // 1. Wipe interior face canvas with bodyColor so blinking/expression switches never leave ghost pixels
-  carrier->display.fillRoundRect(cx - 19, cy - 11, 38, 18, 4, bodyColor);
 
   uint16_t eyeDark     = color565(16, 22, 38);
   uint16_t irisEmerald = color565(45, 195, 165);
@@ -434,27 +439,35 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
   uint16_t mouthDark   = color565(28, 45, 58);
   uint16_t tonguePink  = color565(255, 115, 140);
 
-  // Rosy kawaii cheeks (extra round & rosy for baby!)
-  uint16_t activeCheek = cheekPink;
-  if (expr == EXPR_SUPER_HAPPY || expr == EXPR_EATING || expr == EXPR_PLAYING || expr == EXPR_SCOLDED) {
-    activeCheek = cheekCoral;
-  } else if (expr == EXPR_FREEZING) {
-    activeCheek = cheekIce;
-  } else if (expr == EXPR_OVERHEATING) {
-    activeCheek = cheekHot;
-  }
-
-  if (stage == STAGE_BABY) {
-    carrier->display.fillCircle(cx - 12, cy + 2, 3, activeCheek);
-    carrier->display.fillCircle(cx + 12, cy + 2, 3, activeCheek);
-  } else {
-    carrier->display.fillRoundRect(cx - 18, cy + 1, 6, 3, 1, activeCheek);
-    carrier->display.fillRoundRect(cx + 12, cy + 1, 6, 3, 1, activeCheek);
-  }
-
   int leftEyeX  = (stage == STAGE_BABY) ? (cx - 7) : (cx - 10);
   int rightEyeX = (stage == STAGE_BABY) ? (cx + 7) : (cx + 10);
   int eyeY      = (stage == STAGE_BABY) ? (cy - 3) : (cy - 4);
+
+  if (wipeEyesOnly) {
+    // Fast flicker-free blink: wipe ONLY the two compact eye boxes without touching cheeks, mouth, beard or hats
+    int eyeW = (stage == STAGE_BABY) ? 9 : 10;
+    int eyeH = (stage == STAGE_BABY) ? 10 : 11;
+    carrier->display.fillRect(leftEyeX - 4, eyeY - 5, eyeW, eyeH, bodyColor);
+    carrier->display.fillRect(rightEyeX - 4, eyeY - 5, eyeW, eyeH, bodyColor);
+  } else {
+    // Rosy kawaii cheeks (extra round & rosy for baby!)
+    uint16_t activeCheek = cheekPink;
+    if (expr == EXPR_SUPER_HAPPY || expr == EXPR_EATING || expr == EXPR_PLAYING || expr == EXPR_SCOLDED) {
+      activeCheek = cheekCoral;
+    } else if (expr == EXPR_FREEZING) {
+      activeCheek = cheekIce;
+    } else if (expr == EXPR_OVERHEATING) {
+      activeCheek = cheekHot;
+    }
+
+    if (stage == STAGE_BABY) {
+      carrier->display.fillCircle(cx - 12, cy + 2, 3, activeCheek);
+      carrier->display.fillCircle(cx + 12, cy + 2, 3, activeCheek);
+    } else {
+      carrier->display.fillRoundRect(cx - 18, cy + 1, 6, 3, 1, activeCheek);
+      carrier->display.fillRoundRect(cx + 12, cy + 1, 6, 3, 1, activeCheek);
+    }
+  }
 
   // Sweat drops for overheating
   if (expr == EXPR_OVERHEATING) {
@@ -575,6 +588,10 @@ void UiPetRenderer::drawFaceFeatures(int cx, int cy, LumiExpression expr, bool i
     // Subtle glint on upper lens edge
     carrier->display.drawPixel(leftEyeX - 2, glassesY - 2, glassGlint);
     carrier->display.drawPixel(rightEyeX - 2, glassesY - 2, glassGlint);
+  }
+
+  if (wipeEyesOnly) {
+    return;
   }
 
   // 3. Render Mouth / Pacifier / Elder Mustache & Flowing Sage Beard
@@ -964,220 +981,7 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     footColor   = color565(140, 170, 195);
   }
 
-  // 1. Headgear & Stage Head Props (Adapts to Wardrobe Outfit)
-  uint16_t stemGreen     = color565(45, 165, 75);
-  uint16_t leafEmerald   = color565(65, 225, 105);
-  uint16_t leafHighlight = color565(175, 255, 165);
-
-  if (expr == EXPR_DEAD) {
-    // Golden Spirit Halo above head
-    carrier->display.drawRoundRect(cx - 10, cy - 29, 20, 5, 2, color565(255, 235, 90));
-    // Tiny ethereal spirit sprout leaf
-    carrier->display.fillRect(cx - 1, cy - 24, 2, 4, stemGreen);
-    carrier->display.fillCircle(cx + 2, cy - 25, 3, leafEmerald);
-    carrier->display.drawPixel(cx + 2, cy - 26, leafHighlight);
-
-    if (celestialAuraActive) {
-      // Celestial radiant halo double ring
-      carrier->display.drawRoundRect(cx - 12, cy - 30, 24, 7, 3, color565(255, 215, 60));
-      // Rotating golden sparkle on the halo rim
-      int haloStep = ((int)(lastAnimTickMs / 50)) % 8;
-      const int haloOffsets[8][2] = {
-        {10, 0}, {7, 2}, {0, 3}, {-7, 2}, {-10, 0}, {-7, -2}, {0, -3}, {7, -2}
-      };
-      carrier->display.drawPixel(cx + haloOffsets[haloStep][0], (cy - 27) + haloOffsets[haloStep][1], 0xFFFF);
-
-      // Ascending spirit motes rising gracefully
-      uint16_t spiritCyan = color565(140, 230, 255);
-      for (int i = 0; i < 4; i++) {
-        int moteStep = (int)((lastAnimTickMs / 40 + i * 22) % 40);
-        int mx = cx + ((i % 2 == 0) ? -18 : 18) + (i * 2);
-        int my = cy + 6 - moteStep;
-        if (my > 35 && my < cy + 8) {
-          carrier->display.drawPixel(mx, my, (i % 2 == 0) ? 0xFFFF : spiritCyan);
-        }
-      }
-    }
-  } else if (outfit == OUTFIT_WINTER) {
-    // =============================================================
-    // WINTER WARDROBE: Stage-adapted winter headgear & beanies
-    // =============================================================
-    if (stage == STAGE_BABY) {
-      // BABY: Cozy knit red beanie with folded brim & fluffy white pompom!
-      uint16_t beanieRed   = color565(225, 45, 65);
-      uint16_t beanieDark  = color565(155, 25, 40);
-      uint16_t beanieWhite = 0xFFFF;
-
-      carrier->display.fillRoundRect(cx - 15, cy - 24, 30, 12, 6, beanieRed);
-      carrier->display.drawFastHLine(cx - 13, cy - 20, 26, beanieDark);
-
-      // Folded ribbed brim with white stripe
-      carrier->display.fillRoundRect(cx - 16, cy - 16, 32, 5, 2, beanieRed);
-      carrier->display.drawFastHLine(cx - 15, cy - 14, 30, beanieWhite);
-
-      // Fluffy snowy pompom on top
-      carrier->display.fillCircle(cx, cy - 26, 4, beanieWhite);
-      carrier->display.drawPixel(cx, cy - 26, color565(200, 220, 240));
-
-      // Tender sprout peeking out right next to the pompom
-      carrier->display.fillRect(cx + 4, cy - 25, 2, 4, stemGreen);
-      carrier->display.fillCircle(cx + 7, cy - 26, 3, leafEmerald);
-      carrier->display.drawPixel(cx + 7, cy - 27, leafHighlight);
-    } else if (stage == STAGE_TEEN) {
-      // TEEN: Slouchy cyber beanie with horns poking through & cyan pompom!
-      uint16_t beanieDark  = color565(28, 32, 52);
-      uint16_t beanieCyan  = color565(0, 230, 255);
-      uint16_t hornDark    = color565(30, 95, 65);
-      uint16_t hornGold    = color565(255, 220, 60);
-
-      carrier->display.fillRoundRect(cx - 17, cy - 25, 34, 12, 5, beanieDark);
-      carrier->display.fillRoundRect(cx - 18, cy - 17, 36, 5, 2, beanieCyan);
-      // Slouchy tail droop to the right with cyan pompom
-      carrier->display.fillRoundRect(cx + 12, cy - 28, 9, 8, 3, beanieDark);
-      carrier->display.fillCircle(cx + 22, cy - 26, 4, beanieCyan);
-      carrier->display.drawPixel(cx + 22, cy - 26, 0xFFFF);
-
-      // Left spirit horn poking through beanie
-      carrier->display.fillTriangle(cx - 5, cy - 24, cx - 11, cy - 34, cx - 8, cy - 21, hornDark);
-      carrier->display.fillTriangle(cx - 5, cy - 23, cx - 10, cy - 32, cx - 7, cy - 21, leafEmerald);
-      carrier->display.fillTriangle(cx - 8, cy - 30, cx - 11, cy - 34, cx - 10, cy - 28, hornGold);
-      carrier->display.drawPixel(cx - 10, cy - 33, 0xFFFF);
-
-      // Right spirit horn poking through beanie
-      carrier->display.fillTriangle(cx + 2, cy - 24, cx + 10, cy - 34, cx + 6, cy - 21, hornDark);
-      carrier->display.fillTriangle(cx + 2, cy - 23, cx + 9, cy - 32, cx + 5, cy - 21, leafEmerald);
-      carrier->display.fillTriangle(cx + 7, cy - 30, cx + 10, cy - 34, cx + 9, cy - 28, hornGold);
-      carrier->display.drawPixel(cx + 9, cy - 33, 0xFFFF);
-    } else if (stage == STAGE_ADULT) {
-      // ADULT: Insulated tweed winter cap with hanging warm earflaps & gold lotus emblem!
-      uint16_t capTweed = color565(35, 95, 75);
-      uint16_t capFur   = color565(240, 245, 250);
-      uint16_t capGold  = color565(255, 215, 60);
-
-      // Cap crown
-      carrier->display.fillRoundRect(cx - 15, cy - 26, 30, 13, 5, capTweed);
-      // Cozy white fleece/fur brim
-      carrier->display.fillRoundRect(cx - 17, cy - 18, 34, 6, 3, capFur);
-
-      // Hanging earflaps
-      carrier->display.fillRoundRect(cx - 19, cy - 14, 5, 9, 2, capFur);
-      carrier->display.fillRoundRect(cx + 14, cy - 14, 5, 9, 2, capFur);
-
-      // Golden blooming lotus crest pinned to front of cap
-      carrier->display.fillCircle(cx, cy - 23, 4, capGold);
-      carrier->display.fillCircle(cx, cy - 23, 2, color565(255, 140, 40));
-      carrier->display.drawPixel(cx - 1, cy - 24, 0xFFFF);
-    } else if (stage == STAGE_OLD) {
-      // OLD: Distinguished top hat with white fur earmuffs hugging the sides & frosted snowflake
-      uint16_t hatColor     = color565(35, 40, 55);
-      uint16_t hatBrim      = color565(25, 28, 40);
-      uint16_t hatRibbon    = color565(190, 45, 65);
-      uint16_t hatGold      = color565(255, 215, 60);
-      uint16_t furWhite     = color565(245, 250, 255);
-      uint16_t snowCrystal  = color565(180, 235, 255);
-
-      carrier->display.fillRoundRect(cx - 11, cy - 35, 22, 12, 2, hatColor);
-      carrier->display.drawFastVLine(cx - 9, cy - 34, 10, color565(60, 65, 85));
-      carrier->display.fillRoundRect(cx - 16, cy - 24, 32, 4, 1, hatBrim);
-      carrier->display.fillRect(cx - 11, cy - 26, 22, 3, hatRibbon);
-      carrier->display.drawRect(cx - 2, cy - 27, 5, 5, hatGold);
-      carrier->display.drawPixel(cx, cy - 25, 0xFFFF);
-
-      // Fluffy winter earmuffs hugging the head under the brim
-      carrier->display.fillCircle(cx - 18, cy - 16, 5, furWhite);
-      carrier->display.fillCircle(cx - 18, cy - 16, 3, color565(220, 230, 240));
-      carrier->display.fillCircle(cx + 18, cy - 16, 5, furWhite);
-      carrier->display.fillCircle(cx + 18, cy - 16, 3, color565(220, 230, 240));
-
-      // Frosted snowflake crystal pinned to the hat
-      carrier->display.drawPixel(cx + 10, cy - 29, snowCrystal);
-      carrier->display.drawPixel(cx + 10, cy - 27, snowCrystal);
-      carrier->display.drawPixel(cx + 9,  cy - 28, snowCrystal);
-      carrier->display.drawPixel(cx + 11, cy - 28, snowCrystal);
-    }
-  } else if (stage == STAGE_BABY) {
-    // Baby stage: A tiny, tender green sprout bud (only 1 single cute mini-leaf!)
-    carrier->display.fillRect(cx - 1, cy - 23, 2, 5, stemGreen);
-    carrier->display.fillCircle(cx + 2, cy - 24, 3, leafEmerald);
-    carrier->display.drawPixel(cx + 2, cy - 25, leafHighlight);
-  } else if (stage == STAGE_TEEN) {
-    // -------------------------------------------------------------
-    // TEEN STAGE: Swag Kokiri Horns / Spiky Antennas with gold tips!
-    // -------------------------------------------------------------
-    uint16_t hornDark   = color565(30, 95, 65);
-    uint16_t hornGold   = color565(255, 220, 60);
-
-    // Left curved spirit horn
-    carrier->display.fillTriangle(cx - 2, cy - 24, cx - 10, cy - 34, cx - 6, cy - 21, hornDark);
-    carrier->display.fillTriangle(cx - 2, cy - 23, cx - 9, cy - 32, cx - 5, cy - 21, leafEmerald);
-    // Left golden tip sparkle
-    carrier->display.fillTriangle(cx - 7, cy - 30, cx - 10, cy - 34, cx - 9, cy - 28, hornGold);
-    carrier->display.drawPixel(cx - 9, cy - 33, 0xFFFF);
-
-    // Right curved spirit horn
-    carrier->display.fillTriangle(cx + 2, cy - 24, cx + 10, cy - 34, cx + 6, cy - 21, hornDark);
-    carrier->display.fillTriangle(cx + 2, cy - 23, cx + 9, cy - 32, cx + 5, cy - 21, leafEmerald);
-    // Right golden tip sparkle
-    carrier->display.fillTriangle(cx + 7, cy - 30, cx + 10, cy - 34, cx + 9, cy - 28, hornGold);
-    carrier->display.drawPixel(cx + 9, cy - 33, 0xFFFF);
-
-    // Center sharp crest sprout
-    carrier->display.fillTriangle(cx - 2, cy - 22, cx, cy - 29, cx + 2, cy - 22, leafHighlight);
-  } else if (stage == STAGE_ADULT) {
-    // -------------------------------------------------------------
-    // ADULT STAGE: Stately Kokiri Spirit Blossom / Crown Crest
-    // -------------------------------------------------------------
-    uint16_t blossomGold  = color565(255, 215, 60);
-    uint16_t blossomAmber = color565(255, 140, 40);
-
-    // Stately central stem
-    carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
-    // Two elegant arching guardian leaves
-    carrier->display.fillTriangle(cx - 1, cy - 25, cx - 11, cy - 32, cx - 7, cy - 22, leafEmerald);
-    carrier->display.fillTriangle(cx + 1, cy - 25, cx + 11, cy - 32, cx + 7, cy - 22, leafEmerald);
-    carrier->display.drawLine(cx - 2, cy - 26, cx - 9, cy - 30, leafHighlight);
-    carrier->display.drawLine(cx + 2, cy - 26, cx + 9, cy - 30, leafHighlight);
-    // Golden blooming lotus/crest on top of crown
-    carrier->display.fillCircle(cx, cy - 27, 4, blossomGold);
-    carrier->display.fillCircle(cx, cy - 27, 2, blossomAmber);
-    carrier->display.drawPixel(cx - 1, cy - 28, 0xFFFF);
-  } else if (stage == STAGE_OLD) {
-    // -------------------------------------------------------------
-    // OLD STAGE: Distinguished Gentleman Top Hat / Sage Cap!
-    // -------------------------------------------------------------
-    uint16_t hatColor     = color565(35, 40, 55);    // Dark charcoal felt
-    uint16_t hatBrim      = color565(25, 28, 40);    // Deep rim
-    uint16_t hatRibbon    = color565(190, 45, 65);   // Crimson silk ribbon band
-    uint16_t hatGold      = color565(255, 215, 60);  // Gold buckle
-    uint16_t featherGreen = color565(65, 225, 105);  // Kokiri sage feather
-
-    // Crown cylinder (X = cx - 11..cx + 10, Y = cy - 35..cy - 24)
-    carrier->display.fillRoundRect(cx - 11, cy - 35, 22, 12, 2, hatColor);
-    carrier->display.drawFastVLine(cx - 9, cy - 34, 10, color565(60, 65, 85));
-
-    // Wide curved hat brim
-    carrier->display.fillRoundRect(cx - 16, cy - 24, 32, 4, 1, hatBrim);
-
-    // Crimson ribbon band around base
-    carrier->display.fillRect(cx - 11, cy - 26, 22, 3, hatRibbon);
-
-    // Little gold buckle in center
-    carrier->display.drawRect(cx - 2, cy - 27, 5, 5, hatGold);
-    carrier->display.drawPixel(cx, cy - 25, 0xFFFF);
-
-    // Kokiri sage feather tucked in ribbon
-    carrier->display.fillTriangle(cx + 7, cy - 26, cx + 12, cy - 33, cx + 9, cy - 27, featherGreen);
-    carrier->display.drawLine(cx + 8, cy - 26, cx + 11, cy - 31, leafHighlight);
-  } else {
-    // Fallback: Stem + Kokiri Leaves
-    carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
-    carrier->display.fillTriangle(cx - 1, cy - 25, cx - 10, cy - 31, cx - 7, cy - 23, leafEmerald);
-    carrier->display.fillTriangle(cx + 1, cy - 25, cx + 10, cy - 31, cx + 7, cy - 23, leafEmerald);
-    carrier->display.drawLine(cx - 2, cy - 26, cx - 8, cy - 29, leafHighlight);
-    carrier->display.drawLine(cx + 2, cy - 26, cx + 8, cy - 29, leafHighlight);
-  }
-
-  // 2. Expressive Forest Spirit Ears
+  // 1. Expressive Forest Spirit Ears (Back Layer)
   if (expr == EXPR_DEAD) {
     // Unified gentle ethereal spirit ears
     carrier->display.fillCircle(cx - 17, cy - 11, 4, bodyOutline);
@@ -1213,7 +1017,7 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillTriangle(cx + 19, cy - 13, cx + 22, cy + earTipOffsetY + 4, cx + 13, cy - 16, earInner);
   }
 
-  // 3. Feet or floating ghost tail wisps
+  // 2. Feet or floating ghost tail wisps (Back Layer)
   if (expr == EXPR_DEAD) {
     // Soft floating spirit wisps
     carrier->display.fillCircle(cx - 7, cy + 14, 3, footColor);
@@ -1228,7 +1032,7 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.fillRoundRect(cx + 6,  cy + 16, 10, 6, 3, footColor);
   }
 
-  // 4. 2.5D Chubby Mochi Body (Hunched and compressed when FREEZING)
+  // 3. 2.5D Chubby Mochi Body (Single-pass interior fill + perimeter outline to prevent SPI flash)
   if (expr == EXPR_DEAD) {
     // Ethereal feathery angel wings spreading behind Lumi
     uint16_t wingGlow   = color565(160, 210, 245);
@@ -1253,24 +1057,27 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
     carrier->display.drawPixel(cx + 26, cy - 13, 0xFFFF);
     carrier->display.drawPixel(cx + 27, cy - 6, 0xFFFF);
 
-    // Unified ethereal ghost body with glowing white belly
-    carrier->display.fillRoundRect(cx - 20, cy - 18, 40, 34, 14, bodyOutline);
-    carrier->display.fillRoundRect(cx - 18, cy - 16, 36, 30, 12, bodyShade);
+    // Unified ethereal ghost body (bottom shade + single bright fill + perimeter outline)
+    carrier->display.fillRoundRect(cx - 18, cy + 6,  36, 8,  5,  bodyShade);
     carrier->display.fillRoundRect(cx - 18, cy - 16, 36, 27, 11, bodyMain);
+    carrier->display.drawRoundRect(cx - 20, cy - 18, 40, 34, 14, bodyOutline);
+    carrier->display.drawRoundRect(cx - 19, cy - 17, 38, 32, 13, bodyOutline);
     carrier->display.fillRoundRect(cx - 10, cy - 14, 8,  3,  1,  0xFFFF);
     carrier->display.fillRoundRect(cx - 11, cy + 5,  22, 8,  4,  bellyPatch);
   } else if (stage == STAGE_BABY) {
     if (expr == EXPR_FREEZING) {
       // Baby huddles into a tighter shivering egg (36x30 px instead of 38x34 px)
-      carrier->display.fillRoundRect(cx - 18, cy - 14, 36, 30, 13, bodyOutline);
-      carrier->display.fillRoundRect(cx - 16, cy - 12, 32, 26, 11, bodyShade);
+      carrier->display.fillRoundRect(cx - 16, cy + 6,  32, 8,  5,  bodyShade);
       carrier->display.fillRoundRect(cx - 16, cy - 12, 32, 23, 10, bodyMain);
+      carrier->display.drawRoundRect(cx - 18, cy - 14, 36, 30, 13, bodyOutline);
+      carrier->display.drawRoundRect(cx - 17, cy - 13, 34, 28, 12, bodyOutline);
       carrier->display.fillRoundRect(cx - 9,  cy - 11, 7,  3,  1,  0xFFFF);
       carrier->display.fillRoundRect(cx - 9,  cy + 5,  18, 6,  3,  bellyPatch);
     } else {
-      carrier->display.fillRoundRect(cx - 19, cy - 17, 38, 34, 15, bodyOutline);
-      carrier->display.fillRoundRect(cx - 17, cy - 15, 34, 30, 13, bodyShade);
+      carrier->display.fillRoundRect(cx - 17, cy + 7,  34, 8,  6,  bodyShade);
       carrier->display.fillRoundRect(cx - 17, cy - 15, 34, 27, 12, bodyMain);
+      carrier->display.drawRoundRect(cx - 19, cy - 17, 38, 34, 15, bodyOutline);
+      carrier->display.drawRoundRect(cx - 18, cy - 16, 36, 32, 14, bodyOutline);
       carrier->display.fillRoundRect(cx - 10, cy - 14, 8,  3,  1,  0xFFFF);
       carrier->display.drawPixel(cx - 11, cy - 12, 0xFFFF);
       carrier->display.fillRoundRect(cx - 10, cy + 5,  20, 8,  4,  bellyPatch);
@@ -1278,15 +1085,17 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   } else {
     if (expr == EXPR_FREEZING) {
       // Teen/Adult/Old hunches shoulders inward (44x35 px instead of 48x39 px)
-      carrier->display.fillRoundRect(cx - 22, cy - 17, 44, 35, 14, bodyOutline);
-      carrier->display.fillRoundRect(cx - 20, cy - 15, 40, 31, 12, bodyShade);
+      carrier->display.fillRoundRect(cx - 20, cy + 8,  40, 8,  6,  bodyShade);
       carrier->display.fillRoundRect(cx - 20, cy - 15, 40, 27, 11, bodyMain);
+      carrier->display.drawRoundRect(cx - 22, cy - 17, 44, 35, 14, bodyOutline);
+      carrier->display.drawRoundRect(cx - 21, cy - 16, 42, 33, 13, bodyOutline);
       carrier->display.fillRoundRect(cx - 11, cy - 13, 8,  3,  1,  0xFFFF);
       carrier->display.fillRoundRect(cx - 11, cy + 6,  22, 7,  3,  bellyPatch);
     } else {
-      carrier->display.fillRoundRect(cx - 24, cy - 20, 48, 39, 16, bodyOutline);
-      carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 35, 14, bodyShade);
+      carrier->display.fillRoundRect(cx - 22, cy + 9,  44, 8,  6,  bodyShade);
       carrier->display.fillRoundRect(cx - 22, cy - 18, 44, 31, 13, bodyMain);
+      carrier->display.drawRoundRect(cx - 24, cy - 20, 48, 39, 16, bodyOutline);
+      carrier->display.drawRoundRect(cx - 23, cy - 19, 46, 37, 15, bodyOutline);
       carrier->display.fillRoundRect(cx - 13, cy - 16, 10, 3,  1,  0xFFFF);
       carrier->display.drawPixel(cx - 15, cy - 14, 0xFFFF);
       carrier->display.fillRoundRect(cx - 13, cy + 7,  26, 9,  4,  bellyPatch);
@@ -1627,9 +1436,162 @@ void UiPetRenderer::drawLumiCharacter(int cx, int cy, LumiExpression expr, bool 
   }
 
   // 6. Facial Features (Eyes, Cheeks, Mouth / Pacifier)
-  drawFaceFeatures(cx, cy, expr, isBlinking, stage, outfit, bodyMain);
+  drawFaceFeatures(cx, cy, expr, isBlinking, stage, outfit, bodyMain, false);
 
-  // 7. Swag Gamer/DJ Headphones for TEEN stage!
+  // 7. Foreground Headgear & Stage Head Props (Drawn after body so hats/earflaps are never overwritten)
+  uint16_t stemGreen     = color565(45, 165, 75);
+  uint16_t leafEmerald   = color565(65, 225, 105);
+  uint16_t leafHighlight = color565(175, 255, 165);
+
+  if (expr == EXPR_DEAD) {
+    // Golden Spirit Halo above head
+    carrier->display.drawRoundRect(cx - 10, cy - 29, 20, 5, 2, color565(255, 235, 90));
+    // Tiny ethereal spirit sprout leaf
+    carrier->display.fillRect(cx - 1, cy - 24, 2, 4, stemGreen);
+    carrier->display.fillCircle(cx + 2, cy - 25, 3, leafEmerald);
+    carrier->display.drawPixel(cx + 2, cy - 26, leafHighlight);
+
+    if (celestialAuraActive) {
+      // Celestial radiant halo double ring
+      carrier->display.drawRoundRect(cx - 12, cy - 30, 24, 7, 3, color565(255, 215, 60));
+      // Rotating golden sparkle on the halo rim
+      int haloStep = ((int)(lastAnimTickMs / 80)) % 8;
+      const int haloOffsets[8][2] = {
+        {10, 0}, {7, 2}, {0, 3}, {-7, 2}, {-10, 0}, {-7, -2}, {0, -3}, {7, -2}
+      };
+      carrier->display.drawPixel(cx + haloOffsets[haloStep][0], (cy - 27) + haloOffsets[haloStep][1], 0xFFFF);
+    }
+  } else if (outfit == OUTFIT_WINTER) {
+    // =============================================================
+    // WINTER WARDROBE: Stage-adapted winter headgear & beanies
+    // =============================================================
+    if (stage == STAGE_BABY) {
+      uint16_t beanieRed   = color565(225, 45, 65);
+      uint16_t beanieDark  = color565(155, 25, 40);
+      uint16_t beanieWhite = 0xFFFF;
+
+      carrier->display.fillRoundRect(cx - 15, cy - 24, 30, 12, 6, beanieRed);
+      carrier->display.drawFastHLine(cx - 13, cy - 20, 26, beanieDark);
+      carrier->display.fillRoundRect(cx - 16, cy - 16, 32, 5, 2, beanieRed);
+      carrier->display.drawFastHLine(cx - 15, cy - 14, 30, beanieWhite);
+      carrier->display.fillCircle(cx, cy - 26, 4, beanieWhite);
+      carrier->display.drawPixel(cx, cy - 26, color565(200, 220, 240));
+      carrier->display.fillRect(cx + 4, cy - 25, 2, 4, stemGreen);
+      carrier->display.fillCircle(cx + 7, cy - 26, 3, leafEmerald);
+      carrier->display.drawPixel(cx + 7, cy - 27, leafHighlight);
+    } else if (stage == STAGE_TEEN) {
+      uint16_t beanieDark  = color565(28, 32, 52);
+      uint16_t beanieCyan  = color565(0, 230, 255);
+      uint16_t hornDark    = color565(30, 95, 65);
+      uint16_t hornGold    = color565(255, 220, 60);
+
+      carrier->display.fillRoundRect(cx - 17, cy - 25, 34, 12, 5, beanieDark);
+      carrier->display.fillRoundRect(cx - 18, cy - 17, 36, 5, 2, beanieCyan);
+      carrier->display.fillRoundRect(cx + 12, cy - 28, 9, 8, 3, beanieDark);
+      carrier->display.fillCircle(cx + 22, cy - 26, 4, beanieCyan);
+      carrier->display.drawPixel(cx + 22, cy - 26, 0xFFFF);
+
+      carrier->display.fillTriangle(cx - 5, cy - 24, cx - 11, cy - 34, cx - 8, cy - 21, hornDark);
+      carrier->display.fillTriangle(cx - 5, cy - 23, cx - 10, cy - 32, cx - 7, cy - 21, leafEmerald);
+      carrier->display.fillTriangle(cx - 8, cy - 30, cx - 11, cy - 34, cx - 10, cy - 28, hornGold);
+      carrier->display.drawPixel(cx - 10, cy - 33, 0xFFFF);
+
+      carrier->display.fillTriangle(cx + 2, cy - 24, cx + 10, cy - 34, cx + 6, cy - 21, hornDark);
+      carrier->display.fillTriangle(cx + 2, cy - 23, cx + 9, cy - 32, cx + 5, cy - 21, leafEmerald);
+      carrier->display.fillTriangle(cx + 7, cy - 30, cx + 10, cy - 34, cx + 9, cy - 28, hornGold);
+      carrier->display.drawPixel(cx + 9, cy - 33, 0xFFFF);
+    } else if (stage == STAGE_ADULT) {
+      uint16_t capTweed = color565(35, 95, 75);
+      uint16_t capFur   = color565(240, 245, 250);
+      uint16_t capGold  = color565(255, 215, 60);
+
+      carrier->display.fillRoundRect(cx - 15, cy - 26, 30, 13, 5, capTweed);
+      carrier->display.fillRoundRect(cx - 17, cy - 18, 34, 6, 3, capFur);
+      carrier->display.fillRoundRect(cx - 19, cy - 14, 5, 9, 2, capFur);
+      carrier->display.fillRoundRect(cx + 14, cy - 14, 5, 9, 2, capFur);
+      carrier->display.fillCircle(cx, cy - 23, 4, capGold);
+      carrier->display.fillCircle(cx, cy - 23, 2, color565(255, 140, 40));
+      carrier->display.drawPixel(cx - 1, cy - 24, 0xFFFF);
+    } else if (stage == STAGE_OLD) {
+      uint16_t hatColor     = color565(35, 40, 55);
+      uint16_t hatBrim      = color565(25, 28, 40);
+      uint16_t hatRibbon    = color565(190, 45, 65);
+      uint16_t hatGold      = color565(255, 215, 60);
+      uint16_t furWhite     = color565(245, 250, 255);
+      uint16_t snowCrystal  = color565(180, 235, 255);
+
+      carrier->display.fillRoundRect(cx - 11, cy - 35, 22, 12, 2, hatColor);
+      carrier->display.drawFastVLine(cx - 9, cy - 34, 10, color565(60, 65, 85));
+      carrier->display.fillRoundRect(cx - 16, cy - 24, 32, 4, 1, hatBrim);
+      carrier->display.fillRect(cx - 11, cy - 26, 22, 3, hatRibbon);
+      carrier->display.drawRect(cx - 2, cy - 27, 5, 5, hatGold);
+      carrier->display.drawPixel(cx, cy - 25, 0xFFFF);
+
+      carrier->display.fillCircle(cx - 18, cy - 16, 5, furWhite);
+      carrier->display.fillCircle(cx - 18, cy - 16, 3, color565(220, 230, 240));
+      carrier->display.fillCircle(cx + 18, cy - 16, 5, furWhite);
+      carrier->display.fillCircle(cx + 18, cy - 16, 3, color565(220, 230, 240));
+
+      carrier->display.drawPixel(cx + 10, cy - 29, snowCrystal);
+      carrier->display.drawPixel(cx + 10, cy - 27, snowCrystal);
+      carrier->display.drawPixel(cx + 9,  cy - 28, snowCrystal);
+      carrier->display.drawPixel(cx + 11, cy - 28, snowCrystal);
+    }
+  } else if (stage == STAGE_BABY) {
+    carrier->display.fillRect(cx - 1, cy - 23, 2, 5, stemGreen);
+    carrier->display.fillCircle(cx + 2, cy - 24, 3, leafEmerald);
+    carrier->display.drawPixel(cx + 2, cy - 25, leafHighlight);
+  } else if (stage == STAGE_TEEN) {
+    uint16_t hornDark   = color565(30, 95, 65);
+    uint16_t hornGold   = color565(255, 220, 60);
+
+    carrier->display.fillTriangle(cx - 2, cy - 24, cx - 10, cy - 34, cx - 6, cy - 21, hornDark);
+    carrier->display.fillTriangle(cx - 2, cy - 23, cx - 9, cy - 32, cx - 5, cy - 21, leafEmerald);
+    carrier->display.fillTriangle(cx - 7, cy - 30, cx - 10, cy - 34, cx - 9, cy - 28, hornGold);
+    carrier->display.drawPixel(cx - 9, cy - 33, 0xFFFF);
+
+    carrier->display.fillTriangle(cx + 2, cy - 24, cx + 10, cy - 34, cx + 6, cy - 21, hornDark);
+    carrier->display.fillTriangle(cx + 2, cy - 23, cx + 9, cy - 32, cx + 5, cy - 21, leafEmerald);
+    carrier->display.fillTriangle(cx + 7, cy - 30, cx + 10, cy - 34, cx + 9, cy - 28, hornGold);
+    carrier->display.drawPixel(cx + 9, cy - 33, 0xFFFF);
+
+    carrier->display.fillTriangle(cx - 2, cy - 22, cx, cy - 29, cx + 2, cy - 22, leafHighlight);
+  } else if (stage == STAGE_ADULT) {
+    uint16_t blossomGold  = color565(255, 215, 60);
+    uint16_t blossomAmber = color565(255, 140, 40);
+
+    carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
+    carrier->display.fillTriangle(cx - 1, cy - 25, cx - 11, cy - 32, cx - 7, cy - 22, leafEmerald);
+    carrier->display.fillTriangle(cx + 1, cy - 25, cx + 11, cy - 32, cx + 7, cy - 22, leafEmerald);
+    carrier->display.drawLine(cx - 2, cy - 26, cx - 9, cy - 30, leafHighlight);
+    carrier->display.drawLine(cx + 2, cy - 26, cx + 9, cy - 30, leafHighlight);
+    carrier->display.fillCircle(cx, cy - 27, 4, blossomGold);
+    carrier->display.fillCircle(cx, cy - 27, 2, blossomAmber);
+    carrier->display.drawPixel(cx - 1, cy - 28, 0xFFFF);
+  } else if (stage == STAGE_OLD) {
+    uint16_t hatColor     = color565(35, 40, 55);
+    uint16_t hatBrim      = color565(25, 28, 40);
+    uint16_t hatRibbon    = color565(190, 45, 65);
+    uint16_t hatGold      = color565(255, 215, 60);
+    uint16_t featherGreen = color565(65, 225, 105);
+
+    carrier->display.fillRoundRect(cx - 11, cy - 35, 22, 12, 2, hatColor);
+    carrier->display.drawFastVLine(cx - 9, cy - 34, 10, color565(60, 65, 85));
+    carrier->display.fillRoundRect(cx - 16, cy - 24, 32, 4, 1, hatBrim);
+    carrier->display.fillRect(cx - 11, cy - 26, 22, 3, hatRibbon);
+    carrier->display.drawRect(cx - 2, cy - 27, 5, 5, hatGold);
+    carrier->display.drawPixel(cx, cy - 25, 0xFFFF);
+    carrier->display.fillTriangle(cx + 7, cy - 26, cx + 12, cy - 33, cx + 9, cy - 27, featherGreen);
+    carrier->display.drawLine(cx + 8, cy - 26, cx + 11, cy - 31, leafHighlight);
+  } else {
+    carrier->display.fillRect(cx - 1, cy - 26, 3, 7, stemGreen);
+    carrier->display.fillTriangle(cx - 1, cy - 25, cx - 10, cy - 31, cx - 7, cy - 23, leafEmerald);
+    carrier->display.fillTriangle(cx + 1, cy - 25, cx + 10, cy - 31, cx + 7, cy - 23, leafEmerald);
+    carrier->display.drawLine(cx - 2, cy - 26, cx - 8, cy - 29, leafHighlight);
+    carrier->display.drawLine(cx + 2, cy - 26, cx + 8, cy - 29, leafHighlight);
+  }
+
+  // 8. Swag Gamer/DJ Headphones for TEEN stage!
   if (stage == STAGE_TEEN && expr != EXPR_DEAD) {
     uint16_t hpBand     = color565(30, 35, 55);    // Dark matte headband
     uint16_t hpNeonCyan = color565(0, 230, 255);   // Glowing cyber cyan ear cups
@@ -1781,8 +1743,26 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   SkyWeatherMode weather = determineSkyWeather(pet, expr);
   bool isNight           = (weather == SKY_NIGHT_STARRY);
 
-  // Dynamic frame rate: 45 ms (~22 FPS) for high-frequency shivering tremor & panting, 65 ms (~15 FPS) for calm states
-  unsigned long minFrameMs = (expr == EXPR_FREEZING || expr == EXPR_OVERHEATING) ? 45 : 65;
+  // Check if bath or evolution morph just finished so we can cleanly restore the stage
+  bool currentlyBathing  = isBathing(nowMs);
+  bool bathJustEnded     = (lastWasBathing && !currentlyBathing);
+  lastWasBathing         = currentlyBathing;
+  if (!currentlyBathing) {
+    lastBubbleStep = -1;
+  }
+
+  bool currentlyMorphing = isMorphing(nowMs);
+  bool morphJustEnded    = (lastMorphStep >= 0 && !currentlyMorphing);
+  if (!currentlyMorphing) {
+    lastMorphStep = -1;
+  }
+
+  if (bathJustEnded || morphJustEnded) {
+    forceRedraw = true;
+  }
+
+  // Dynamic frame rate: 45 ms (~22 FPS) for shivering/panting/morphing, 65 ms (~15 FPS) for calm states
+  unsigned long minFrameMs = (currentlyMorphing || expr == EXPR_FREEZING || expr == EXPR_OVERHEATING) ? 45 : 65;
   if (!forceRedraw && stageInitialized && (nowMs - lastAnimTickMs < minFrameMs)) {
     return;
   }
@@ -1791,63 +1771,105 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   // Match the exact screen background from ui_menu.cpp so there is no rectangular box
   uint16_t nativeBg = color565(8, 12, 26);
 
-  // 1. Compute procedural squash/stretch breathing, happy hop, cold shiver, and panting offsets
+  // 1. Compute smooth 1-pixel breathing, happy hop, cold shiver, and panting offsets
   int dx = 0;
   int dy = 0;
 
   if (expr == EXPR_DEAD) {
     // Ethereal gentle vertical hover oscillation above cenotaph
     const int ghostHover[4] = {0, -1, -2, -1};
-    dy = ghostHover[(nowMs / 280) % 4];
+    dy = ghostHover[(nowMs / 380) % 4];
     dx = 0;
   } else if (expr == EXPR_FREEZING) {
-    // 4-phase micro-tremor spasm (~22 Hz): asymmetric involuntary shivering + hunched posture (+1..+2 px)
-    const int shiverX[4] = {-2, 1, -1, 2};
+    // 4-phase micro-tremor spasm: asymmetric involuntary shivering + hunched posture (+1..+2 px)
+    const int shiverX[4] = {-1, 1, -1, 1};
     const int shiverY[4] = {2, 1, 2, 1}; // hunched down tight
-    dx = shiverX[(nowMs / 45) % 4];
-    dy = shiverY[(nowMs / 45) % 4];
+    dx = shiverX[(nowMs / 65) % 4];
+    dy = shiverY[(nowMs / 65) % 4];
   } else if (expr == EXPR_OVERHEATING) {
-    // Heavy rapid thermal panting heave: exhausted wilt/slump rhythm (90 ms per step)
+    // Heavy thermal panting heave: exhausted wilt/slump rhythm
     const int pantingDy[4] = {-1, 0, 1, 0};
-    dy = pantingDy[(nowMs / 90) % 4];
+    dy = pantingDy[(nowMs / 120) % 4];
     dx = 0;
   } else if (expr == EXPR_SLEEPING) {
-    // Slow, deep sleeping respiration
+    // Slow, deep sleeping respiration (1-px gentle heave)
     const int sleepBreath[4] = {0, 0, -1, -1};
-    dy = sleepBreath[(nowMs / 500) % 4];
+    dy = sleepBreath[(nowMs / 700) % 4];
   } else if (expr == EXPR_SUPER_HAPPY) {
-    // Joyful Nintendo bounce rhythm
-    const int happyHop[4] = {0, -2, -3, -1};
-    dy = happyHop[(nowMs / 240) % 4];
+    // Smooth 1-px harmonic Nintendo bounce rhythm (zero jump tearing)
+    const int happyHop[4] = {0, -1, -2, -1};
+    dy = happyHop[(nowMs / 320) % 4];
   } else {
-    // Gentle organic idle breathing
-    const int idleBreath[4] = {0, -1, -2, -1};
-    dy = idleBreath[(nowMs / 340) % 4];
+    // Calm organic idle breathing (1-px gentle chest rise)
+    const int idleBreath[4] = {0, 0, -1, -1};
+    dy = idleBreath[(nowMs / 520) % 4];
   }
 
   // Screen shake micro-jitter on impact events
   if (nowMs < screenShakeEndTimeMs) {
-    int shake = ((nowMs / 25) % 2 == 0) ? -2 : 2;
+    int shake = ((nowMs / 35) % 2 == 0) ? -2 : 2;
     dx += shake;
-    dy += (shake > 0 ? 1 : -1);
   }
 
   int targetCx = LUMI_BASE_CX + dx;
   int targetCy = (expr == EXPR_DEAD) ? (98 + dy) : (LUMI_BASE_CY + dy);
 
-  // Natural eye blink: 140 ms blink every 3.2 seconds (never when dead or sleeping)
-  bool isBlinking = (!isNight && expr != EXPR_DEAD) && ((nowMs % 3200) < 140);
+  // Natural eye blink: 140 ms blink every 3.4 seconds (never when dead or sleeping)
+  bool isBlinking = (!isNight && expr != EXPR_DEAD) && ((nowMs % 3400) < 140);
 
   // Fairies gentle floating orbits
-  const int naviDx[4] = {0, 2, 0, -2};
-  const int naviDy[4] = {0, -2, -4, -2};
-  int naviStep        = (nowMs / 280) % 4;
+  const int naviDx[4] = {0, 1, 0, -1};
+  const int naviDy[4] = {0, -1, -2, -1};
+  int naviStep        = (nowMs / 360) % 4;
   int targetNaviX     = 75 + naviDx[naviStep];
   int targetNaviY     = (isNight ? 100 : 96) + naviDy[naviStep];
   int targetSmallY    = 123 - naviDy[(naviStep + 2) % 4];
 
   // Weather & side overlay phase (0..3)
-  int overlayPhase = (nowMs / 450) % 4;
+  int overlayPhase = (nowMs / 480) % 4;
+
+  // 1b. Multi-frame Evolution / Stage Transformation Morph Animation
+  if (currentlyMorphing) {
+    int morphStep = (int)(((nowMs - morphStartTimeMs) * 6) / morphDurationMs);
+    if (morphStep > 5) morphStep = 5;
+    if (morphStep != lastMorphStep) {
+      lastMorphStep = morphStep;
+      // Clear character & aura zone cleanly
+      carrier->display.fillRect(LUMI_BASE_CX - 38, 72, 76, 70, nativeBg);
+      drawForestStage(weather, (expr == EXPR_DEAD));
+
+      int mCy = (expr == EXPR_DEAD) ? 98 : LUMI_BASE_CY;
+      uint16_t morphGold = color565(255, 225, 80);
+      uint16_t morphCyan = color565(80, 240, 255);
+      uint16_t morphGlow = color565(255, 248, 200);
+
+      if (morphStep == 0) {
+        // Phase 0: Golden aura rings contracting toward Lumi + warm glowing silhouette
+        carrier->display.drawCircle(LUMI_BASE_CX, mCy - 2, 33, morphCyan);
+        carrier->display.drawCircle(LUMI_BASE_CX, mCy - 2, 26, morphGold);
+        carrier->display.fillRoundRect(LUMI_BASE_CX - 18, mCy - 15, 36, 30, 12, morphGold);
+        carrier->display.fillRoundRect(LUMI_BASE_CX - 14, mCy - 12, 28, 24, 10, morphGlow);
+      } else if (morphStep == 1) {
+        // Phase 1: Pure white-gold energy core compression
+        carrier->display.drawCircle(LUMI_BASE_CX, mCy - 2, 28, morphGold);
+        carrier->display.fillRoundRect(LUMI_BASE_CX - 20, mCy - 17, 40, 33, 14, morphGlow);
+        carrier->display.fillRoundRect(LUMI_BASE_CX - 16, mCy - 14, 32, 26, 11, 0xFFFF);
+      } else if (morphStep == 2) {
+        // Phase 2: Radiant starburst flash at core
+        carrier->display.fillRoundRect(LUMI_BASE_CX - 22, mCy - 18, 44, 35, 15, 0xFFFF);
+        carrier->display.drawCircle(LUMI_BASE_CX, mCy - 2, 31, morphCyan);
+        carrier->display.drawFastHLine(LUMI_BASE_CX - 34, mCy - 2, 10, morphGold);
+        carrier->display.drawFastHLine(LUMI_BASE_CX + 25, mCy - 2, 10, morphGold);
+        carrier->display.drawFastVLine(LUMI_BASE_CX, mCy - 34, 10, morphGold);
+      } else {
+        // Phases 3..5: Newly evolved Lumi emerges inside expanding magic rings!
+        drawLumiCharacter(targetCx, targetCy, expr, false, stage, outfit, nativeBg);
+        int ringR = 27 + (morphStep - 3) * 4;
+        carrier->display.drawCircle(LUMI_BASE_CX, mCy - 2, ringR, (morphStep % 2 == 1) ? morphGold : morphCyan);
+      }
+    }
+    return;
+  }
 
   // 2. Full stage initialization when entering SCREEN_HOME or when weather / stage / outfit changes
   bool weatherChanged = (weather != lastWeather);
@@ -1856,8 +1878,8 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   bool deathChanged   = ((expr == EXPR_DEAD) != (lastExpression == EXPR_DEAD));
   bool sleepChanged   = ((expr == EXPR_SLEEPING) != (lastExpression == EXPR_SLEEPING));
   if (forceRedraw || !stageInitialized || weatherChanged || stageChanged || outfitChanged || deathChanged || sleepChanged) {
-    if (expr == EXPR_DEAD) {
-      // Clear top menu area for peaceful memorial starry sky
+    if (expr == EXPR_DEAD && lastShowcaseAct == 0) {
+      // Clear top menu area for peaceful memorial starry sky (when not showing showcase header)
       carrier->display.fillRect(38, 14, 164, 50, nativeBg);
       carrier->display.setTextSize(1);
       carrier->display.setTextColor(color565(120, 150, 200));
@@ -1900,9 +1922,9 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
   // 3. Delta-update Lumi (zero-flicker partial redraw)
   if (targetCx != lastDrawnCx || targetCy != lastDrawnCy || expr != lastExpression || outfit != lastOutfit) {
     if (expr == EXPR_DEAD) {
-      carrier->display.fillRect(lastDrawnCx - 30, lastDrawnCy - 34, 61, 56, nativeBg);
+      carrier->display.fillRect(lastDrawnCx - 30, lastDrawnCy - 32, 61, 52, nativeBg);
     } else if (expr != lastExpression || outfit != lastOutfit) {
-      // Expression or outfit changed: clear full character bounds (paws, ears, horns, briefcase, halo, beanie, scarf)
+      // Expression or outfit changed: clear full character bounds
       carrier->display.fillRect(lastDrawnCx - 31, lastDrawnCy - 35, 65, 57, nativeBg);
       carrier->display.fillRoundRect(96, 154, 48, 5, 2, color565(12, 42, 30)); // drop shadow
     } else {
@@ -1915,7 +1937,7 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     lastExpression = expr;
     lastOutfit     = outfit;
   } else if (isBlinking != lastBlinking) {
-    // Only the eyelids changed: redraw face interior directly without touching body!
+    // Only the eyelids changed: wipe ONLY the two compact eye boxes for zero-flicker blinking!
     uint16_t bodyMain = color565(155, 248, 220);
     if (expr == EXPR_OVERHEATING) bodyMain = color565(255, 220, 195);
     else if (expr == EXPR_FREEZING) bodyMain = color565(150, 215, 255);
@@ -1924,11 +1946,40 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     else if (expr == EXPR_SICK) bodyMain = color565(190, 235, 205);
     else if (expr == EXPR_DEAD) bodyMain = color565(210, 225, 235);
 
-    drawFaceFeatures(targetCx, targetCy, expr, isBlinking, stage, outfit, bodyMain);
+    drawFaceFeatures(targetCx, targetCy, expr, isBlinking, stage, outfit, bodyMain, true);
     lastBlinking = isBlinking;
   }
 
+  // 3b. Delta-update Celestial Aura ascending spirit motes (when deceased in Showcase Act 9)
+  if (expr == EXPR_DEAD && celestialAuraActive) {
+    int moteStep = (int)((nowMs / 90) % 24);
+    if (moteStep != lastMoteStep) {
+      const int moteX[4] = {82, 89, 151, 158};
+      uint16_t spiritCyan = color565(140, 230, 255);
+      if (lastMoteStep >= 0) {
+        for (int i = 0; i < 4; i++) {
+          int oldMy = 112 - ((lastMoteStep + i * 6) % 24) * 2;
+          if (oldMy >= 68 && oldMy <= 114) {
+            carrier->display.fillRect(moteX[i] - 1, oldMy - 1, 3, 3, nativeBg);
+          }
+        }
+      }
+      for (int i = 0; i < 4; i++) {
+        int my = 112 - ((moteStep + i * 6) % 24) * 2;
+        if (my >= 68 && my <= 114) {
+          uint16_t mc = (i % 2 == 0) ? 0xFFFF : spiritCyan;
+          carrier->display.drawPixel(moteX[i], my, mc);
+          carrier->display.drawPixel(moteX[i], my - 1, mc);
+        }
+      }
+      lastMoteStep = moteStep;
+    }
+  } else {
+    lastMoteStep = -1;
+  }
+
   // 4. Delta-update Fairies, Sky Weather (Sun/Stars/Snow), and Side Overlay
+  bool zzzPhaseChanged = (overlayPhase != lastZzzPhase);
   updateFairies(targetNaviX, targetNaviY, targetSmallY, isNight, nativeBg, false);
   updateSkyWeather(weather, overlayPhase, nativeBg, false);
   updateSideOverlay(LUMI_BASE_CX, LUMI_BASE_CY, expr, overlayPhase, nativeBg, false);
@@ -1946,63 +1997,74 @@ void UiPetRenderer::updateHomeDisplay(const PetLogic& pet, unsigned long nowMs, 
     }
   }
 
-  // 6. Delta-update Poop and Soap Bubbles shower
+  // 6. Delta-update Poop (only on phase tick) and Soap Bubbles shower
   if (expr != EXPR_DEAD) {
     const int poopX = 168;
     const int poopY = 145;
     bool hasPoop = pet.getHasPoop();
     if (hasPoop) {
-      drawPoop(poopX, poopY, overlayPhase);
+      if (!lastHadPoop || zzzPhaseChanged) {
+        drawPoop(poopX, poopY, overlayPhase);
+      }
       lastHadPoop = true;
     } else if (lastHadPoop) {
       erasePoop(poopX, poopY, nativeBg);
       lastHadPoop = false;
     }
 
-    if (isBathing(nowMs)) {
+    if (currentlyBathing) {
       drawSoapBubbles(nowMs);
     }
   }
 
-  // 7. Dynamic Evolution / Hatching Starburst (Nova)
-  if (nowMs < novaStartTimeMs + novaDurationMs) {
+  // 7. Dynamic Evolution / Hatching Starburst (Nova) - anchored outside Lumi's silhouette
+  const int novaCenterX = LUMI_BASE_CX;
+  const int novaCenterY = 114;
+  if (novaDurationMs > 0 && (nowMs - novaStartTimeMs < novaDurationMs)) {
     unsigned long elapsedNova = nowMs - novaStartTimeMs;
-    int radius = 12 + (int)((elapsedNova * 38) / novaDurationMs);
+    int radius = 28 + (int)((elapsedNova * 18) / novaDurationMs);
     uint16_t starGold  = color565(255, 230, 90);
     uint16_t starCyan  = color565(90, 240, 255);
     uint16_t starWhite = 0xFFFF;
 
-    // Erase previous star ring
-    if (lastNovaRadius > 0 && lastNovaRadius != radius) {
-      for (int i = 0; i < 8; i++) {
-        int oldX = targetCx + (int)(cos(i * 0.785) * lastNovaRadius);
-        int oldY = targetCy + (int)(sin(i * 0.785) * (lastNovaRadius * 0.75));
-        if (oldX > 20 && oldX < 220 && oldY > 30 && oldY < 160) {
-          carrier->display.drawPixel(oldX, oldY, nativeBg);
+    if (lastNovaRadius != radius) {
+      // Erase previous star ring
+      if (lastNovaRadius > 0) {
+        for (int i = 0; i < 8; i++) {
+          int oldX = novaCenterX + (int)(cos(i * 0.785) * lastNovaRadius);
+          int oldY = novaCenterY + (int)(sin(i * 0.785) * (lastNovaRadius * 0.72));
+          if (oldX > 36 && oldX < 204 && oldY > 68 && oldY < 138) {
+            carrier->display.fillRect(oldX - 1, oldY - 1, 3, 3, nativeBg);
+          }
         }
       }
-    }
 
-    // Draw expanding 8-star ring
-    for (int i = 0; i < 8; i++) {
-      int sx = targetCx + (int)(cos(i * 0.785) * radius);
-      int sy = targetCy + (int)(sin(i * 0.785) * (radius * 0.75));
-      if (sx > 20 && sx < 220 && sy > 30 && sy < 160) {
-        uint16_t col = (i % 2 == 0) ? starGold : (i % 4 == 1 ? starCyan : starWhite);
-        carrier->display.drawPixel(sx, sy, col);
+      // Draw crisp expanding 8-diamond star ring around Lumi
+      for (int i = 0; i < 8; i++) {
+        int sx = novaCenterX + (int)(cos(i * 0.785) * radius);
+        int sy = novaCenterY + (int)(sin(i * 0.785) * (radius * 0.72));
+        if (sx > 36 && sx < 204 && sy > 68 && sy < 138) {
+          uint16_t col = (i % 2 == 0) ? starGold : (i % 4 == 1 ? starCyan : starWhite);
+          carrier->display.drawFastHLine(sx - 1, sy, 3, col);
+          carrier->display.drawFastVLine(sx, sy - 1, 3, col);
+          carrier->display.drawPixel(sx, sy, starWhite);
+        }
       }
+      lastNovaRadius = radius;
     }
-    lastNovaRadius = radius;
   } else if (lastNovaRadius > 0) {
-    // Erase final stars when nova burst finishes
+    // Erase final stars when nova burst finishes and restore Lumi & fairies cleanly
     for (int i = 0; i < 8; i++) {
-      int oldX = targetCx + (int)(cos(i * 0.785) * lastNovaRadius);
-      int oldY = targetCy + (int)(sin(i * 0.785) * (lastNovaRadius * 0.75));
-      if (oldX > 20 && oldX < 220 && oldY > 30 && oldY < 160) {
-        carrier->display.drawPixel(oldX, oldY, nativeBg);
+      int oldX = novaCenterX + (int)(cos(i * 0.785) * lastNovaRadius);
+      int oldY = novaCenterY + (int)(sin(i * 0.785) * (lastNovaRadius * 0.72));
+      if (oldX > 36 && oldX < 204 && oldY > 68 && oldY < 138) {
+        carrier->display.fillRect(oldX - 1, oldY - 1, 3, 3, nativeBg);
       }
     }
     lastNovaRadius = 0;
+    novaDurationMs = 0;
+    drawLumiCharacter(targetCx, targetCy, expr, isBlinking, stage, outfit, nativeBg);
+    updateFairies(targetNaviX, targetNaviY, targetSmallY, isNight, nativeBg, true);
   }
 }
 
@@ -2064,51 +2126,86 @@ void UiPetRenderer::drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16
   uint16_t subCyan   = color565(120, 215, 255);
 
   static uint8_t lastDrawnPhase = 255;
+  static unsigned long lastHatchFrameMs = 0;
+  static int lastEggEx = 120;
+  static int lastSparkStep = -1;
+
+  // Detect fresh entry into hatching scene
+  if (nowMs < lastHatchFrameMs || (nowMs - lastHatchFrameMs > 600)) {
+    lastDrawnPhase = 255;
+  }
+
   bool phaseChanged = (phase != lastDrawnPhase);
+  if (!phaseChanged && (nowMs - lastHatchFrameMs < 55)) {
+    return; // Throttle to ~18 FPS for smooth flicker-free animation
+  }
+  lastHatchFrameMs = nowMs;
+
   if (phaseChanged) {
-    carrier->display.fillScreen(bgColor);
-    carrier->display.drawCircle(120, 120, 118, rimColor);
+    if (lastDrawnPhase == 255) {
+      carrier->display.fillScreen(bgColor);
+      carrier->display.drawCircle(120, 120, 118, rimColor);
 
-    // Twinkling background stars
-    carrier->display.drawPixel(38, 35, color565(180, 220, 255));
-    carrier->display.drawPixel(55, 22, color565(255, 230, 120));
-    carrier->display.drawPixel(185, 24, color565(255, 230, 120));
-    carrier->display.drawPixel(202, 36, color565(180, 220, 255));
-    carrier->display.drawPixel(28, 80, color565(100, 140, 190));
-    carrier->display.drawPixel(212, 82, color565(100, 140, 190));
+      // Twinkling background stars
+      carrier->display.drawPixel(38, 35, color565(180, 220, 255));
+      carrier->display.drawPixel(55, 22, color565(255, 230, 120));
+      carrier->display.drawPixel(185, 24, color565(255, 230, 120));
+      carrier->display.drawPixel(202, 36, color565(180, 220, 255));
+      carrier->display.drawPixel(28, 80, color565(100, 140, 190));
+      carrier->display.drawPixel(212, 82, color565(100, 140, 190));
 
-    // Title (Y = 22)
+      // Title (Y = 22)
+      carrier->display.setTextSize(1);
+      carrier->display.setTextColor(titleGold);
+      const char* title = "* ET NYT LIV BEGYNDER *";
+      carrier->display.setCursor(120 - ((int)strlen(title) * 3), 22);
+      carrier->display.print(title);
+
+      // Subtitle (Y = 36)
+      char subBuf[32];
+      snprintf(subBuf, sizeof(subBuf), "< LUMI GENERATION %u >", (unsigned int)generation);
+      carrier->display.setTextColor(subCyan);
+      carrier->display.setCursor(120 - ((int)strlen(subBuf) * 3), 36);
+      carrier->display.print(subBuf);
+
+      // Mossy woven nest (X=90..150, Y=132..146)
+      carrier->display.fillRoundRect(90, 134, 60, 15, 5, color565(45, 60, 35));
+      carrier->display.fillRoundRect(95, 132, 50, 8, 3, color565(75, 150, 65));
+      carrier->display.drawPixel(94, 138, color565(210, 180, 70));
+      carrier->display.drawPixel(145, 137, color565(210, 180, 70));
+      carrier->display.drawPixel(120, 142, color565(95, 185, 80));
+    } else {
+      // Phase transition (0->1 or 1->2): clear only the egg box & prompt line
+      carrier->display.fillRect(82, 66, 76, 65, bgColor);
+      carrier->display.fillRect(36, 170, 168, 16, bgColor);
+    }
+
+    // Draw phase prompt once on phase change
     carrier->display.setTextSize(1);
-    carrier->display.setTextColor(titleGold);
-    const char* title = "* ET NYT LIV BEGYNDER *";
-    carrier->display.setCursor(120 - ((int)strlen(title) * 3), 22);
-    carrier->display.print(title);
-
-    // Subtitle (Y = 36)
-    char subBuf[32];
-    snprintf(subBuf, sizeof(subBuf), "< LUMI GENERATION %u >", (unsigned int)generation);
-    carrier->display.setTextColor(subCyan);
-    carrier->display.setCursor(120 - ((int)strlen(subBuf) * 3), 36);
-    carrier->display.print(subBuf);
-
-    // Mossy woven nest (X=90..150, Y=132..146)
-    carrier->display.fillRoundRect(90, 134, 60, 15, 5, color565(45, 60, 35));
-    carrier->display.fillRoundRect(95, 132, 50, 8, 3, color565(75, 150, 65));
-    carrier->display.drawPixel(94, 138, color565(210, 180, 70)); // Golden straw
-    carrier->display.drawPixel(145, 137, color565(210, 180, 70));
-    carrier->display.drawPixel(120, 142, color565(95, 185, 80)); // Moss speck
+    if (phase == 0) {
+      carrier->display.setTextColor(color565(190, 215, 235), bgColor);
+      const char* p0 = "Aegget vugger roligt...";
+      carrier->display.setCursor(120 - ((int)strlen(p0) * 3), 175);
+      carrier->display.print(p0);
+    } else if (phase == 1) {
+      carrier->display.setTextColor(color565(255, 220, 90), bgColor);
+      const char* p1 = "KRAK! Skallen revner!";
+      carrier->display.setCursor(120 - ((int)strlen(p1) * 3), 175);
+      carrier->display.print(p1);
+    } else {
+      carrier->display.setTextColor(color565(80, 245, 150), bgColor);
+      const char* p2 = "Velkommen, Baby Lumi!";
+      carrier->display.setCursor(120 - ((int)strlen(p2) * 3), 175);
+      carrier->display.print(p2);
+    }
 
     lastDrawnPhase = phase;
+    lastEggEx = -1;
+    lastSparkStep = -1;
   }
 
   int cx = 120;
   int cy = 114;
-  if (nowMs < screenShakeEndTimeMs) {
-    cx += ((nowMs / 25) % 2 == 0) ? -2 : 2;
-  }
-
-  // Clear egg center dynamic region (X = 85..155, Y = 68..133)
-  carrier->display.fillRect(85, 68, 70, 65, bgColor);
 
   uint16_t eggShell   = color565(250, 246, 230); // Warm ivory
   uint16_t eggShadow  = color565(215, 205, 185); // Cream shadow
@@ -2117,35 +2214,42 @@ void UiPetRenderer::drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16
   uint16_t sparkGold  = color565(255, 225, 90);   // Golden spark
 
   if (phase == 0) {
-    // Phase 0: Gentle rocking wobble in nest
-    int wobble = (int)(sin((double)nowMs * 0.012) * 3.0);
+    int wobble = (int)(sin((double)nowMs * 0.010) * 2.5);
     int ex = cx + wobble;
+    if (ex == lastEggEx) return; // Zero redraw if egg hasn't shifted pixel
 
-    // Egg body (26 px wide, 32 px high)
+    if (lastEggEx > 0) {
+      // Delta-erase only left/right exposed slivers
+      if (ex > lastEggEx) {
+        carrier->display.fillRect(lastEggEx - 14, cy - 17, (ex - lastEggEx) + 2, 34, bgColor);
+      } else {
+        carrier->display.fillRect(ex + 12, cy - 17, (lastEggEx - ex) + 3, 34, bgColor);
+      }
+    }
+    lastEggEx = ex;
+
     carrier->display.fillRoundRect(ex - 13, cy - 16, 26, 32, 11, eggShell);
     carrier->display.drawRoundRect(ex - 13, cy - 16, 26, 32, 11, eggShadow);
-
-    // Kokiri emerald spots
     carrier->display.fillCircle(ex - 4, cy - 6, 2, eggSpeckle);
     carrier->display.fillCircle(ex + 5, cy - 2, 3, eggSpeckle);
     carrier->display.fillCircle(ex - 2, cy + 6, 2, eggSpeckle);
     carrier->display.drawPixel(ex + 4, cy + 7, eggSpeckle);
-
-    // Prompt
-    carrier->display.setTextSize(1);
-    carrier->display.setTextColor(color565(190, 215, 235), bgColor);
-    const char* p0 = "Aegget vugger roligt...";
-    carrier->display.setCursor(120 - ((int)strlen(p0) * 3), 175);
-    carrier->display.print(p0);
   } else if (phase == 1) {
-    // Phase 1: More violent vibration + zigzag crack + golden sparks
-    int wobble = (int)(sin((double)nowMs * 0.025) * 4.5);
+    int wobble = (int)(sin((double)nowMs * 0.022) * 3.0);
     int ex = cx + wobble;
+    if (ex == lastEggEx) return;
+
+    if (lastEggEx > 0) {
+      if (ex > lastEggEx) {
+        carrier->display.fillRect(lastEggEx - 14, cy - 17, (ex - lastEggEx) + 2, 34, bgColor);
+      } else {
+        carrier->display.fillRect(ex + 12, cy - 17, (lastEggEx - ex) + 3, 34, bgColor);
+      }
+    }
+    lastEggEx = ex;
 
     carrier->display.fillRoundRect(ex - 13, cy - 16, 26, 32, 11, eggShell);
     carrier->display.drawRoundRect(ex - 13, cy - 16, 26, 32, 11, eggShadow);
-
-    // Speckles
     carrier->display.fillCircle(ex - 4, cy - 6, 2, eggSpeckle);
     carrier->display.fillCircle(ex + 5, cy - 2, 3, eggSpeckle);
 
@@ -2154,66 +2258,55 @@ void UiPetRenderer::drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16
     carrier->display.drawLine(ex - 4, cy - 5, ex + 3, cy + 2, crackColor);
     carrier->display.drawLine(ex + 3, cy + 2, ex + 10, cy - 3, crackColor);
 
-    // Golden light & sparks leaking out of crack
+    // Golden light leaking out of crack
     carrier->display.drawPixel(ex - 4, cy - 4, sparkGold);
     carrier->display.drawPixel(ex + 3, cy + 3, sparkGold);
-    carrier->display.drawPixel(ex - 8, cy - 8, sparkGold);
-    carrier->display.drawPixel(ex + 7, cy - 7, sparkGold);
-
-    // Prompt
-    carrier->display.setTextSize(1);
-    carrier->display.setTextColor(color565(255, 220, 90), bgColor);
-    const char* p1 = "KRAK! Skallen revner!";
-    carrier->display.setCursor(120 - ((int)strlen(p1) * 3), 175);
-    carrier->display.print(p1);
   } else {
     // Phase 2: Top shell pops off, Baby Lumi emerges with pacifier!
-    // Lower shell remains in nest
-    carrier->display.fillRoundRect(cx - 13, cy + 4, 26, 12, 4, eggShell);
-    carrier->display.drawRoundRect(cx - 13, cy + 4, 26, 12, 4, eggShadow);
+    if (lastEggEx != cx) {
+      lastEggEx = cx;
+      carrier->display.fillRoundRect(cx - 13, cy + 4, 26, 12, 4, eggShell);
+      carrier->display.drawRoundRect(cx - 13, cy + 4, 26, 12, 4, eggShadow);
 
-    // Top shell lifted and tilted up-left
-    int topY = cy - 26;
-    carrier->display.fillRoundRect(cx - 15, topY, 22, 11, 4, eggShell);
-    carrier->display.drawRoundRect(cx - 15, topY, 22, 11, 4, eggShadow);
+      int topY = cy - 26;
+      carrier->display.fillRoundRect(cx - 15, topY, 22, 11, 4, eggShell);
+      carrier->display.drawRoundRect(cx - 15, topY, 22, 11, 4, eggShadow);
 
-    // Baby Lumi emerging head (mint-green body)
-    carrier->display.fillRoundRect(cx - 14, cy - 16, 28, 22, 9, color565(155, 248, 220));
+      carrier->display.fillRoundRect(cx - 14, cy - 16, 28, 22, 9, color565(155, 248, 220));
 
-    // Joyful closed arch eyes (^  ^)
-    uint16_t eyeDark = color565(18, 45, 35);
-    carrier->display.drawLine(cx - 8, cy - 8, cx - 6, cy - 11, eyeDark);
-    carrier->display.drawLine(cx - 6, cy - 11, cx - 4, cy - 8, eyeDark);
-    carrier->display.drawLine(cx + 4, cy - 8, cx + 6, cy - 11, eyeDark);
-    carrier->display.drawLine(cx + 6, cy - 11, cx + 8, cy - 8, eyeDark);
+      uint16_t eyeDark = color565(18, 45, 35);
+      carrier->display.drawLine(cx - 8, cy - 8, cx - 6, cy - 11, eyeDark);
+      carrier->display.drawLine(cx - 6, cy - 11, cx - 4, cy - 8, eyeDark);
+      carrier->display.drawLine(cx + 4, cy - 8, cx + 6, cy - 11, eyeDark);
+      carrier->display.drawLine(cx + 6, cy - 11, cx + 8, cy - 8, eyeDark);
 
-    // Cute pink blushing cheeks
-    carrier->display.fillCircle(cx - 9, cy - 5, 2, color565(255, 140, 175));
-    carrier->display.fillCircle(cx + 9, cy - 5, 2, color565(255, 140, 175));
+      carrier->display.fillCircle(cx - 9, cy - 5, 2, color565(255, 140, 175));
+      carrier->display.fillCircle(cx + 9, cy - 5, 2, color565(255, 140, 175));
 
-    // Yellow dummy / pacifier
-    carrier->display.fillCircle(cx, cy - 3, 3, color565(255, 220, 60));
-    carrier->display.drawCircle(cx, cy - 3, 3, color565(200, 160, 30));
+      carrier->display.fillCircle(cx, cy - 3, 3, color565(255, 220, 60));
+      carrier->display.drawCircle(cx, cy - 3, 3, color565(200, 160, 30));
 
-    // Cute Kokiri sprout on head
-    carrier->display.drawFastVLine(cx, cy - 20, 4, color565(75, 205, 95));
-    carrier->display.fillCircle(cx + 2, cy - 21, 2, color565(95, 235, 115));
+      carrier->display.drawFastVLine(cx, cy - 20, 4, color565(75, 205, 95));
+      carrier->display.fillCircle(cx + 2, cy - 21, 2, color565(95, 235, 115));
+    }
 
-    // Radiating magical golden stars
-    int step = ((nowMs / 80) % 6);
-    int rad = 22 + step * 2;
-    carrier->display.drawPixel(cx - rad, cy - 5, sparkGold);
-    carrier->display.drawPixel(cx + rad, cy - 5, sparkGold);
-    carrier->display.drawPixel(cx, cy - rad, sparkGold);
-    carrier->display.drawPixel(cx - (rad * 7 / 10), cy - (rad * 7 / 10), sparkGold);
-    carrier->display.drawPixel(cx + (rad * 7 / 10), cy - (rad * 7 / 10), sparkGold);
-
-    // Prompt
-    carrier->display.setTextSize(1);
-    carrier->display.setTextColor(color565(80, 245, 150), bgColor);
-    const char* p2 = "Velkommen, Baby Lumi!";
-    carrier->display.setCursor(120 - ((int)strlen(p2) * 3), 175);
-    carrier->display.print(p2);
+    // Radiating magical golden stars (delta-erased)
+    int step = ((nowMs / 90) % 6);
+    if (step != lastSparkStep) {
+      if (lastSparkStep >= 0) {
+        int oldRad = 22 + lastSparkStep * 2;
+        carrier->display.drawPixel(cx - oldRad, cy - 5, bgColor);
+        carrier->display.drawPixel(cx + oldRad, cy - 5, bgColor);
+        carrier->display.drawPixel(cx - (oldRad * 7 / 10), cy - (oldRad * 7 / 10), bgColor);
+        carrier->display.drawPixel(cx + (oldRad * 7 / 10), cy - (oldRad * 7 / 10), bgColor);
+      }
+      int rad = 22 + step * 2;
+      carrier->display.drawPixel(cx - rad, cy - 5, sparkGold);
+      carrier->display.drawPixel(cx + rad, cy - 5, sparkGold);
+      carrier->display.drawPixel(cx - (rad * 7 / 10), cy - (rad * 7 / 10), sparkGold);
+      carrier->display.drawPixel(cx + (rad * 7 / 10), cy - (rad * 7 / 10), sparkGold);
+      lastSparkStep = step;
+    }
   }
 
   stageInitialized = false;
@@ -2221,6 +2314,7 @@ void UiPetRenderer::drawHatchingScene(uint8_t phase, unsigned long nowMs, uint16
 
 void UiPetRenderer::triggerBath(unsigned long nowMs) {
   bathEndTimeMs = nowMs + 1500;
+  lastBubbleStep = -1;
 }
 
 bool UiPetRenderer::isBathing(unsigned long nowMs) const {
@@ -2229,10 +2323,11 @@ bool UiPetRenderer::isBathing(unsigned long nowMs) const {
 
 void UiPetRenderer::drawPoop(int x, int y, int phase) {
   if (carrier == nullptr) return;
+  uint16_t nativeBg  = color565(8, 12, 26);
   uint16_t poopDark  = color565(110, 60, 25);
   uint16_t poopMid   = color565(145, 85, 35);
   uint16_t poopLight = color565(185, 115, 50);
-  uint16_t flyColor  = color565(35, 35, 45);
+  uint16_t flyColor  = color565(160, 210, 230);
 
   // 1. Swirl poop body
   carrier->display.fillRoundRect(x - 6, y + 2, 12, 5, 2, poopMid);
@@ -2242,9 +2337,10 @@ void UiPetRenderer::drawPoop(int x, int y, int phase) {
   carrier->display.drawPixel(x, y - 4, poopLight); // Tip swirl
   carrier->display.drawPixel(x - 2, y - 1, poopLight); // Specular highlight
 
-  // 2. Tiny buzzing flies (alternating animation)
+  // 2. Clear tiny fly zone above poop before drawing alternating flies
+  carrier->display.fillRect(x - 6, y - 9, 13, 4, nativeBg);
   int f1Y = (phase % 2 == 0) ? (y - 7) : (y - 8);
-  int f2Y = (phase % 2 == 0) ? (y - 6) : (y - 5);
+  int f2Y = (phase % 2 == 0) ? (y - 8) : (y - 6);
   carrier->display.drawPixel(x - 5, f1Y, flyColor);
   carrier->display.drawPixel(x + 5, f2Y, flyColor);
 }
@@ -2266,21 +2362,36 @@ void UiPetRenderer::erasePoop(int x, int y, uint16_t bgColor) {
 
 void UiPetRenderer::drawSoapBubbles(unsigned long nowMs) {
   if (carrier == nullptr) return;
-  int step = (nowMs / 80) % 6;
-  uint16_t bubbleCyan  = color565(140, 230, 255);
+  int step = (int)((nowMs / 95) % 6);
+  if (step == lastBubbleStep) return;
+
+  uint16_t nativeBg    = color565(8, 12, 26);
+  uint16_t bubbleCyan  = color565(120, 230, 255);
   uint16_t bubbleWhite = 0xFFFF;
 
-  // Clustered buoyant foam bubbles across the glade
+  // Frame Lumi on left & right sides in the sky so bubbles never corrupt Lumi's face
   const int bubblePos[6][2] = {
-    {85, 130}, {105, 115}, {135, 125}, {155, 110}, {168, 140}, {118, 95}
+    {82, 130}, {88, 114}, {78, 102}, {154, 128}, {162, 114}, {150, 100}
   };
+
+  if (lastBubbleStep >= 0) {
+    for (int i = 0; i < 6; i++) {
+      int oldBx = bubblePos[i][0] + ((lastBubbleStep + i) % 3) - 1;
+      int oldBy = bubblePos[i][1] - (lastBubbleStep * 2);
+      int r = 3 + (i % 2);
+      carrier->display.drawCircle(oldBx, oldBy, r, nativeBg);
+      carrier->display.drawPixel(oldBx - 1, oldBy - 1, nativeBg);
+    }
+  }
+
   for (int i = 0; i < 6; i++) {
     int bx = bubblePos[i][0] + ((step + i) % 3) - 1;
     int by = bubblePos[i][1] - (step * 2);
-    int r = 3 + (i % 3);
+    int r = 3 + (i % 2);
     carrier->display.drawCircle(bx, by, r, bubbleCyan);
     carrier->display.drawPixel(bx - 1, by - 1, bubbleWhite);
   }
+  lastBubbleStep = step;
 }
 
 void UiPetRenderer::triggerScreenShake(unsigned long nowMs, uint16_t durationMs) {
@@ -2291,6 +2402,78 @@ void UiPetRenderer::triggerNova(unsigned long nowMs, uint16_t durationMs) {
   novaStartTimeMs = nowMs;
   novaDurationMs = durationMs;
   lastNovaRadius = 0;
+}
+
+void UiPetRenderer::triggerMorph(unsigned long nowMs, uint16_t durationMs) {
+  morphStartTimeMs = nowMs;
+  morphDurationMs = durationMs;
+  lastMorphStep = -1;
+}
+
+bool UiPetRenderer::isMorphing(unsigned long nowMs) const {
+  return (morphDurationMs > 0 && (nowMs - morphStartTimeMs < morphDurationMs));
+}
+
+void UiPetRenderer::playIrisTransition(uint16_t accentColor) {
+  if (carrier == nullptr) return;
+  uint16_t ringDim = color565(18, 32, 62);
+  // Fast concentric circular portal sweep across the 240x240 display
+  for (int r = 114; r >= 18; r -= 16) {
+    carrier->display.drawCircle(120, 120, r, accentColor);
+    carrier->display.drawCircle(120, 120, r - 4, ringDim);
+  }
+  stageInitialized = false;
+  lastShowcaseAct = 0;
+}
+
+void UiPetRenderer::drawShowcaseHeader(uint8_t actNumber, const char* actTitle, bool force) {
+  if (carrier == nullptr || actNumber == 0) return;
+  if (!force && actNumber == lastShowcaseAct && actTitle == lastShowcaseTitle) {
+    return;
+  }
+  lastShowcaseAct   = actNumber;
+  lastShowcaseTitle = actTitle;
+
+  uint16_t nativeBg   = color565(8, 12, 26);
+  uint16_t cardBg     = color565(14, 24, 48);
+  uint16_t cardBorder = color565(55, 165, 225);
+  uint16_t goldColor  = color565(255, 215, 70);
+  uint16_t barEmpty   = color565(28, 44, 78);
+  uint16_t barFill    = color565(80, 240, 190);
+
+  // Clear top menu bar region and render sleek Cinema Chapter Header (Y = 14..62)
+  carrier->display.fillRect(34, 14, 172, 50, nativeBg);
+  carrier->display.fillRoundRect(38, 16, 164, 44, 7, cardBg);
+  carrier->display.drawRoundRect(38, 16, 164, 44, 7, cardBorder);
+
+  // Line 1: Act indicator ("* SHOWCASE AKT X AF 11 *")
+  char actBuf[28];
+  snprintf(actBuf, sizeof(actBuf), "* SHOWCASE AKT %u/11 *", (unsigned int)actNumber);
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(goldColor);
+  int actX = 120 - ((int)strlen(actBuf) * 3);
+  carrier->display.setCursor(actX, 21);
+  carrier->display.print(actBuf);
+
+  // Line 2: Danish Chapter Title
+  if (actTitle != nullptr && actTitle[0] != '\0') {
+    carrier->display.setTextColor(0xFFFF);
+    int titleX = 120 - ((int)strlen(actTitle) * 3);
+    if (titleX < 44) titleX = 44;
+    carrier->display.setCursor(titleX, 33);
+    carrier->display.print(actTitle);
+  }
+
+  // Line 3: 11-segment Cinema Timeline Progress Bar (X = 50..190, Y = 48..52)
+  const int barX = 50;
+  const int barY = 48;
+  const int segW = 11;
+  const int segGap = 2;
+  for (uint8_t i = 1; i <= 11; i++) {
+    int sx = barX + (i - 1) * (segW + segGap);
+    uint16_t col = (i < actNumber) ? barFill : (i == actNumber ? goldColor : barEmpty);
+    carrier->display.fillRoundRect(sx, barY, segW, 5, 1, col);
+  }
 }
 
 void UiPetRenderer::setCelestialAura(bool active) {

@@ -1709,20 +1709,27 @@ void testShowcaseDirector() {
   CHECK(act4.soundToPlay == SOUND_BUBBLES, "Plays bubble sound");
   CHECK(!pet.getHasPoop(), "Poop cleaned from screen");
 
-  // Act 5: Teen & cuddle pet (16500 .. 23500 ms)
+  // Act 5: Teen, cuddle pet & Adult evolution (16500 .. 23500 ms)
   ShowcaseAction act5 = showcase.update(18000, pet, menu, nameEntry, pong); // elapsed 17000
   CHECK(act5.phase == SHOWCASE_GROW_TEEN_PET, "Phase is SHOWCASE_GROW_TEEN_PET");
   CHECK(act5.triggerNova, "Triggers starburst Nova on Teen evolution");
+  CHECK(act5.triggerMorph, "Triggers smooth stage evolution Morph on Teen evolution");
   CHECK(act5.triggerChaser, "Triggers LED chaser portal on Teen evolution");
+  CHECK(act5.actNumber == 5, "Act number is 5");
   CHECK(pet.getStageEnum() == STAGE_TEEN, "Evolved to Teenager");
 
   ShowcaseAction act5b = showcase.update(20500, pet, menu, nameEntry, pong); // elapsed 19500
   CHECK(act5b.soundToPlay == SOUND_PURR, "Plays purr sound on petting");
   CHECK(pet.isBeingPetted(20500), "Petting reaction window active");
 
+  ShowcaseAction act5c = showcase.update(22500, pet, menu, nameEntry, pong); // elapsed 21500
+  CHECK(act5c.triggerMorph, "Triggers smooth stage evolution Morph on Adult evolution");
+  CHECK(pet.getStageEnum() == STAGE_ADULT, "Evolved to Adult diplomat stage");
+
   // Act 6: Solo Pong (23500 .. 35000 ms)
   ShowcaseAction act6 = showcase.update(25000, pet, menu, nameEntry, pong); // elapsed 24000
   CHECK(act6.phase == SHOWCASE_SOLO_PONG, "Phase is SHOWCASE_SOLO_PONG");
+  CHECK(act6.triggerIrisWipe, "Triggers circular iris transition into Solo Pong");
   CHECK(menu.getActiveScreen() == SCREEN_MINIGAME_PONG, "Switched to SCREEN_MINIGAME_PONG");
 
   // Act 7: Starry night sleep (35000 .. 45000 ms)

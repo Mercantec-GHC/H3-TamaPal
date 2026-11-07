@@ -74,6 +74,16 @@ public:
   void setCelestialAura(bool active);
   bool isCelestialAura() const;
 
+  // Trigger smooth multi-frame character evolution / stage transformation morph
+  void triggerMorph(unsigned long nowMs, uint16_t durationMs = 600);
+  bool isMorphing(unsigned long nowMs) const;
+
+  // Render smooth circular iris portal wipe when switching showcase modes
+  void playIrisTransition(uint16_t accentColor);
+
+  // Render top cinema chapter header & 11-act progress bar on SCREEN_HOME during showcase
+  void drawShowcaseHeader(uint8_t actNumber, const char* actTitle, bool force = false);
+
   // Render glorious finale title splash screen (TAMAPAL • MERCANTEC H3)
   void drawTitleSplash(unsigned long nowMs);
 
@@ -97,14 +107,22 @@ private:
   bool lastBlinking;
   bool lastPromptBlink;
   bool lastHadPoop;
+  bool lastWasBathing;
+  int16_t lastBubbleStep;
   unsigned long bathEndTimeMs;
 
-  // Impact shake, Nova burst and Celestial Aura effects
+  // Impact shake, Nova burst, Evolution Morph and Celestial Aura effects
   unsigned long screenShakeEndTimeMs;
   unsigned long novaStartTimeMs;
   uint16_t novaDurationMs;
   int16_t lastNovaRadius;
+  unsigned long morphStartTimeMs;
+  uint16_t morphDurationMs;
+  int16_t lastMorphStep;
+  int16_t lastMoteStep;
   bool celestialAuraActive;
+  uint8_t lastShowcaseAct;
+  const char* lastShowcaseTitle;
 
   // Draw seamless Kokiri forest glade platform and flora (cenotaph gravestone when dead)
   void drawForestStage(SkyWeatherMode weather, bool isDead = false);
@@ -138,7 +156,7 @@ private:
   void drawSleepingBed(int cx, int cy, PetStage stage, PetOutfit outfit, uint16_t bgColor);
 
   // Draw eyes & mouth based on expression and stage
-  void drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bodyColor);
+  void drawFaceFeatures(int cx, int cy, LumiExpression expr, bool isBlinking, PetStage stage, PetOutfit outfit, uint16_t bodyColor, bool wipeEyesOnly = false);
 
   // Draw floating Navi fairy + secondary miniature forest fairy
   void updateFairies(int naviX, int naviY, int smallFairyY, bool isSleeping, uint16_t bgColor, bool force);

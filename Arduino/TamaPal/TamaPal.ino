@@ -854,10 +854,12 @@ void loop() {
   // 3. LOGIC LAYER: Advance animations and countdown timers
   bool wasAlive = petLogic.isAlive();
   menuLogic.update(now);
-  petLogic.update(now);
+  if (!showcaseDirector.isActive() || currentScreen != SCREEN_HATCHING) {
+    petLogic.update(now);
+  }
   soundLed.update(now);
 
-  if (wasAlive && !petLogic.isAlive()) {
+  if (wasAlive && !petLogic.isAlive() && !showcaseDirector.isActive()) {
     soundLed.playSound(SOUND_DEATH);
     storagePet.logGraveRecord(petLogic);
     storagePet.savePet(petLogic);
@@ -871,8 +873,12 @@ void loop() {
   }
 
   // 3b. AUTONOMOUS SHOWCASE DIRECTOR UPDATE (~72s full cinematic presentation)
+  static uint8_t activeShowcaseAct = 0;
+  static const char* activeShowcaseTitle = "";
   if (showcaseDirector.isActive()) {
     ShowcaseAction act = showcaseDirector.update(now, petLogic, menuLogic, nameEntry, pongLogic, storagePet.getGraveRecordCount());
+    activeShowcaseAct = act.actNumber;
+    activeShowcaseTitle = act.actTitle;
     if (act.soundToPlay != SOUND_NONE) {
       soundLed.playSound(act.soundToPlay);
     }
@@ -882,6 +888,15 @@ void loop() {
       soundLed.startBreathing(act.flashR, act.flashG, act.flashB, 9500);
     } else if (act.hasFlash) {
       soundLed.flashColor(act.flashR, act.flashG, act.flashB, act.flashDurationMs);
+    }
+    if (act.triggerIrisWipe) {
+      uint16_t irisColor = (act.flashR > 0 || act.flashG > 0 || act.flashB > 0)
+                           ? (((uint16_t)(act.flashR & 0xF8) << 8) | ((uint16_t)(act.flashG & 0xFC) << 3) | (act.flashB >> 3))
+                           : 0x07FF;
+      uiPet.playIrisTransition(irisColor);
+    }
+    if (act.triggerMorph) {
+      uiPet.triggerMorph(now, 600);
     }
     if (act.triggerShake) {
       uiPet.triggerScreenShake(now, 180);
@@ -903,8 +918,19 @@ void loop() {
       if (act.forceRedraw) {
         uiPet.drawTitleSplash(now);
       }
-    } else if (act.forceRedraw) {
-      if (menuLogic.getActiveScreen() == SCREEN_HOME) {
+    } else if (act.phase == SHOWCASE_COMPLETED) {
+      uiPet.setCelestialAura(false);
+      uiMenu.drawInitialScreen();
+      if (petLogic.isAlive()) {
+        uiMenu.drawMenuBar(menuLogic, true);
+      }
+      uiPet.updateHomeDisplay(petLogic, now, true);
+    } else {
+      ScreenType nextScr = menuLogic.getActiveScreen();
+      if ((nextScr == SCREEN_HOME || nextScr == SCREEN_ACTION) && nextScr == previousScreen) {
+        uiPet.drawShowcaseHeader(activeShowcaseAct, activeShowcaseTitle, act.forceRedraw);
+      }
+      if (act.forceRedraw && nextScr == SCREEN_HOME && previousScreen == SCREEN_HOME) {
         uiPet.updateHomeDisplay(petLogic, now, true);
       }
     }
@@ -963,7 +989,9 @@ void loop() {
       soundLed.setMoodColor(0, 150, 220);
       if (currentScreen == SCREEN_HOME) {
         uiMenu.drawInitialScreen();
-        uiMenu.drawMenuBar(menuLogic, true);
+        if (!showcaseDirector.isActive()) {
+          uiMenu.drawMenuBar(menuLogic, true);
+        }
       }
     } else if (previousScreen == SCREEN_ACTION) {
       // Exiting temporary center overlay: top menu bar is still intact, only restore LED glow
@@ -975,6 +1003,9 @@ void loop() {
     switch (currentScreen) {
       case SCREEN_HOME:
         Serial.println(F("[UI] Skærm: HOME (Lumi Tamagotchi)"));
+        if (showcaseDirector.isActive()) {
+          uiPet.drawShowcaseHeader(activeShowcaseAct, activeShowcaseTitle, true);
+        }
         uiPet.updateHomeDisplay(petLogic, now, true);
         break;
 
@@ -1028,6 +1059,9 @@ void loop() {
       case SCREEN_MINIGAME_PONG:
         Serial.println(F("[UI] Skærm: SOLO PONG (Mur-Pong) startet!"));
         pongLogic.startNewGame(petLogic.getHighScorePong());
+        if (showcaseDirector.isActive()) {
+          pongLogic.serveBall();
+        }
         uiPong.drawInitialScreen(pongLogic);
         soundLed.setMoodColor(0, 220, 255);
         break;
@@ -1067,6 +1101,7 @@ void loop() {
       case SCREEN_ACTION:
         Serial.println(F("[UI] Skærm: HANDLING udføres"));
         if (showcaseDirector.isActive()) {
+          uiPet.drawShowcaseHeader(activeShowcaseAct, activeShowcaseTitle, true);
           if (showcaseDirector.getPhase() == SHOWCASE_BABY_FEED_POOP) {
             uiPet.drawActionScene(petLogic, EXPR_EATING, "MUMS: MAD!", "Lumi spiser et baer!", now);
             soundLed.setMoodColor(80, 255, 80);
@@ -1253,7 +1288,7 @@ void loop() {
       lastHatchPhase = phase;
     }
 
-    if (!petLogic.isHatching()) {
+    if (!petLogic.isHatching() && !showcaseDirector.isActive()) {
       lastHatchPhase = 0;
       storagePet.savePet(petLogic);
       syncPetStateToBackend(true);
@@ -1267,9 +1302,9 @@ void loop() {
   } else if (currentScreen == SCREEN_NAME_ENTRY) {
     uiName.drawNameEntry(nameEntry, now, false);
   } else if (currentScreen != SCREEN_CHOOSE_PLAYER && currentScreen != SCREEN_GAMES_MENU && currentScreen != SCREEN_HOUSE_MENU && currentScreen != SCREEN_WARDROBE && currentScreen != SCREEN_MEMORIAL) {
-    // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME or title splash)
+    // Normal menu modes (HOME, ACTION): update sliding top menu bar (hidden when Lumi is a ghost on HOME or during Showcase)
     if (!showcaseDirector.isActive() || showcaseDirector.getPhase() != SHOWCASE_TITLE_SPLASH) {
-      if (petLogic.isAlive() || currentScreen != SCREEN_HOME) {
+      if (!showcaseDirector.isActive() && (petLogic.isAlive() || currentScreen != SCREEN_HOME)) {
         uiMenu.drawMenuBar(menuLogic, false);
       }
 
