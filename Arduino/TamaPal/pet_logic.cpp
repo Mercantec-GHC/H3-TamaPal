@@ -212,11 +212,11 @@ void PetLogic::update(unsigned long currentTimeMs) {
   if (!alive) return; // Simulation stops if Lumi is deceased
 
   // If pet loaded with poop from SD, initialize poop timer on first active frame
-  if (hasPoop && poopTimeMs == 0) {
+  if (hasPoop && (poopTimeMs == 0 || currentTimeMs < poopTimeMs)) {
     poopTimeMs = currentTimeMs;
   }
 
-  if (!decayInitialized) {
+  if (!decayInitialized || currentTimeMs < lastDecayTimeMs) {
     lastDecayTimeMs = currentTimeMs;
     decayInitialized = true;
     return;
@@ -228,8 +228,20 @@ void PetLogic::update(unsigned long currentTimeMs) {
 
     float intervals = (float)elapsedIntervals;
     unsigned long totalTicks = (unsigned long)ageTickCount + elapsedIntervals;
-    ageMinutes += (totalTicks / 6);
+    unsigned long addedDays = totalTicks / 6;
+    ageMinutes += addedDays;
     ageTickCount = (uint8_t)(totalTicks % 6);
+
+    // Automatic lifecycle stage evolution across the 100-day lifespan (Baby -> Teen -> Adult -> Old)
+    if (addedDays > 0) {
+      if (ageMinutes >= 70 && currentStage < STAGE_OLD) {
+        currentStage = STAGE_OLD;
+      } else if (ageMinutes >= 30 && currentStage < STAGE_ADULT) {
+        currentStage = STAGE_ADULT;
+      } else if (ageMinutes >= 10 && currentStage < STAGE_TEEN) {
+        currentStage = STAGE_TEEN;
+      }
+    }
 
     if (isAsleep) {
       // Recover energy while sleeping

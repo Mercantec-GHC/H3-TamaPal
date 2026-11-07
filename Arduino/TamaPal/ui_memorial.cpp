@@ -132,9 +132,9 @@ void UiMemorialRenderer::drawRecord(uint16_t index, uint16_t totalCount, const G
   carrier->display.fillRoundRect(18, 90, 204, 106, 6, cardBg);
   carrier->display.drawRoundRect(18, 90, 204, 106, 6, cardBorder);
 
-  // Line 1 (Y = 96): Pet name, Generation pill & age
+  // Line 1 (Y = 96): Pet name, Generation pill & age in days (dage)
   char genAgeBuf[40];
-  snprintf(genAgeBuf, sizeof(genAgeBuf), "%s (GEN %u) | %lu min", record.name, (unsigned int)record.generation, (unsigned long)record.ageMinutes);
+  snprintf(genAgeBuf, sizeof(genAgeBuf), "%s (GEN %u) | %lu dage", record.name, (unsigned int)record.generation, (unsigned long)record.ageMinutes);
   int gLen = (int)strlen(genAgeBuf);
   carrier->display.setTextColor(color565(255, 220, 90));
   carrier->display.setCursor(120 - (gLen * 3), 96);

@@ -277,6 +277,11 @@ void setup() {
   // Initialize MicroSD card persistence and restore Lumi if file exists
   storagePet.begin();
   if (storagePet.loadPet(petLogic)) {
+    if (!petLogic.isAlive() && petLogic.getAgeMinutes() < 10) {
+      // Auto-recover if Lumi died prematurely under legacy fast-minute decay
+      petLogic.rebirth();
+      storagePet.savePet(petLogic);
+    }
     Serial.println(F("[STORAGE] Lumi fortsætter fra gemt tilstand på MicroSD-kort!"));
   }
 
@@ -879,8 +884,16 @@ void loop() {
   // 3. LOGIC LAYER: Advance animations and countdown timers
   bool wasAlive = petLogic.isAlive();
   menuLogic.update(now);
-  if (!showcaseDirector.isActive() || currentScreen != SCREEN_HATCHING) {
-    petLogic.update(now);
+  if (!showcaseDirector.isActive()) {
+    if (petLogic.isHatching()) {
+      petLogic.update(now); // Hatching animation completes in 2.8 real seconds
+    } else if (currentScreen == SCREEN_HOME || currentScreen == SCREEN_STATS || currentScreen == SCREEN_ACTION) {
+      // Real-time Tamagotchi biological clock: 1 virtual age unit = 1 real day (1,440x scale).
+      // Maximum lifespan = 100 days (STAGE_OLD at 100 dage), average neglected lifespan = ~10 days.
+      // Paused automatically while playing minigames or in menus so Lumi never dies in the background!
+      unsigned long bioClockMs = 10000UL + (now / 1440UL);
+      petLogic.update(bioClockMs);
+    }
   }
   soundLed.update(now);
 

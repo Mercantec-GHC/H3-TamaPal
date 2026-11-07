@@ -23,9 +23,10 @@
 // Cell item bitflags
 #define MAZE_ITEM_MASK     0xE0
 #define MAZE_ITEM_NONE     0x00
-#define MAZE_ITEM_BERRY    0x20  // Glowing Deku Berry (+bonus score & energy)
-#define MAZE_ITEM_PITFALL  0x40  // Dark pit hole (respawns ball, +5s penalty)
-#define MAZE_ITEM_ICE      0x80  // Slippery ice patch (zero friction speed-up)
+#define MAZE_ITEM_BERRY    0x20  // Glowing Deku Berry (-2s time bonus & energy)
+#define MAZE_ITEM_PITFALL  0x40  // Black Hole with gravitational pull (respawns ball, +5s penalty)
+#define MAZE_ITEM_ICE      0x80  // Narrow pinch corridor (protruding side walls requiring careful IMU steering)
+#define MAZE_ITEM_NARROW   0x80  // Alias for narrow pinch corridor
 
 // Game states
 enum MazeState : uint8_t {
