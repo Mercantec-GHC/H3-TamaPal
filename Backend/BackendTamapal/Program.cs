@@ -1,5 +1,6 @@
 using BackendTamapal.Hubs;
 using BackendTamapal.Models;
+using BackendTamapal.Services;
 
 namespace BackendTamapal
 {
@@ -13,7 +14,8 @@ namespace BackendTamapal
 
             builder.Services.AddControllers();
             builder.Services.AddSignalR();
-
+            builder.Services.AddSingleton<GameService>();
+            builder.Services.AddHostedService<GameLoop>();
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("Frontend", policy =>
