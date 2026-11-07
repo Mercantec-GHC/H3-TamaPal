@@ -73,7 +73,8 @@ private:
   char topicPetState[48];
   char clientMqttId[28];
 
-  // Boolean flags
+  // Boolean flags & backoff counter
+  uint8_t wifiFailCount;
   bool connectingState;
   bool lastReportedWifiConnected;
   bool hasPublishedFirstPacket;

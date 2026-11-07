@@ -370,15 +370,19 @@ void MazeLogic::resolveWallCollisions() {
   float cellTop    = (float)(ORIGIN_Y + row * CELL_SIZE);
   float cellBottom = cellTop + (float)CELL_SIZE;
 
-  // Collision against cell walls:
+  // Collision against cell walls (smooth sliding at low impact speed, soft bounce on fast impact):
   // North Wall
   if (grid[row][c] & MAZE_WALL_NORTH) {
     float minY = cellTop + r + 1.0f;
     if (ballY < minY) {
       ballY = minY;
       if (ballVy < 0.0f) {
-        ballVy = -ballVy * 0.2f;
-        wallCollidedFlag = true;
+        if (ballVy < -0.85f) {
+          ballVy = -ballVy * 0.2f;
+          wallCollidedFlag = true;
+        } else {
+          ballVy = 0.0f;
+        }
       }
     }
   }
@@ -389,8 +393,12 @@ void MazeLogic::resolveWallCollisions() {
     if (ballY > maxY) {
       ballY = maxY;
       if (ballVy > 0.0f) {
-        ballVy = -ballVy * 0.2f;
-        wallCollidedFlag = true;
+        if (ballVy > 0.85f) {
+          ballVy = -ballVy * 0.2f;
+          wallCollidedFlag = true;
+        } else {
+          ballVy = 0.0f;
+        }
       }
     }
   }
@@ -401,8 +409,12 @@ void MazeLogic::resolveWallCollisions() {
     if (ballX < minX) {
       ballX = minX;
       if (ballVx < 0.0f) {
-        ballVx = -ballVx * 0.2f;
-        wallCollidedFlag = true;
+        if (ballVx < -0.85f) {
+          ballVx = -ballVx * 0.2f;
+          wallCollidedFlag = true;
+        } else {
+          ballVx = 0.0f;
+        }
       }
     }
   }
@@ -413,8 +425,12 @@ void MazeLogic::resolveWallCollisions() {
     if (ballX > maxX) {
       ballX = maxX;
       if (ballVx > 0.0f) {
-        ballVx = -ballVx * 0.2f;
-        wallCollidedFlag = true;
+        if (ballVx > 0.85f) {
+          ballVx = -ballVx * 0.2f;
+          wallCollidedFlag = true;
+        } else {
+          ballVx = 0.0f;
+        }
       }
     }
   }

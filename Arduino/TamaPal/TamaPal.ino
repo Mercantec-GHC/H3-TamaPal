@@ -654,24 +654,18 @@ void loop() {
       }
     }
   } else if (currentScreen == SCREEN_MINIGAME_PONG) {
-    // Solo Wall-Pong game on Oplà:
-    if (pongLogic.getState() == PONG_STATE_READY || pongLogic.getState() == PONG_STATE_BALL_LOST) {
-      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH2)) {
-        pongLogic.serveBall();
-        lastTouchTimeMs = now;
-      } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
-        menuLogic.onButtonBack();
-        lastTouchTimeMs = now;
-      }
-    } else if (pongLogic.getState() == PONG_STATE_GAMEOVER) {
-      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && (carrier.Buttons.onTouchDown(TOUCH2) || carrier.Buttons.onTouchDown(TOUCH3))) {
+    // Solo Wall-Pong game on Oplà (100% pure button control: TOUCH0=Up, TOUCH1=Down, TOUCH2=OK/Serve, TOUCH3=Exit):
+    if (pongLogic.getState() == PONG_STATE_GAMEOVER) {
+      bool retryPressed = carrier.Buttons.onTouchDown(TOUCH2);
+      bool exitPressed  = carrier.Buttons.onTouchDown(TOUCH3);
+      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && (retryPressed || exitPressed)) {
         // Save high score and apply pet effects
         if (pongLogic.getScore() > petLogic.getHighScorePong()) {
           petLogic.setHighScorePong(pongLogic.getScore());
           storagePet.savePet(petLogic);
         }
         petLogic.applyGameReward(pongLogic.getScore());
-        uint16_t earnedBerries = pongLogic.getScore() / 5;
+        uint16_t earnedBerries = pongLogic.getScore() / 3;
         if (earnedBerries > 0) {
           petLogic.addBerries(earnedBerries);
           Serial.print(F("[BAER-PUNG] Pong sejr! +"));
@@ -680,22 +674,39 @@ void loop() {
         }
         syncPetStateToBackend(true);
 
-        menuLogic.onButtonBack(); // Return to games menu
+        if (retryPressed) {
+          // TOUCH2 (OK): Start a new round immediately
+          pongLogic.startNewGame(petLogic.getHighScorePong());
+          uiPong.drawInitialScreen(pongLogic);
+        } else {
+          // TOUCH3: Return to games menu
+          menuLogic.onButtonBack();
+        }
         lastTouchTimeMs = now;
       }
     } else {
-      // In active play: optional button paddle movement (rate-limited to 50 Hz / 20 ms)
+      // Smooth 50 Hz button paddle control in READY, BALL_LOST, and PLAYING states:
+      // TOUCH0 = Op (Up, -Y), TOUCH1 = Ned (Down, +Y)
       static unsigned long lastPaddleBtnMs = 0;
       if (now - lastPaddleBtnMs >= 20) {
         lastPaddleBtnMs = now;
         if (touch0) {
-          pongLogic.movePaddle(4.5f); // Down
+          pongLogic.movePaddle(-3.8f); // Up (Op)
         }
         if (touch1) {
-          pongLogic.movePaddle(-4.5f); // Up
+          pongLogic.movePaddle(3.8f);  // Down (Ned)
         }
       }
-      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+
+      if (pongLogic.getState() == PONG_STATE_READY || pongLogic.getState() == PONG_STATE_BALL_LOST) {
+        if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH2)) {
+          pongLogic.serveBall();
+          lastTouchTimeMs = now;
+        } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+          menuLogic.onButtonBack();
+          lastTouchTimeMs = now;
+        }
+      } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
         if (pongLogic.getScore() > 0) {
           if (pongLogic.getScore() > petLogic.getHighScorePong()) {
             petLogic.setHighScorePong(pongLogic.getScore());
@@ -707,9 +718,11 @@ void loop() {
       }
     }
   } else if (currentScreen == SCREEN_MINIGAME_MAZE) {
-    // Procedural Marble Maze: Pure 2D physical IMU tilt control (no arrow buttons)
+    // Procedural Marble Maze: 2D physical IMU tilt control + T2 Pause/Replay + T3 Menu
     if (mazeLogic.getState() == MAZE_STATE_VICTORY) {
-      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && (carrier.Buttons.onTouchDown(TOUCH2) || carrier.Buttons.onTouchDown(TOUCH3))) {
+      bool replayPressed = carrier.Buttons.onTouchDown(TOUCH2);
+      bool exitPressed   = carrier.Buttons.onTouchDown(TOUCH3);
+      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && (replayPressed || exitPressed)) {
         // Save best completion time (least seconds) to pet logic and MicroSD
         uint16_t elapsed = mazeLogic.getElapsedSeconds();
         if (petLogic.getHighScoreMaze() == 0 || elapsed < petLogic.getHighScoreMaze()) {
@@ -734,12 +747,24 @@ void loop() {
         petLogic.setVitals(newHunger, petLogic.getWarmth(), newEnergy, newHap, newDisc);
         syncPetStateToBackend(true);
 
-        menuLogic.onButtonBack(); // Return to games menu
+        if (replayPressed) {
+          // TOUCH2 (OK): Generate a brand-new procedural maze immediately
+          mazeLogic.generateMaze((uint32_t)now, petLogic.getHighScoreMaze());
+          uiMaze.drawInitialScreen(mazeLogic);
+        } else {
+          // TOUCH3: Return to games menu
+          menuLogic.onButtonBack();
+        }
         lastTouchTimeMs = now;
       }
     } else {
-      // During active play: only TOUCH3 allows early exit back to menu
-      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+      // During active play: TOUCH2 toggles Pause, TOUCH3 exits back to menu
+      if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH2)) {
+        bool shouldPause = (mazeLogic.getState() != MAZE_STATE_PAUSED);
+        mazeLogic.setPaused(shouldPause, now);
+        soundLed.playSound(SOUND_CLICK);
+        lastTouchTimeMs = now;
+      } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
         menuLogic.onButtonBack();
         lastTouchTimeMs = now;
       }
@@ -953,9 +978,10 @@ void loop() {
     }
   }
 
-  // Real-time hand petting detection via APDS-9960 proximity sensor (every 100 ms on SCREEN_HOME, paused during showcase)
+  // Real-time hand petting detection via APDS-9960 proximity sensor (every 100 ms on SCREEN_HOME, paused during button taps)
   static unsigned long lastProximityCheckMs = 0;
-  if (!showcaseDirector.isActive() && currentScreen == SCREEN_HOME && petLogic.isAlive() && (now - lastProximityCheckMs >= 100)) {
+  bool anyTouchActive = touch0 || touch1 || carrier.Buttons.getTouch(TOUCH2) || touch3 || touch4;
+  if (!showcaseDirector.isActive() && currentScreen == SCREEN_HOME && petLogic.isAlive() && !anyTouchActive && (now - lastTouchTimeMs >= 1000) && (now - lastProximityCheckMs >= 100)) {
     lastProximityCheckMs = now;
     if (carrier.Light.proximityAvailable()) {
       int prox = carrier.Light.readProximity();
@@ -1179,11 +1205,11 @@ void loop() {
 
   // 6. SCREEN-SPECIFIC RUNTIME LOOPS
   if (currentScreen == SCREEN_CONTROLLER) {
-    // 6a. Read accelerometer from IMU (IMUmodule in Carrier v2.x)
+    // 6a. Read accelerometer from IMU (negate ax so physical left tilt = negative X, right tilt = positive X)
     if (carrier.IMUmodule.accelerationAvailable()) {
       float ax = 0.0f, ay = 0.0f, az = 0.0f;
       carrier.IMUmodule.readAcceleration(ax, ay, az);
-      tiltLogic.updateAcceleration(ax, ay, az);
+      tiltLogic.updateAcceleration(-ax, ay, az);
     }
 
     // 6b. Read touch buttons for gameplay
@@ -1219,15 +1245,7 @@ void loop() {
       }
     }
 
-    // 6a. Read accelerometer for paddle tilt (only when not in showcase autopilot)
-    if (!showcaseDirector.isActive() && carrier.IMUmodule.accelerationAvailable()) {
-      float ax = 0.0f, ay = 0.0f, az = 0.0f;
-      carrier.IMUmodule.readAcceleration(ax, ay, az);
-      tiltLogic.updateAcceleration(ax, ay, az);
-      pongLogic.setPaddleTilt(tiltLogic.getTiltY());
-    }
-
-    // 6b. Step physics
+    // 6a. Step physics (Paddle is controlled purely via TOUCH0/TOUCH1 buttons, no IMU interference)
     pongLogic.update(now);
 
     // 6c. Handle sound & LEDs
@@ -1242,11 +1260,11 @@ void loop() {
     // 6d. Update display (zero-flicker delta-rendering)
     uiPong.updateDisplay(pongLogic, false);
   } else if (currentScreen == SCREEN_MINIGAME_MAZE) {
-    // 6a. Read 2D accelerometer for marble tilt physics
+    // 6a. Read 2D accelerometer for marble tilt physics (negate ax so tilting left rolls left, tilting right rolls right)
     if (carrier.IMUmodule.accelerationAvailable()) {
       float ax = 0.0f, ay = 0.0f, az = 0.0f;
       carrier.IMUmodule.readAcceleration(ax, ay, az);
-      tiltLogic.updateAcceleration(ax, ay, az);
+      tiltLogic.updateAcceleration(-ax, ay, az);
       mazeLogic.setTilt(tiltLogic.getTiltX(), tiltLogic.getTiltY());
     }
 

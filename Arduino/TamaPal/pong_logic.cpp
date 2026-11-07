@@ -10,8 +10,8 @@ PongLogic::PongLogic()
     paddleY((FIELD_TOP + FIELD_BOTTOM - PADDLE_HEIGHT) * 0.5f),
     ballX((FIELD_LEFT + FIELD_RIGHT) * 0.5f),
     ballY((FIELD_TOP + FIELD_BOTTOM) * 0.5f),
-    ballVx(2.4f),
-    ballVy(1.0f),
+    ballVx(1.60f),
+    ballVy(0.65f),
     score(0),
     highScore(0),
     lives(3),
@@ -38,10 +38,13 @@ void PongLogic::startNewGame(uint16_t existingHighScore) {
 }
 
 void PongLogic::resetBall() {
-  ballX = PADDLE_X + PADDLE_WIDTH + 6;
+  ballX = PADDLE_X + PADDLE_WIDTH + 4;
   ballY = paddleY + (PADDLE_HEIGHT - BALL_SIZE) * 0.5f;
-  ballVx = 2.4f;
-  ballVy = 1.0f;
+  // Smooth progressive base speed: starts gentle at score 0, scales slightly if respawning mid-game
+  float scoreBonus = (float)score * 0.04f;
+  if (scoreBonus > 0.70f) scoreBonus = 0.70f;
+  ballVx = 1.60f + scoreBonus;
+  ballVy = 0.65f;
 }
 
 void PongLogic::serveBall() {
@@ -97,6 +100,9 @@ void PongLogic::update(unsigned long currentTimeMs) {
   }
 
   if (state == PONG_STATE_BALL_LOST) {
+    // Keep ball positioned on paddle so player sees where next serve launches from
+    ballX = (float)(PADDLE_X + PADDLE_WIDTH + 4);
+    ballY = paddleY + (PADDLE_HEIGHT - BALL_SIZE) * 0.5f;
     if (stateTimerEndMs != 0 && currentTimeMs >= stateTimerEndMs) {
       resetBall();
       state = PONG_STATE_PLAYING;
@@ -152,15 +158,17 @@ void PongLogic::update(unsigned long currentTimeMs) {
       if (relHit < -1.0f) relHit = -1.0f;
       if (relHit > 1.0f)  relHit = 1.0f;
 
-      // Increase speed slightly with each hit (cap at 5.5f)
-      float currentSpeed = -ballVx * 1.05f;
-      if (currentSpeed > 5.5f) currentSpeed = 5.5f;
+      // Smooth progressive acceleration on each paddle hit (+6% per hit, capped at 5.0f)
+      float currentSpeed = -ballVx * 1.06f;
+      if (currentSpeed > 5.0f) currentSpeed = 5.0f;
       ballVx = currentSpeed;
 
-      // Vertical spin/angle based on hit point
-      ballVy = relHit * 2.8f;
-      if (ballVy > -0.3f && ballVy < 0.3f) {
-        ballVy = (relHit >= 0.0f) ? 0.6f : -0.6f;
+      // Vertical spin/angle proportional to current speed so early rally bounces stay smooth
+      float maxVy = currentSpeed * 0.85f;
+      if (maxVy > 2.6f) maxVy = 2.6f;
+      ballVy = relHit * maxVy;
+      if (ballVy > -0.30f && ballVy < 0.30f) {
+        ballVy = (relHit >= 0.0f) ? 0.45f : -0.45f;
       }
 
       score++;

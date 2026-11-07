@@ -35,7 +35,7 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
   // 2. Bottom controls hint
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(color565(95, 130, 175), nativeBg);
-  const char* hint = "Haeld for at rulle | T3:Exit";
+  const char* hint = "Vip kortet | T2:Pause T3:Menu";
   int hintW = strlen(hint) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 214);
   carrier->display.print(hint);
@@ -334,9 +334,9 @@ void UiMazeRenderer::drawVictoryScreen(const MazeLogic& maze) {
     carrier->display.print(buf);
   }
 
-  // 4. Dismiss Prompt
+  // 4. Replay / Dismiss Prompt
   carrier->display.setTextColor(cyanHint, modalBg);
-  const char* sub = "Tryk OK / T3: Menu";
+  const char* sub = "T2:Ny bane | T3:Menu";
   int subW = strlen(sub) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - subW) / 2, 146);
   carrier->display.print(sub);
@@ -365,6 +365,16 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
       drawVictoryScreen(maze);
       lastState = currentState;
       return;
+    }
+    if (currentState == MAZE_STATE_PAUSED) {
+      carrier->display.fillRect(90, 16, 60, 12, nativeBg);
+      carrier->display.setTextSize(1);
+      carrier->display.setTextColor(color565(255, 215, 60), nativeBg);
+      carrier->display.setCursor(93, 18);
+      carrier->display.print("PAUSE");
+    } else if (lastState == MAZE_STATE_PAUSED) {
+      lastSeconds = 9999; // Force timer redraw on resume
+      drawHud(maze, false);
     }
     if (currentState == MAZE_STATE_PITFALL_FALL) {
       drawPitfallSplash(maze.getBallX(), maze.getBallY());
@@ -416,8 +426,10 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
     }
   }
 
-  // 2. HUD Updates
-  drawHud(maze, false);
+  // 2. HUD Updates (skip while paused so "PAUSE" badge stays visible)
+  if (currentState != MAZE_STATE_PAUSED) {
+    drawHud(maze, false);
+  }
 
   // 3. Ball Delta-Rendering
   int16_t newX = (int16_t)maze.getBallX();

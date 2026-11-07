@@ -41,6 +41,7 @@ NetMqttClient::NetMqttClient()
     lastPublishTime(0),
     lastReconnectAttempt(0),
     playerId(1),
+    wifiFailCount(0),
     connectingState(false),
     lastReportedWifiConnected(false),
     hasPublishedFirstPacket(false) {
@@ -79,6 +80,8 @@ void NetMqttClient::setPlayerId(int id) {
     disconnect();
   }
   playerId = newId;
+  wifiFailCount = 0; // Reset backoff when user explicitly enters controller mode
+  lastReconnectAttempt = 0;
   snprintf(topicInput, sizeof(topicInput), "%s/opla-%d/input", MQTT_TOPIC_PREFIX, playerId);
   snprintf(topicEvent, sizeof(topicEvent), "%s/opla-%d/event", MQTT_TOPIC_PREFIX, playerId);
   snprintf(topicReward, sizeof(topicReward), "%s/opla-%d/pet/reward", MQTT_TOPIC_PREFIX, playerId);
@@ -108,6 +111,7 @@ void NetMqttClient::disconnect() {
     Serial.println(F("[MQTT] Lukker forbindelse til broker..."));
     mqttClient.stop();
   }
+  wifiFailCount = 0;
   connectingState = false;
   lastReportedWifiConnected = false;
   hasPublishedFirstPacket = false;
@@ -119,8 +123,9 @@ void NetMqttClient::attemptConnection(unsigned long now) {
     return;
   }
 
-  // Rate-limit connection attempts to avoid freezing loop()
-  if (now - lastReconnectAttempt < MQTT_RECONNECT_INTERVAL_MS) {
+  // Rate-limit connection attempts (use 20s backoff after 2 failed Wi-Fi attempts so UI never freezes)
+  unsigned long retryInterval = (wifiFailCount >= 2) ? 20000UL : MQTT_RECONNECT_INTERVAL_MS;
+  if (lastReconnectAttempt != 0 && (now - lastReconnectAttempt < retryInterval)) {
     return;
   }
   lastReconnectAttempt = now;
@@ -146,9 +151,14 @@ void NetMqttClient::attemptConnection(unsigned long now) {
     Serial.println(wifiStatusToString(wifiStatus));
 
     if (wifiStatus != WL_CONNECTED) {
+      if (wifiFailCount < 10) wifiFailCount++;
+      if (wifiFailCount >= 2) {
+        Serial.println(F("[WiFi] Tip: Hotspot ikke fundet. Venter 20s (tryk TOUCH 3 for at gaa tilbage)."));
+      }
       connectingState = false;
       return;
     }
+    wifiFailCount = 0;
     #else
     Serial.println(F("[WiFi] FEJL: Ingen arduino_secrets.h fundet!"));
     connectingState = false;

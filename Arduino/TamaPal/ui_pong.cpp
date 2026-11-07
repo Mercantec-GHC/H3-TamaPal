@@ -57,10 +57,10 @@ void UiPongRenderer::drawInitialScreen(const PongLogic& pong) {
     carrier->display.drawPixel(PongLogic::FIELD_LEFT, y, color565(180, 50, 70));
   }
 
-  // 3. Bottom controls hint
+  // 3. Bottom controls hint (pure button control: T0=Up, T1=Down, T2=OK/Serve, T3=Exit)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(hintColor, nativeBg);
-  const char* hint = "Haeld/T0,T1 | T3:Exit";
+  const char* hint = "T0:Op T1:Ned | T2:OK T3:Exit";
   int hintW = strlen(hint) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 214);
   carrier->display.print(hint);
@@ -146,12 +146,12 @@ void UiPongRenderer::drawReadyPrompt() {
   uint16_t cardBg   = color565(16, 26, 52);
   uint16_t cyanText = color565(80, 230, 255);
 
-  carrier->display.fillRoundRect(50, 110, 140, 22, 5, cardBg);
-  carrier->display.drawRoundRect(50, 110, 140, 22, 5, cyanText);
+  carrier->display.fillRoundRect(41, 110, 158, 22, 5, cardBg);
+  carrier->display.drawRoundRect(41, 110, 158, 22, 5, cyanText);
 
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(cyanText, cardBg);
-  const char* txt = "TRYK OK FOR SERVE";
+  const char* txt = "TRYK T2 (OK) FOR START";
   int txtW = strlen(txt) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - txtW) / 2, 117);
   carrier->display.print(txt);
@@ -160,7 +160,7 @@ void UiPongRenderer::drawReadyPrompt() {
 void UiPongRenderer::clearReadyPrompt() {
   if (!carrier) return;
   uint16_t nativeBg = color565(8, 12, 26);
-  carrier->display.fillRect(48, 108, 144, 26, nativeBg);
+  carrier->display.fillRect(39, 108, 162, 26, nativeBg);
 }
 
 void UiPongRenderer::drawGameOverScreen(const PongLogic& pong) {
@@ -208,9 +208,9 @@ void UiPongRenderer::drawGameOverScreen(const PongLogic& pong) {
     carrier->display.print(buf);
   }
 
-  // 4. Dismiss Prompt
+  // 4. Replay / Dismiss Prompt
   carrier->display.setTextColor(cyanHint, modalBg);
-  const char* sub = "Tryk OK for menu";
+  const char* sub = "T2:Spil igen | T3:Menu";
   int subW = strlen(sub) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - subW) / 2, 144);
   carrier->display.print(sub);
@@ -264,8 +264,8 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
   // 1. HUD updates
   drawHud(pong, false);
 
-  // 2. Ball delta-erasure & rendering
-  if (currentState != PONG_STATE_BALL_LOST) {
+  // 2. Ball delta-erasure & rendering (visible during READY, BALL_LOST, and PLAYING)
+  {
     int16_t newBallX = (int16_t)pong.getBallX();
     int16_t newBallY = (int16_t)pong.getBallY();
     if (newBallX != lastBallX || newBallY != lastBallY) {

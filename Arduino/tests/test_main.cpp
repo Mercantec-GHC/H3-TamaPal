@@ -649,11 +649,11 @@ void testSoloPongLogic() {
     pong.update(t);
     if (pong.popWallHit()) break;
   }
-  // Move paddle to bottom while ball travels high
-  pong.movePaddle(200.0f);
+  // Move paddle to opposite side from ball to guarantee miss
   bool ballLost = false;
-  for (int i = 0; i < 200; i++) {
+  for (int i = 0; i < 300; i++) {
     t += 20;
+    pong.setPaddleY(pong.getBallY() > 120.0f ? 42.0f : 170.0f);
     pong.update(t);
     if (pong.getState() == PONG_STATE_BALL_LOST) {
       ballLost = true;
@@ -671,9 +671,9 @@ void testSoloPongLogic() {
 
   // 8. Deplete remaining lives to reach Game Over
   // Miss life 2
-  pong.movePaddle(200.0f);
   for (int i = 0; i < 400; i++) {
     t += 20;
+    pong.setPaddleY(pong.getBallY() > 120.0f ? 42.0f : 170.0f);
     pong.update(t);
     if (pong.getState() == PONG_STATE_BALL_LOST) break;
   }
@@ -683,9 +683,9 @@ void testSoloPongLogic() {
   CHECK(pong.getState() == PONG_STATE_PLAYING, "Manual serve immediately resumes playing from BALL_LOST");
 
   // Miss life 3 -> Game Over
-  pong.movePaddle(200.0f);
   for (int i = 0; i < 400; i++) {
     t += 20;
+    pong.setPaddleY(pong.getBallY() > 120.0f ? 42.0f : 170.0f);
     pong.update(t);
     if (pong.getState() == PONG_STATE_GAMEOVER) break;
   }
@@ -724,13 +724,13 @@ void testSoloPongLogic() {
     sweptPong.update(st);
     if (sweptPong.popWallHit()) break;
   }
-  // Ball is returning towards paddle. Let it get near x=40
-  for (int i = 0; i < 200 && sweptPong.getBallX() > 42.0f; i++) {
+  // Ball is returning towards paddle. Let it get near x=39 (just in front of paddleRight=36)
+  for (int i = 0; i < 300 && sweptPong.getBallX() > 39.0f; i++) {
     st += 10;
     sweptPong.movePaddle(sweptPong.getBallY() - sweptPong.getPaddleY());
     sweptPong.update(st);
   }
-  // Step with large dt (60ms) where ball jumps past paddle without swept collision
+  // Step with large dt (60ms) where ball jumps across paddle face without tunneling
   st += 60;
   sweptPong.movePaddle(sweptPong.getBallY() - sweptPong.getPaddleY());
   sweptPong.update(st);
