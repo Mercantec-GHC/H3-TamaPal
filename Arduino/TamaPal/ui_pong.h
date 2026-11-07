@@ -22,16 +22,42 @@ public:
   // High-performance flicker-free frame update
   void updateDisplay(const PongLogic& pong, bool forceRedraw = false);
 
+  // Trigger wall ricochet sparks (only when ball bounces off a wall)
+  void triggerWallSparks(float ballX, float ballY, float ballVx, float ballVy);
+
+  // Trigger Lumi cheerleader celebration jump when player hits the ball
+  void triggerCheer();
+
   // Draw Game Over overlay with final score, high score, and exit prompt
   void drawGameOverScreen(const PongLogic& pong);
 
 private:
+  struct PongSpark {
+    int16_t x;
+    int16_t y;
+    int16_t prevX;
+    int16_t prevY;
+    int8_t vx;
+    int8_t vy;
+    uint8_t life;
+    uint16_t color;
+  };
+
+  static constexpr uint8_t MAX_SPARKS = 6;
+  static constexpr uint8_t TRAIL_LEN  = 3;
+
   MKRIoTCarrier* carrier;
 
   int16_t lastPaddleY;
   int16_t lastBotY;
   int16_t lastBallX;
   int16_t lastBallY;
+  int16_t trailX[TRAIL_LEN];
+  int16_t trailY[TRAIL_LEN];
+  PongSpark sparks[MAX_SPARKS];
+  uint8_t cheerTimer;
+  uint8_t lastCheerMood;
+  uint8_t lastCheerAnimTick;
   uint16_t lastScore;
   uint16_t lastHighScore;
   uint8_t lastLives;
@@ -42,6 +68,9 @@ private:
   void drawLives(uint8_t lives);
   void drawReadyPrompt();
   void clearReadyPrompt();
+  void drawCheerleaderLumi(const PongLogic& pong, bool force);
+  void updateSparks(bool& mascotOverlapped);
+  void clearFireballAndTrail();
 
   static uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);

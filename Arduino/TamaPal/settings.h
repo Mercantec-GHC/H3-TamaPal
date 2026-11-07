@@ -41,14 +41,17 @@ const unsigned long ACTION_MESSAGE_DURATION_MS = 1500;
   #define SECRET_USE_CASE false
 #endif
 
-// Capacitive touch sensitivity thresholds:
+// Capacitive touch sensitivity thresholds (uint8_t 0..255 in QTouch):
 // Lower value = MORE sensitive (for plastic case, penetrates plastic dielectric)
 // Higher value = LESS sensitive (for bare PCB, prevents hovering finger ghost taps)
-const int TOUCH_SENSITIVITY_BARE_BOARD = 200; // Bare PCB without case
-const int TOUCH_SENSITIVITY_WITH_CASE  = 60;  // Board mounted in plastic enclosure
+const int TOUCH_SENSITIVITY_BARE_BOARD = 242; // Bare PCB: requires firm skin contact, ignores air hover
+const int TOUCH_SENSITIVITY_WITH_CASE  = 75;  // Board mounted in plastic enclosure
 
 // Minimum pause between button triggers in milliseconds (prevents accidental double-taps)
 const unsigned long TOUCH_COOLDOWN_MS = 180;
+
+// First-touch contact filter for Pong paddle buttons (ignores 1-30ms air-hover spikes)
+const unsigned long PONG_BUTTON_DEBOUNCE_MS = 35;
 
 // Start with sound enabled (can be toggled at any time by pressing TOUCH0 + TOUCH4 together)
 const bool START_WITH_SOUND_MUTED = false;
