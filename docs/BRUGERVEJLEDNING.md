@@ -42,7 +42,7 @@ Brug **TOUCH0** (`<`) og **TOUCH1** (`>`) til at bladre mellem de 7 ikoner i top
    Åbner husets faciliteter:
    - **Garderobe (Skab):** Skift mellem standardtøj og varm vinterhue & halstørklæde.
    - **Sengetid (Søvn):** Lægger Lumi til at sove. Han sover uforstyrret og vågner automatisk fuld af energi ved 100%!
-   - **Mindelund (Kirkegård):** Se familietræ, rekordtider og forfædres gravsten fra MicroSD-kortet.
+   - **Mindelund (De Dødes Skov & Kirkegård):** Træd ind i den hellige skovlysning med fyrretræer, nattemåne, ildfluer og gravstene ("De Dødes Skov"). Vælg en forfader med **TOUCH0 / TOUCH1** og tryk **TOUCH2 (OK)** for at åbne deres fulde **Livscyklus og mindekrønike** (generation, dage levet, dødsårsag, arkaderekorder og gravskrift)! Tryk **TOUCH3** for at vende tilbage til skoven.
 4. 💊 **4. MEDICIN:**  
    Helbreder Lumi, hvis han er blevet forkølet eller syg.
 5. ⚡ **5. SKÆLD UD (Disciplin):**  
@@ -117,3 +117,4 @@ Fysisk vippespil baseret på Oplà-kortets indbyggede IMU-bevægelsessensor:
   Hold **TOUCH3 nede i 1.2 sekunder** på Hjem-skærmen for at slå lyden fra eller til.
 * **Livscyklus og genfødsel:**  
   Lumi lever et fuldt, langt liv (op til 100 dage). Hvis han en dag sover stille ind af alderdom, trykker du på **TOUCH2**, staver din næste generations navn på arkade-tavlen, og et nyt magisk æg klækkes med generationstæller på MicroSD!
+

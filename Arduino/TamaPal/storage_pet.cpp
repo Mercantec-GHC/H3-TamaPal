@@ -664,3 +664,32 @@ bool StoragePet::loadGraveRecord(uint16_t index, GraveRecord& outRecord) {
 #endif
 }
 
+static const uint8_t HISTORICAL_GRAVE_COUNT = 3;
+static const GraveRecord historicalGraves[HISTORICAL_GRAVE_COUNT] = {
+  { "ELDUR", 0, 95, DEATH_OLD_AGE, 28, 14, "Skovens evige stamfader." },
+  { "AURA",  0, 78, DEATH_OLD_AGE, 21, 19, "Lyste i den morkeste nat." },
+  { "FROST", 0, 62, DEATH_COLD,    16, 26, "Sover trygt i vintersneen." }
+};
+
+uint16_t StoragePet::getCemeteryCount() {
+  uint16_t userCount = getGraveRecordCount();
+  if (userCount >= HISTORICAL_GRAVE_COUNT) {
+    return userCount;
+  }
+  return HISTORICAL_GRAVE_COUNT;
+}
+
+bool StoragePet::loadCemeteryRecord(uint16_t index, GraveRecord& outRecord) {
+  uint16_t userCount = getGraveRecordCount();
+  if (index < userCount) {
+    return loadGraveRecord(index, outRecord);
+  }
+  uint16_t histIndex = index - userCount;
+  if (histIndex < HISTORICAL_GRAVE_COUNT) {
+    outRecord = historicalGraves[histIndex];
+    return true;
+  }
+  return false;
+}
+
+

@@ -51,6 +51,8 @@ public:
   void memorialNext(uint16_t totalCount);
   void memorialPrev(uint16_t totalCount);
   ScreenType getMemorialReturnScreen() const;
+  MemorialViewMode getMemorialViewMode() const;
+  void setMemorialViewMode(MemorialViewMode mode);
 
   // Periodic update for animation interpolation and auto-close timers
   void update(unsigned long currentTimeMs);
@@ -79,6 +81,7 @@ private:
   uint8_t selectedHouseOption;
   uint8_t selectedWardrobeOption;
   uint16_t memorialIndex;
+  MemorialViewMode memorialViewMode;
   int playerId;
 
   float cursorPositionX;
