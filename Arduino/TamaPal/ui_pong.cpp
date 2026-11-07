@@ -555,7 +555,9 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     cheerTimer--;
   }
 
-  bool mascotOverlapped = false;
+  bool paddleNeedsRedraw = false;
+  bool botNeedsRedraw    = false;
+  bool mascotOverlapped  = false;
 
   // State transitions
   PongState currentState = pong.getState();
@@ -563,17 +565,22 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     if (lastState == PONG_STATE_READY && currentState == PONG_STATE_PLAYING) {
       clearReadyPrompt();
       clearFireballAndTrail();
-      lastPaddleY = -1;
-      mascotOverlapped = true;
+      paddleNeedsRedraw = true;
+      botNeedsRedraw    = true;
+      mascotOverlapped  = true;
     } else if (lastState == PONG_STATE_READY) {
       clearReadyPrompt();
+      paddleNeedsRedraw = true;
+      botNeedsRedraw    = true;
     }
 
     if (currentState == PONG_STATE_READY) {
       drawReadyPrompt();
     } else if (currentState == PONG_STATE_BALL_LOST) {
       clearFireballAndTrail();
-      mascotOverlapped = true;
+      paddleNeedsRedraw = true;
+      botNeedsRedraw    = true;
+      mascotOverlapped  = true;
       // Red stadium alert ring & MISS! badge
       carrier->display.drawCircle(120, 120, 114, color565(255, 45, 60));
       carrier->display.drawCircle(120, 120, 112, color565(180, 20, 40));
@@ -599,6 +606,8 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
       for (int y = 106; y <= 134; y += 6) {
         carrier->display.drawFastVLine(120, y, 3, color565(30, 55, 95));
       }
+      paddleNeedsRedraw = true;
+      botNeedsRedraw    = true;
     }
     lastState = currentState;
   }
@@ -642,10 +651,10 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
                                   PongLogic::BALL_SIZE + 4, PongLogic::BALL_SIZE + 4, nativeBg);
 
         if (ex <= PongLogic::PADDLE_X + PongLogic::PADDLE_WIDTH + 3) {
-          lastPaddleY = -1;
+          paddleNeedsRedraw = true;
         }
         if (ex + PongLogic::BALL_SIZE + 3 >= PongLogic::FIELD_RIGHT - 4) {
-          lastBotY = -1;
+          botNeedsRedraw = true;
         }
         if (ey <= PongLogic::FIELD_TOP + 3) {
           carrier->display.drawFastHLine(PongLogic::FIELD_LEFT, PongLogic::FIELD_TOP,
@@ -722,8 +731,8 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
 
   // 6. Player Paddle (Left, cyan) delta-rendering with 1px outer glow
   int16_t newPaddleY = (int16_t)pong.getPaddleY();
-  if (newPaddleY != lastPaddleY) {
-    if (lastPaddleY != -1) {
+  if (newPaddleY != lastPaddleY || paddleNeedsRedraw) {
+    if (newPaddleY != lastPaddleY && lastPaddleY != -1) {
       carrier->display.fillRect(PongLogic::PADDLE_X - 1, lastPaddleY - 1,
                                 PongLogic::PADDLE_WIDTH + 2, PongLogic::PADDLE_HEIGHT + 2, nativeBg);
     }
@@ -746,9 +755,9 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
   if (targetBotY < minBotY) targetBotY = minBotY;
   if (targetBotY > maxBotY) targetBotY = maxBotY;
 
-  if (targetBotY != lastBotY) {
+  if (targetBotY != lastBotY || botNeedsRedraw) {
     const int16_t botX = PongLogic::FIELD_RIGHT - 2;
-    if (lastBotY != -1) {
+    if (targetBotY != lastBotY && lastBotY != -1) {
       carrier->display.fillRect(botX - 1, lastBotY - 1,
                                 PongLogic::PADDLE_WIDTH + 2, PongLogic::PADDLE_HEIGHT + 2, nativeBg);
     }
