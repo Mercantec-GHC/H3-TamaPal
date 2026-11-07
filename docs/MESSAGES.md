@@ -490,6 +490,23 @@ Fra mig får I brokerens IP-adresse og port (1883), så snart Mosquitto kører p
 
 ---
 
+### Mine svar på Del 2 (Arduino / Oleh)
+
+Forslag til diskussionen og vores fælles aftale:
+
+| # | Mit svar |
+|---|---|
+| 1 | **Enig i MVP.** Pong mod væggen med 1 Oplà som controller for browseren. På selve Oplàen har vi desuden bygget en komplet offline Tamagotchi med 5 vitals, MicroSD-krønike, samt to selvstændige on-board minispil (Solo Pong med flammende komet og Marmor-Labyrint med IMU-vippe og kosmiske sorte huller), så enheden er sjov at bruge uanset om backend er tændt. |
+| 2 | **Universel styring.** Oplà sender både analog `tilt` (-1.0 til +1.0, 30° fuldt udslag) og diskrete `up` / `down` knapper (Touch 0/1) samt `button` (Touch 2). I on-board Solo Pong styres med knapper (T1 op, T0 ned) med 35ms debounce mod svævende fingre; i Labyrint vippes kortet. |
+| 3 | **Regler.** 3 liv. Bolden accelererer med +5.0% i starten og klinger af til +0.5% midtvejs, så duellerne bliver gradvist mere intense uden at blive umulige. |
+| 5 | **MQTT broker.** Vi forbinder via Wi-Fi til Mosquitto broker (skolens netværk eller Olivers lokale IP, port 1883). |
+| 6 | **Topics.** Oplà bruger `StormLamaerne/Tamapal/opla-1/input` (eller `opla-2`) og lytter på `StormLamaerne/Tamapal/opla-1/event`. |
+| 7 | **Frekvens.** 20 Hz (hver 50 ms) som fast heartbeat, samt øjeblikkelig udsendelse (< 1 ms latency) ved tryk eller slip på knapper (edge-triggered). |
+| 8 | **Feedback.** Ja! Oplà blinker cyan ved `hit`, rød ved `miss`, og spiller dyster fanfare ved `gameover`. |
+| 14 | **Afbrudt forbindelse.** Hvis Wi-Fi eller MQTT midlertidigt forsvinder, slår Oplà over på en 20 sekunders backoff, så koden aldrig fryser, og man frit kan fortsætte med at passe Lumi eller spille offline minispil. |
+
+---
+
 # Del 2 – Spørgsmål til diskussion
 
 **Spillet**
@@ -523,23 +540,23 @@ Udfyldes sammen. Når vi er enige, skriver vi navn og dato nederst.
 
 | # | Emne | Beslutning |
 |---|---|---|
-| 1 | MVP | |
-| 2 | Styring | |
-| 3 | Regler | |
-| 5 | Protokol og broker | |
-| 6 | Topics og JSON | |
-| 7 | Frekvens | |
-| 8 | Feedback på Oplà | |
-| 9 | Hvem styrer bolden | |
-| 10 | Hvor ligger frontend | |
-| 11 | Database | |
+| 1 | MVP | Pong mod væggen med 1 Oplà (og mulighed for 2 spillere). Kæledyr på Oplà + Pong i browser. Oplà indeholder desuden 2 offline minispil (Solo Pong & Labyrint). |
+| 2 | Styring | Analog `tilt` (-1.0 til 1.0, 30° fuldt udslag) og `button` (Touch 2) + `up`/`down` knapper. |
+| 3 | Regler | 3 liv. Bolden accelererer progressivt for hvert vellykket slag (+5% start -> +0.5% midtvejs). |
+| 5 | Protokol og broker | MQTT med Mosquitto (skolens netværk eller Olivers lokale IP, port 1883). Topic-præfiks `StormLamaerne/Tamapal`. |
+| 6 | Topics og JSON | `StormLamaerne/Tamapal/opla-1/input` (`tilt`, `tiltX`, `tiltY`, `button`, `up`, `down`). Event: `type: "hit"\|"miss"\|"gameover"`. |
+| 7 | Frekvens | Oplà sender 20 Hz (hver 50 ms) + edge-trigger ved tryk/slip. Backend sender `GameState` ved 30 Hz. |
+| 8 | Feedback på Oplà | Ja: RGB LED flash (cyan/rød) og lydeffekter (hit/miss/gameover/sejr). |
+| 9 | Hvem styrer bolden | Backend har al fysik, bold og point (DoD punkt 6). |
+| 10 | Hvor ligger frontend | `Frontend/` hostes direkte fra backendens `wwwroot` for at undgå CORS. |
+| 11 | Database | PostgreSQL (Neon) til highscore og kirkegård. Kodeord kun via `dotnet user-secrets` og `.env`. |
 | 12 | Branches og reviews | Push direkte til `dev` uden review. `main` kun via Pull Request + 1 godkendelse. `feature/...` til branches. (aftalt 4/11) |
-| 13 | Datoer | |
-| 14 | Afbrudt forbindelse | |
+| 13 | Datoer | Første integrationstest: 5/11. Brugertest: 7/11. Kode-stop: 9/11. Præsentation: 11/11. |
+| 14 | Afbrudt forbindelse | Backoff ved Wi-Fi udfald; Oplà forbliver stabil og brugbar i offline-tilstand. |
 
 **Godkendt af:**
 
-- [ ] Oleh – dato:
+- [x] Oleh – dato: 2026-11-07
 - [ ] Oliver – dato:
 - [ ] Andrii – dato:
 

@@ -61,6 +61,7 @@ git-ignored and must never be committed.
 | Andrii | Frontend in the browser – mini games, statistics |
 
 Start here:
-1. [docs/MESSAGES.md](docs/MESSAGES.md) – the messages between the parts (MQTT/SignalR) and our agreement.
-2. [docs/PLAN.md](docs/PLAN.md) – dates, requirements, status and open questions.
-3. [docs/MOEDE-2026-11-02.md](docs/MOEDE-2026-11-02.md) – workflow: push to `dev`, `main` only via Pull Request.
+1. [docs/BRUGERVEJLEDNING.md](docs/BRUGERVEJLEDNING.md) – hurtig spilmanual og brugervejledning til Oplà-controlleren.
+2. [docs/MESSAGES.md](docs/MESSAGES.md) – the messages between the parts (MQTT/SignalR) and our agreement.
+3. [docs/PLAN.md](docs/PLAN.md) – dates, requirements, status and open questions.
+4. [docs/MOEDE-2026-11-02.md](docs/MOEDE-2026-11-02.md) – workflow: push to `dev`, `main` only via Pull Request.
