@@ -1,7 +1,7 @@
 import { draw } from './draw.js';
 // Where the game runs. Both files have the same functions, so only this line changes:
 // './fakeGame.js' = fake game in the browser, './network.js' = Oliver's /gamehub (SignalR)
-import { getState, startGame, updateGame, setPaddleDirection, isConnected } from './fakeGame.js';
+import { getState, startGame, updateGame, setPaddleDirection, isConnected } from './network.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
