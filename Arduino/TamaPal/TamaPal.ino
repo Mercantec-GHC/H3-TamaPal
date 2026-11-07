@@ -223,13 +223,40 @@ void processWardrobeGestures(unsigned long now, bool touch0, bool touch1, Screen
 // Non-blocking Showcase trigger gesture processing (Hold TOUCH1 + TOUCH3 for 800ms on HOME)
 static unsigned long combo13StartTime = 0;
 static bool combo13Fired = false;
+static PetLogic showcaseSavedPet;
+static bool showcaseHasSavedBackup = false;
+
+// Forward declarations
+void finishShowcaseMode(unsigned long now);
+
+void startShowcaseMode(unsigned long now) {
+  showcaseSavedPet = petLogic; // Complete snapshot of player's real pet
+  showcaseHasSavedBackup = true;
+  showcaseDirector.start(now);
+}
+
+void finishShowcaseMode(unsigned long now) {
+  showcaseDirector.stop();
+  if (showcaseHasSavedBackup) {
+    petLogic = showcaseSavedPet; // Restore player's real pet untouched!
+    showcaseHasSavedBackup = false;
+    storagePet.savePet(petLogic);
+  }
+  menuLogic.setScreen(SCREEN_HOME, now);
+  uiPet.setCelestialAura(false);
+  uiMenu.drawInitialScreen();
+  if (petLogic.isAlive()) {
+    uiMenu.drawMenuBar(menuLogic, true);
+  }
+  uiPet.updateHomeDisplay(petLogic, now, true);
+}
 
 void processShowcaseGestures(unsigned long now, bool touch1, bool touch3, ScreenType currentScreen) {
   if (currentScreen == SCREEN_HOME && touch1 && touch3 && !showcaseDirector.isActive()) {
     if (combo13StartTime == 0) {
       combo13StartTime = now;
     } else if (!combo13Fired && (now - combo13StartTime >= 800)) {
-      showcaseDirector.start(now);
+      startShowcaseMode(now);
       combo13Fired = true;
       soundLed.playSound(SOUND_REBIRTH);
       soundLed.flashColor(255, 235, 90, 800);
@@ -340,13 +367,11 @@ void loop() {
     char c = (char)Serial.read();
     if (c == 'a' || c == 'A') {
       if (!showcaseDirector.isActive()) {
-        showcaseDirector.start(now);
+        startShowcaseMode(now);
         Serial.println(F("[SHOWCASE] *** AUTONOMT SHOWCASE-TEATER STARTET (~70 SEK) ***"));
         Serial.println(F("[SHOWCASE] Saet Opla i holderen og peg telefon-kameraet mod skaermen!"));
       } else {
-        showcaseDirector.stop();
-        menuLogic.setScreen(SCREEN_HOME, now);
-        uiPet.updateHomeDisplay(petLogic, now, true);
+        finishShowcaseMode(now);
         soundLed.playSound(SOUND_CLICK);
         Serial.println(F("[SHOWCASE] Showcase afbrudt manuelt via Serial."));
       }
@@ -548,10 +573,7 @@ void loop() {
     // During autonomous showcase, human touch navigation is disabled.
     // TOUCH3 allows graceful early exit back to normal interactive home screen:
     if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
-      showcaseDirector.stop();
-      uiPet.setCelestialAura(false);
-      menuLogic.setScreen(SCREEN_HOME, now);
-      uiPet.updateHomeDisplay(petLogic, now, true);
+      finishShowcaseMode(now);
       soundLed.playSound(SOUND_CLICK);
       lastTouchTimeMs = now;
       Serial.println(F("[SHOWCASE] Afbrudt af bruger via TOUCH3."));
@@ -1001,10 +1023,7 @@ void loop() {
         } else if (now - lastSleepRechargeMs >= 2500) {
           lastSleepRechargeMs = now;
           if (petLogic.getEnergy() < 100) {
-            float nextE = (float)petLogic.getEnergy() + 2.0f;
-            if (nextE > 100.0f) nextE = 100.0f;
-            petLogic.setVitals((float)petLogic.getHunger(), (float)petLogic.getWarmth(),
-                               nextE, (float)petLogic.getHappiness(), (float)petLogic.getDiscipline());
+            petLogic.restoreSleepEnergy(2.0f);
           }
           if (sleepStartedBelowFull && petLogic.getEnergy() >= 100) {
             // Full 100% energy recovery achieved -> wake up refreshed!
@@ -1077,7 +1096,7 @@ void loop() {
     if (act.triggerBath) {
       uiPet.triggerBath(now);
     }
-    if (act.saveGrave) {
+    if (act.saveGrave && !showcaseHasSavedBackup) {
       storagePet.logGraveRecord(petLogic);
       storagePet.savePet(petLogic);
     }
@@ -1086,12 +1105,7 @@ void loop() {
         uiPet.drawTitleSplash(now);
       }
     } else if (act.phase == SHOWCASE_COMPLETED) {
-      uiPet.setCelestialAura(false);
-      uiMenu.drawInitialScreen();
-      if (petLogic.isAlive()) {
-        uiMenu.drawMenuBar(menuLogic, true);
-      }
-      uiPet.updateHomeDisplay(petLogic, now, true);
+      finishShowcaseMode(now);
     } else {
       ScreenType nextScr = menuLogic.getActiveScreen();
       if ((nextScr == SCREEN_HOME || nextScr == SCREEN_ACTION) && nextScr == previousScreen) {

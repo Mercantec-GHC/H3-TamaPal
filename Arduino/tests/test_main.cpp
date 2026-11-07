@@ -1811,6 +1811,51 @@ void testShowcaseDirector() {
   CHECK(menu.getActiveScreen() == SCREEN_HOME, "Returned safely to SCREEN_HOME");
 }
 
+void testAuditBugFixes() {
+  printf("\n--- Test: Audit Defect Resolutions (Sub-stepping, Crisis Isolation, Sleep Floats) ---\n");
+
+  // 1. Maze sub-stepping prevents wall tunneling at high dtMs
+  MazeLogic maze;
+  maze.generateMaze(12345);
+  maze.update(1000); // init
+  maze.setTilt(-1.0f, 0.0f);
+  for (int i = 0; i < 5; i++) {
+    maze.update(1000 + (i + 1) * 100);
+  }
+  CHECK(maze.getBallX() >= (float)(MazeLogic::ORIGIN_X + MazeLogic::BALL_RADIUS), "Sub-stepping stops ball inside western boundary");
+
+  // 2. Sleep energy float preservation
+  PetLogic sleepPet;
+  sleepPet.setVitals(74.8f, 82.3f, 40.5f, 65.1f, 50.0f);
+  sleepPet.restoreSleepEnergy(2.0f);
+  CHECK(sleepPet.getEnergy() == 43, "Energy restored to 42.5 -> rounded 43");
+  CHECK(sleepPet.getHunger() == 75, "Hunger preserved");
+
+  // 3. Isolated critical ticks: danger change from hunger to cold resets counter
+  PetLogic crisisPet;
+  crisisPet.setVitals(0.0f, 50.0f, 50.0f, 50.0f, 50.0f);
+  for (int i = 1; i <= 10; i++) {
+    crisisPet.update(i * 10000UL);
+  }
+  CHECK(crisisPet.isAlive(), "Pet still alive after 10 hunger ticks");
+
+  // Feed pet, now freezing cold
+  crisisPet.setVitals(100.0f, 0.0f, 50.0f, 50.0f, 50.0f);
+  crisisPet.update(11 * 10000UL);
+  crisisPet.update(12 * 10000UL);
+  CHECK(crisisPet.isAlive(), "Cold ticks started fresh and did not inherit hunger ticks!");
+
+  // 4. Old age at 100 days triggers DEATH_OLD_AGE even if hunger is 0
+  PetLogic elderPet;
+  elderPet.setStage(STAGE_OLD);
+  elderPet.setAgeMinutes(100);
+  elderPet.setVitals(0.0f, 50.0f, 50.0f, 50.0f, 50.0f);
+  elderPet.update(10000UL); // Initialize decay clock
+  elderPet.update(20000UL); // Execute decay tick
+  CHECK(!elderPet.isAlive(), "Elder pet passed away at 100 days");
+  CHECK(elderPet.getDeathCause() == DEATH_OLD_AGE, "Passed away of DEATH_OLD_AGE (not starvation)");
+}
+
 int main() {
   printf("==================================================\n");
   printf("TAMAPAL UNIT TEST RUNNER: MenuLogic & TiltLogic & PetLogic\n");
@@ -1847,6 +1892,7 @@ int main() {
   testNameEntryLogic();
   testOldAgeThreshold();
   testShowcaseDirector();
+  testAuditBugFixes();
 
   printf("\n==================================================\n");
   if (totalTestsFailed == 0) {

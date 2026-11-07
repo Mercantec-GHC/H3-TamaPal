@@ -413,12 +413,24 @@ void MazeLogic::update(unsigned long currentTimeMs) {
   if (ballVy > maxV)  ballVy = maxV;
   if (ballVy < -maxV) ballVy = -maxV;
 
-  // 3. Step movement
-  ballX += ballVx * speedFactor;
-  ballY += ballVy * speedFactor;
+  // 3. Step movement with continuous sub-stepping
+  // Prevents high-speed tunneling through walls during SPI frame latency or large dtMs
+  float totalMoveX = ballVx * speedFactor;
+  float totalMoveY = ballVy * speedFactor;
+  float maxDisplacement = fmaxf(fabsf(totalMoveX), fabsf(totalMoveY));
 
-  // 4. Resolve wall collisions with smooth corner sliding
-  resolveWallCollisions();
+  int subSteps = 1;
+  if (maxDisplacement > 2.2f) {
+    subSteps = (int)(maxDisplacement / 2.2f) + 1;
+    if (subSteps > 8) subSteps = 8;
+  }
+
+  float stepFactor = speedFactor / (float)subSteps;
+  for (int s = 0; s < subSteps; s++) {
+    ballX += ballVx * stepFactor;
+    ballY += ballVy * stepFactor;
+    resolveWallCollisions();
+  }
 
   // 5. Trigger items (Berries, Pitfalls, Victory exit)
   int c = (int)((ballX - ORIGIN_X) / CELL_SIZE);
@@ -541,13 +553,35 @@ void MazeLogic::resolveWallCollisions() {
     }
   }
 
-  // 5. Corner pillars (intersections of grid walls)
+  // 5. Corner pillars (only at true wall terminations/intersections, never in open corridors)
   const float pillarR = r + 0.4f;
   const float pillarRSq = pillarR * pillarR;
   const float cornerX[4] = { cellLeft, cellRight, cellLeft, cellRight };
   const float cornerY[4] = { cellTop, cellTop, cellBottom, cellBottom };
 
+  bool cornerHasWall[4];
+  // 0: Top-Left (cellLeft, cellTop)
+  cornerHasWall[0] = (grid[row][c] & (MAZE_WALL_NORTH | MAZE_WALL_WEST)) ||
+                     (row > 0 && (grid[row - 1][c] & MAZE_WALL_WEST)) ||
+                     (c > 0 && (grid[row][c - 1] & MAZE_WALL_NORTH));
+
+  // 1: Top-Right (cellRight, cellTop)
+  cornerHasWall[1] = (grid[row][c] & (MAZE_WALL_NORTH | MAZE_WALL_EAST)) ||
+                     (row > 0 && (grid[row - 1][c] & MAZE_WALL_EAST)) ||
+                     (c < MAZE_COLS - 1 && (grid[row][c + 1] & MAZE_WALL_NORTH));
+
+  // 2: Bottom-Left (cellLeft, cellBottom)
+  cornerHasWall[2] = (grid[row][c] & (MAZE_WALL_SOUTH | MAZE_WALL_WEST)) ||
+                     (row < MAZE_ROWS - 1 && (grid[row + 1][c] & MAZE_WALL_WEST)) ||
+                     (c > 0 && (grid[row][c - 1] & MAZE_WALL_SOUTH));
+
+  // 3: Bottom-Right (cellRight, cellBottom)
+  cornerHasWall[3] = (grid[row][c] & (MAZE_WALL_SOUTH | MAZE_WALL_EAST)) ||
+                     (row < MAZE_ROWS - 1 && (grid[row + 1][c] & MAZE_WALL_EAST)) ||
+                     (c < MAZE_COLS - 1 && (grid[row][c + 1] & MAZE_WALL_SOUTH));
+
   for (int i = 0; i < 4; i++) {
+    if (!cornerHasWall[i]) continue;
     float dx = ballX - cornerX[i];
     float dy = ballY - cornerY[i];
     float dSq = dx * dx + dy * dy;

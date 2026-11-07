@@ -43,6 +43,7 @@ void PetLogic::reset() {
   pettingActiveUntilMs = 0;
   lastPetTimeMs = 0;
   criticalTicks = 0;
+  activeCrisisCause = DEATH_NONE;
   decayInitialized = false;
   lastDecayTimeMs = 0;
   darkStartTimeMs = 0;
@@ -62,12 +63,6 @@ void PetLogic::setVitals(float hunger, float warmth, float energy, float happine
   energyVal = clamp0100(energy);
   happinessVal = clamp0100(happiness);
   disciplineVal = clamp0100(discipline);
-  if (getOverallHealth() == 0) {
-    alive = false;
-    if (deathCause == DEATH_NONE) {
-      deathCause = DEATH_HUNGER;
-    }
-  }
 }
 
 bool PetLogic::feed() {
@@ -315,42 +310,39 @@ void PetLogic::update(unsigned long currentTimeMs) {
       }
     }
 
-    // Check critical death conditions (after sustained neglected status)
-    if (hungerVal <= 0.0f) {
-      criticalTicks += (uint8_t)elapsedIntervals;
-      if (criticalTicks >= 12) { // ~2 minutes of absolute 0% hunger
-        triggerDeath(DEATH_HUNGER);
-        return;
-      }
-    } else if (warmthVal <= 0.0f) {
-      criticalTicks += (uint8_t)elapsedIntervals;
-      if (criticalTicks >= 12) { // ~2 minutes of absolute 0% warmth in freezing cold
-        triggerDeath(DEATH_COLD);
-        return;
-      }
-    } else if (isOverheating() && warmthVal >= 90.0f && happinessVal <= 0.0f) {
-      criticalTicks += (uint8_t)elapsedIntervals;
-      if (criticalTicks >= 12) { // ~2 minutes of severe heat exhaustion
-        triggerDeath(DEATH_HEAT);
-        return;
-      }
-    } else if (happinessVal <= 0.0f && energyVal < 20.0f) {
-      criticalTicks += (uint8_t)elapsedIntervals;
-      if (criticalTicks >= 18) { // ~3 minutes of absolute boredom / depression
-        triggerDeath(DEATH_BOREDOM);
-        return;
-      }
-    } else if (energyVal <= 0.0f && hungerVal < 20.0f) {
-      criticalTicks += (uint8_t)elapsedIntervals;
-      if (criticalTicks >= 12) { // ~2 minutes of complete exhaustion
-        triggerDeath(DEATH_EXHAUSTION);
-        return;
-      }
-    } else if (currentStage == STAGE_OLD && ageMinutes >= 100) {
+    // 1. Check natural old age threshold first (peaceful passing once 100 days milestone is reached)
+    if (currentStage == STAGE_OLD && ageMinutes >= 100) {
       triggerDeath(DEATH_OLD_AGE); // Peaceful old age death
       return;
-    } else {
+    }
+
+    // 2. Determine active critical crisis cause (each cause has its own dedicated counter)
+    DeathCause currentCrisis = DEATH_NONE;
+    if (hungerVal <= 0.0f) {
+      currentCrisis = DEATH_HUNGER;
+    } else if (warmthVal <= 0.0f) {
+      currentCrisis = DEATH_COLD;
+    } else if (isOverheating() && warmthVal >= 90.0f && happinessVal <= 0.0f) {
+      currentCrisis = DEATH_HEAT;
+    } else if (happinessVal <= 0.0f && energyVal < 20.0f) {
+      currentCrisis = DEATH_BOREDOM;
+    } else if (energyVal <= 0.0f && hungerVal < 20.0f) {
+      currentCrisis = DEATH_EXHAUSTION;
+    }
+
+    // If the danger changed or was resolved, reset counter so different causes never mix!
+    if (currentCrisis != activeCrisisCause) {
+      activeCrisisCause = currentCrisis;
       criticalTicks = 0;
+    }
+
+    if (activeCrisisCause != DEATH_NONE) {
+      criticalTicks += (uint8_t)elapsedIntervals;
+      uint8_t threshold = (activeCrisisCause == DEATH_BOREDOM) ? 18 : 12;
+      if (criticalTicks >= threshold) {
+        triggerDeath(activeCrisisCause);
+        return;
+      }
     }
   }
 }
@@ -426,13 +418,10 @@ const char* PetLogic::getMoodStatusDanish() const {
 }
 
 bool PetLogic::isAlive() const {
-  return alive && (getOverallHealth() > 0);
+  return alive;
 }
 
 DeathCause PetLogic::getDeathCause() const {
-  if (deathCause == DEATH_NONE && getOverallHealth() == 0) {
-    return DEATH_HUNGER;
-  }
   return deathCause;
 }
 
@@ -614,6 +603,11 @@ void PetLogic::setOutfit(PetOutfit outfit) {
 
 void PetLogic::toggleOutfit() {
   setOutfit((currentOutfit == OUTFIT_DEFAULT) ? OUTFIT_WINTER : OUTFIT_DEFAULT);
+}
+
+void PetLogic::restoreSleepEnergy(float amount) {
+  if (amount <= 0.0f) return;
+  energyVal = clamp0100(energyVal + amount);
 }
 
 void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char* petName, const char* petStage) const {

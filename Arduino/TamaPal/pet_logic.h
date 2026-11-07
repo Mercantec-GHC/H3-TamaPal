@@ -67,6 +67,7 @@ public:
   PetOutfit getOutfitEnum() const;    // Current wardrobe outfit enum
   void setOutfit(PetOutfit outfit);   // Set wardrobe outfit
   void toggleOutfit();                // Toggle between default and winter outfit
+  void restoreSleepEnergy(float amount); // Direct floating-point energy recharge during sleep
   bool isOverheating() const;         // True if wearing winter clothes while warm (> 75% or > 23.5C)
   bool needsAttention() const;        // True if any vital is below PET_CRITICAL_THRESHOLD
   const char* getMoodStatusDanish() const;
@@ -136,6 +137,7 @@ private:
   unsigned long pettingActiveUntilMs;
   unsigned long lastPetTimeMs;
   uint8_t criticalTicks;
+  DeathCause activeCrisisCause;
   bool decayInitialized;
   unsigned long lastDecayTimeMs;
   unsigned long darkStartTimeMs;
