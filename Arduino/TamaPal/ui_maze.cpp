@@ -19,7 +19,14 @@ UiMazeRenderer::UiMazeRenderer()
     lastSeconds(9999),
     lastAnimPhase(255),
     lastState(MAZE_STATE_READY),
-    isInitialized(false) {}
+    isInitialized(false) {
+  dustX[0] = -1;
+  dustX[1] = -1;
+  dustY[0] = -1;
+  dustY[1] = -1;
+  dustLife[0] = 0;
+  dustLife[1] = 0;
+}
 
 void UiMazeRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
@@ -27,34 +34,52 @@ void UiMazeRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   lastCollectedBerries = 0;
   berryBurstTimer = 0;
   berryHudFlashTimer = 0;
+  dustLife[0] = 0;
+  dustLife[1] = 0;
 }
 
 void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
   if (!carrier) return;
 
-  uint16_t nativeBg     = color565(8, 12, 26);      // Dark seamless midnight background
-  uint16_t tabletStone  = color565(18, 30, 26);     // Carved Kokiri stone tablet slab
-  uint16_t goldFiligree = color565(210, 165, 45);    // Warm antique gold filigree
-  uint16_t goldDark     = color565(120, 85, 25);     // Shaded golden rim
-  uint16_t emeraldGem   = color565(60, 240, 130);    // Glowing Kokiri emerald stud
-  uint16_t hintColor    = color565(115, 160, 140);   // Nature hint text
+  uint16_t nativeBg     = 0x0000;                   // Deep true black for maximum IPS contrast & vibrancy
+  uint16_t tabletStone  = color565(18, 30, 24);     // Carved Kokiri stone tablet slab
+  uint16_t goldFiligree = color565(235, 185, 45);   // Rich antique gold filigree
+  uint16_t goldDark     = color565(130, 90, 25);    // Shaded golden rim
+  uint16_t emeraldGem   = color565(60, 255, 140);   // Radiant Kokiri emerald stud
+  uint16_t hintColor    = color565(130, 230, 185);  // High-contrast nature hint text
 
   carrier->display.fillScreen(nativeBg);
 
   // 1. Circular ancient sanctuary rings (R = 112..114)
-  carrier->display.drawCircle(120, 120, 114, color565(18, 38, 28));
-  carrier->display.drawCircle(120, 120, 112, color565(32, 70, 50));
+  carrier->display.drawCircle(120, 120, 114, color565(20, 52, 35));
+  carrier->display.drawCircle(120, 120, 112, color565(40, 105, 65));
 
-  // 2. Ornate Kokiri Stone & Gold Tablet Frame (around 140x140 maze)
+  // 2. Fairy Motes & Sacred Runes outside the tablet frame (in dark circular corners)
+  carrier->display.drawPixel(28, 38, emeraldGem);
+  carrier->display.drawPixel(29, 38, 0xFFFF);
+  carrier->display.drawPixel(210, 36, color565(255, 225, 70));
+  carrier->display.drawPixel(211, 36, 0xFFFF);
+  carrier->display.drawPixel(30, 204, color565(255, 225, 70));
+  carrier->display.drawPixel(31, 204, 0xFFFF);
+  carrier->display.drawPixel(208, 202, emeraldGem);
+  carrier->display.drawPixel(209, 202, 0xFFFF);
+
+  // Stardust constellation specks
+  carrier->display.drawPixel(22, 75, color565(45, 120, 85));
+  carrier->display.drawPixel(218, 75, color565(45, 120, 85));
+  carrier->display.drawPixel(22, 165, color565(45, 120, 85));
+  carrier->display.drawPixel(218, 165, color565(45, 120, 85));
+
+  // 3. Ornate Kokiri Stone & Gold Tablet Frame (around 140x140 maze)
   // Outer carved stone slab (X=44..196, Y=44..196)
   carrier->display.fillRoundRect(44, 44, 152, 152, 7, tabletStone);
   carrier->display.drawRoundRect(45, 45, 150, 150, 6, goldFiligree);
   carrier->display.drawRoundRect(46, 46, 148, 148, 5, goldDark);
 
-  // Labyrinth interior ground (X=50..190, Y=50..190)
+  // Labyrinth interior ground (X=50..190, Y=50..190) in true deep black
   carrier->display.fillRect(50, 50, 140, 140, nativeBg);
 
-  // 4 Golden Corner Leaf Brackets with sparkling emerald gems
+  // 4 Golden Corner Leaf Brackets with sparkling emerald gems & white specular glints
   // Top-Left
   carrier->display.fillRect(45, 45, 6, 6, goldFiligree);
   carrier->display.drawPixel(47, 47, emeraldGem);
@@ -72,17 +97,21 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
   carrier->display.drawPixel(192, 192, emeraldGem);
   carrier->display.drawPixel(193, 192, 0xFFFF);
 
-  // 4 Cardinal Golden Clover studs on tablet border
+  // 4 Cardinal Elemental Shrine Diamonds on tablet border with specular white cuts
   carrier->display.fillCircle(120, 46, 2, goldFiligree);
+  carrier->display.drawPixel(120, 46, 0xFFFF);
   carrier->display.fillCircle(120, 193, 2, goldFiligree);
+  carrier->display.drawPixel(120, 193, 0xFFFF);
   carrier->display.fillCircle(46, 120, 2, goldFiligree);
+  carrier->display.drawPixel(46, 120, 0xFFFF);
   carrier->display.fillCircle(193, 120, 2, goldFiligree);
+  carrier->display.drawPixel(193, 120, 0xFFFF);
 
-  // 3. Draw static maze walls and floor tiles
+  // 4. Draw static maze walls and floor tiles
   drawAllWalls(maze);
   drawCellItems(maze);
 
-  // 4. Bottom controls hint (calibrated at Y=202 inside circular bottom arc)
+  // 5. Bottom controls hint (calibrated at Y=202 inside circular bottom arc)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(hintColor, nativeBg);
   const char* hint = "Vip:Rul | T2:Pause";
@@ -90,7 +119,7 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
   carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 202);
   carrier->display.print(hint);
 
-  // 5. Reset cached state and draw HUD
+  // 6. Reset cached state and draw HUD
   lastBallX   = -1;
   lastBallY   = -1;
   berryBurstX = -1;
@@ -100,12 +129,19 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
   lastBerries = 255;
   lastCollectedBerries = maze.getBerriesCollected();
   lastSeconds = 9999;
+  lastAnimPhase = 255;
+  dustX[0] = -1;
+  dustX[1] = -1;
+  dustY[0] = -1;
+  dustY[1] = -1;
+  dustLife[0] = 0;
+  dustLife[1] = 0;
   lastState   = maze.getState();
   isInitialized = true;
 
   drawHud(maze, true);
 
-  // 6. Initial draw of mini-Lumi ball
+  // 7. Initial draw of mini-Lumi ball
   drawMiniLumi((int)maze.getBallX(), (int)maze.getBallY(), 0.0f, 0.0f);
   lastBallX = (int16_t)maze.getBallX();
   lastBallY = (int16_t)maze.getBallY();
@@ -114,10 +150,11 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
 void UiMazeRenderer::drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8_t r) {
   if (!carrier || c >= MAZE_COLS || r >= MAZE_ROWS) return;
 
-  uint16_t wallHighlight = color565(95, 215, 145);  // Mossy jade sunlit edge
-  uint16_t wallBody      = color565(36, 105, 68);   // Carved moss stone block
-  uint16_t wallShadow    = color565(6, 14, 18);     // Ambient drop shadow on floor
-  uint16_t goldRivet     = color565(255, 215, 75);  // Ancient golden rune stud
+  uint16_t wallHighlight = color565(105, 245, 155); // Sunlit jade moss edge
+  uint16_t wallBody      = color565(36, 115, 75);   // Carved moss stone block
+  uint16_t wallShadow    = 0x0000;                  // Deep drop shadow on pure black floor
+  uint16_t goldRivet     = color565(255, 215, 65);  // Ancient golden rune stud
+  uint16_t ivyLeaf       = color565(145, 255, 130); // Tender ivy leaf sprout
 
   int left = MazeLogic::ORIGIN_X + c * MazeLogic::CELL_SIZE;
   int top  = MazeLogic::ORIGIN_Y + r * MazeLogic::CELL_SIZE;
@@ -128,12 +165,24 @@ void UiMazeRenderer::drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8
     carrier->display.drawFastHLine(left, top, MazeLogic::CELL_SIZE + 1, wallHighlight);
     carrier->display.drawFastHLine(left, top + 1, MazeLogic::CELL_SIZE + 1, wallBody);
     carrier->display.drawFastHLine(left + 1, top + 2, MazeLogic::CELL_SIZE - 1, wallShadow);
+
+    // Occasional ancient ivy sprout on north wall
+    if (((c + r * 3) & 3) == 1 && c > 0 && c < MAZE_COLS - 1) {
+      carrier->display.drawPixel(left + 7, top + 2, ivyLeaf);
+      carrier->display.drawPixel(left + 8, top + 3, ivyLeaf);
+    }
   }
   // West wall (3px solid carved stone + drop shadow)
   if (cell & MAZE_WALL_WEST) {
     carrier->display.drawFastVLine(left, top, MazeLogic::CELL_SIZE + 1, wallHighlight);
     carrier->display.drawFastVLine(left + 1, top, MazeLogic::CELL_SIZE + 1, wallBody);
     carrier->display.drawFastVLine(left + 2, top + 1, MazeLogic::CELL_SIZE - 1, wallShadow);
+
+    // Occasional ancient ivy sprout on west wall
+    if (((c * 2 + r) & 3) == 2 && r > 0 && r < MAZE_ROWS - 1) {
+      carrier->display.drawPixel(left + 2, top + 7, ivyLeaf);
+      carrier->display.drawPixel(left + 3, top + 8, ivyLeaf);
+    }
   }
   // East wall (2px solid carved stone)
   if (cell & MAZE_WALL_EAST) {
@@ -146,7 +195,7 @@ void UiMazeRenderer::drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8
     carrier->display.drawFastHLine(left, top + MazeLogic::CELL_SIZE - 1, MazeLogic::CELL_SIZE + 1, wallBody);
   }
 
-  // Corner Carved Capstone Pillars (at junction points where walls meet)
+  // Corner Carved Capstone Pillars (at junction points where walls meet) with golden rune rivets & white glint
   if (cell & (MAZE_WALL_NORTH | MAZE_WALL_WEST)) {
     carrier->display.fillRect(left - 1, top - 1, 3, 3, wallBody);
     carrier->display.drawPixel(left - 1, top - 1, wallHighlight);
@@ -170,15 +219,14 @@ void UiMazeRenderer::drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8
 
   // Narrow Ice/Crystal Pinch Passage (MAZE_ITEM_ICE): glacial blue ledges with frost notches
   if (cell & MAZE_ITEM_ICE) {
-    uint16_t iceFill  = color565(35, 135, 215);
-    uint16_t iceEdge  = color565(180, 245, 255);
+    uint16_t iceFill  = color565(35, 145, 230);
+    uint16_t iceEdge  = color565(190, 250, 255);
     uint16_t iceGleam = 0xFFFF;
     if ((cell & MAZE_WALL_NORTH) && (cell & MAZE_WALL_SOUTH)) {
       carrier->display.fillRect(left + 2, top + 2, MazeLogic::CELL_SIZE - 3, 2, iceFill);
       carrier->display.drawFastHLine(left + 2, top + 4, MazeLogic::CELL_SIZE - 3, iceEdge);
       carrier->display.fillRect(left + 2, top + MazeLogic::CELL_SIZE - 3, MazeLogic::CELL_SIZE - 3, 2, iceFill);
       carrier->display.drawFastHLine(left + 2, top + MazeLogic::CELL_SIZE - 4, MazeLogic::CELL_SIZE - 3, iceEdge);
-      // Crystalline diagonal frost notches
       carrier->display.drawPixel(left + 6,  top + 3, iceGleam);
       carrier->display.drawPixel(left + 12, top + 4, iceGleam);
       carrier->display.drawPixel(left + 8,  top + MazeLogic::CELL_SIZE - 3, iceGleam);
@@ -188,7 +236,6 @@ void UiMazeRenderer::drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8
       carrier->display.drawFastVLine(left + 4, top + 2, MazeLogic::CELL_SIZE - 3, iceEdge);
       carrier->display.fillRect(left + MazeLogic::CELL_SIZE - 3, top + 2, 2, MazeLogic::CELL_SIZE - 3, iceFill);
       carrier->display.drawFastVLine(left + MazeLogic::CELL_SIZE - 4, top + 2, MazeLogic::CELL_SIZE - 3, iceEdge);
-      // Crystalline diagonal frost notches
       carrier->display.drawPixel(left + 3, top + 6,  iceGleam);
       carrier->display.drawPixel(left + 4, top + 12, iceGleam);
       carrier->display.drawPixel(left + MazeLogic::CELL_SIZE - 3, top + 8,  iceGleam);
@@ -208,11 +255,11 @@ void UiMazeRenderer::drawAllWalls(const MazeLogic& maze) {
 void UiMazeRenderer::drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8_t r) {
   if (!carrier || c >= MAZE_COLS || r >= MAZE_ROWS) return;
 
-  uint16_t berryRed     = color565(255, 60, 90);
-  uint16_t berryYellow  = color565(255, 220, 60);
-  uint16_t berryGreen   = color565(60, 220, 90);
-  uint16_t bhHorizon    = color565(195, 60, 255);
-  uint16_t bhCore       = color565(2, 2, 6);
+  uint16_t berryRed     = color565(255, 35, 75);    // Candy ruby red
+  uint16_t berryYellow  = color565(255, 225, 70);   // Golden seed
+  uint16_t berryGreen   = color565(60, 240, 100);   // Fresh emerald leaflet
+  uint16_t bhHorizon    = color565(210, 60, 255);   // Electric neon violet
+  uint16_t bhCore       = 0x0000;                   // Deep space singularity
   uint16_t portalGold   = color565(255, 215, 50);
 
   int left = MazeLogic::ORIGIN_X + c * MazeLogic::CELL_SIZE;
@@ -221,64 +268,92 @@ void UiMazeRenderer::drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8
   int cy   = top  + MazeLogic::CELL_SIZE / 2;
   uint8_t cell = maze.getCell(c, r);
 
-  // 0. Ancient stone tile flagstone clover motif in plain hallway cells
+  // 0. Hallways and Dead-Ends Decor
   if (!(cell & (MAZE_ITEM_BERRY | MAZE_ITEM_PITFALL)) && !(c == 0 && r == 0) && !(c == MAZE_COLS - 1 && r == MAZE_ROWS - 1)) {
-    carrier->display.drawPixel(cx, cy, color565(26, 44, 36));
-    carrier->display.drawPixel(cx - 2, cy, color565(16, 26, 22));
-    carrier->display.drawPixel(cx + 2, cy, color565(16, 26, 22));
-    carrier->display.drawPixel(cx, cy - 2, color565(16, 26, 22));
-    carrier->display.drawPixel(cx, cy + 2, color565(16, 26, 22));
+    uint8_t walls = 0;
+    if (cell & MAZE_WALL_NORTH) walls++;
+    if (cell & MAZE_WALL_SOUTH) walls++;
+    if (cell & MAZE_WALL_WEST)  walls++;
+    if (cell & MAZE_WALL_EAST)  walls++;
+
+    if (walls >= 3) {
+      // DEAD-END: Bioluminescent Fairy Mushroom!
+      uint16_t shroomCap = ((c + r) & 1) ? color565(40, 235, 255) : color565(230, 120, 255);
+      uint16_t shroomGlow= ((c + r) & 1) ? color565(12, 60, 75) : color565(65, 20, 75);
+      // Soft ambient ground glow
+      carrier->display.drawPixel(cx - 2, cy + 2, shroomGlow);
+      carrier->display.drawPixel(cx + 2, cy + 2, shroomGlow);
+      // Cream stem
+      carrier->display.drawFastVLine(cx, cy + 1, 2, color565(240, 245, 230));
+      // Glowing cap with specular glint
+      carrier->display.drawFastHLine(cx - 1, cy, 3, shroomCap);
+      carrier->display.drawPixel(cx, cy - 1, shroomCap);
+      carrier->display.drawPixel(cx - 1, cy, 0xFFFF); // Dewdrop glint on cap
+    } else {
+      // OPEN HALLWAY: Ancient Temple Flagstone Clover Tile
+      carrier->display.drawPixel(cx, cy, color565(32, 55, 45));
+      carrier->display.drawPixel(cx - 2, cy, color565(18, 32, 26));
+      carrier->display.drawPixel(cx + 2, cy, color565(18, 32, 26));
+      carrier->display.drawPixel(cx - 2, cy - 2, color565(18, 32, 26));
+      carrier->display.drawPixel(cx + 2, cy + 2, color565(18, 32, 26));
+    }
   }
 
-  // 1. Plump Deku Berry item
+  // 1. Plump Deku Berry with Crystal Dewdrop Gleam
   if (cell & MAZE_ITEM_BERRY) {
     carrier->display.fillCircle(cx, cy + 1, 4, berryRed);
+    // Crystal dewdrop specular shine
+    carrier->display.drawPixel(cx - 2, cy - 1, 0xFFFF);
     carrier->display.drawPixel(cx - 1, cy, berryYellow);
     carrier->display.drawPixel(cx + 1, cy + 1, berryYellow);
+    carrier->display.drawPixel(cx, cy + 2, color565(190, 20, 50));
+    // Leaf crown
     carrier->display.drawPixel(cx, cy - 3, berryGreen);
     carrier->display.drawPixel(cx - 1, cy - 4, berryGreen);
     carrier->display.drawPixel(cx + 1, cy - 4, berryGreen);
   }
 
-  // 2. Cosmic Black Hole (MAZE_ITEM_PITFALL) with pulsating gravitational accretion vortex
+  // 2. Cosmic Black Hole (Abyss Vortex) with twisting gravitational accretion particles
   if (cell & MAZE_ITEM_PITFALL) {
     uint8_t pulse = (uint8_t)((millis() / 180) % 3);
-    uint16_t outerRing = (pulse == 0) ? color565(110, 30, 175) : ((pulse == 1) ? color565(80, 20, 135) : color565(140, 45, 215));
+    uint16_t outerRing = (pulse == 0) ? color565(120, 35, 185) : ((pulse == 1) ? color565(85, 22, 145) : color565(160, 50, 235));
     carrier->display.drawCircle(cx, cy, 7, outerRing);
     carrier->display.drawCircle(cx, cy, 5, bhHorizon);
-    carrier->display.fillCircle(cx, cy, 4, bhCore);
-    // Swirling accretion disk particles that rotate with pulse!
+    carrier->display.fillCircle(cx, cy, 4, bhCore); // Deep singularity
+    // Swirling accretion disk particles
     int8_t sOffset[3][4] = {
       { -6, -3,  6,  3 },
       { -3, -6,  3,  6 },
       { -5,  4,  5, -4 }
     };
     carrier->display.drawPixel(cx + sOffset[pulse][0], cy + sOffset[pulse][1], bhHorizon);
-    carrier->display.drawPixel(cx + sOffset[pulse][2], cy + sOffset[pulse][3], color565(245, 175, 255));
+    carrier->display.drawPixel(cx + sOffset[pulse][2], cy + sOffset[pulse][3], color565(255, 190, 255));
+    carrier->display.drawPixel(cx + sOffset[pulse][2] / 2, cy + sOffset[pulse][3] / 2, 0xFFFF);
   }
 
   // 3. Start marker at (0, 0): Golden Kokiri Leaf & Compass Seal
   if (c == 0 && r == 0) {
-    carrier->display.drawCircle(cx, cy, 6, color565(210, 165, 45));
-    carrier->display.drawCircle(cx, cy, 4, color565(55, 215, 115));
+    carrier->display.drawCircle(cx, cy, 6, color565(225, 175, 50));
+    carrier->display.drawCircle(cx, cy, 4, color565(60, 230, 125));
     carrier->display.drawPixel(cx, cy, 0xFFFF);
-    carrier->display.drawPixel(cx, cy - 2, color565(255, 230, 80));
-    carrier->display.drawPixel(cx - 2, cy + 1, color565(255, 230, 80));
-    carrier->display.drawPixel(cx + 2, cy + 1, color565(255, 230, 80));
+    carrier->display.drawPixel(cx, cy - 2, color565(255, 240, 90));
+    carrier->display.drawPixel(cx - 2, cy + 1, color565(255, 240, 90));
+    carrier->display.drawPixel(cx + 2, cy + 1, color565(255, 240, 90));
   }
 
   // 4. Stargate Exit Portal at (6, 6)
   if (c == MAZE_COLS - 1 && r == MAZE_ROWS - 1) {
     uint8_t pSpin = (uint8_t)((millis() / 200) % 4);
-    uint16_t portalRing = (pSpin & 1) ? color565(255, 220, 60) : color565(80, 245, 180);
+    uint16_t portalRing = (pSpin & 1) ? color565(255, 225, 65) : color565(85, 255, 195);
     carrier->display.drawCircle(cx, cy, 8, portalRing);
-    carrier->display.drawCircle(cx, cy, 6, color565(210, 160, 30));
+    carrier->display.drawCircle(cx, cy, 6, color565(220, 170, 35));
     carrier->display.fillCircle(cx, cy, 4, portalGold);
     carrier->display.drawPixel(cx, cy, 0xFFFF);
-    // Twinkling stars at 4 quadrants
+    // Radiant star rays
     int8_t starX[4] = { 0, 3, 0, -3 };
     int8_t starY[4] = { -3, 0, 3, 0 };
     carrier->display.drawPixel(cx + starX[pSpin], cy + starY[pSpin], 0xFFFF);
+    carrier->display.drawPixel(cx + starX[(pSpin + 2) % 4], cy + starY[(pSpin + 2) % 4], 0xFFFF);
   }
 }
 
@@ -314,21 +389,22 @@ void UiMazeRenderer::repairMazeRegion(const MazeLogic& maze, int16_t centerPxX, 
 void UiMazeRenderer::drawHud(const MazeLogic& maze, bool force) {
   if (!carrier) return;
 
-  uint16_t nativeBg   = color565(8, 12, 26);
-  uint16_t berryPink  = color565(255, 110, 140);
-  uint16_t timeCyan   = color565(210, 245, 255);
+  uint16_t nativeBg   = 0x0000;
+  uint16_t berryPink  = color565(255, 60, 110);
+  uint16_t timeCyan   = color565(90, 240, 255);
   uint16_t goldRecord = color565(255, 215, 60);
 
   // 1. Berries counter with pixel-art berry icon (Left, X=52, Y=31)
   if (force || maze.getBerriesCollected() != lastBerries || berryHudFlashTimer > 0) {
     carrier->display.fillRect(52, 28, 44, 14, nativeBg);
 
-    // Pixel-art Deku Berry icon (5x6 px)
-    carrier->display.drawPixel(55, 29, color565(60, 220, 90)); // Sprout leaf
-    carrier->display.drawPixel(56, 29, color565(60, 220, 90));
-    carrier->display.fillRect(54, 30, 4, 3, color565(255, 55, 85)); // Strawberry body
-    carrier->display.drawPixel(55, 33, color565(255, 55, 85));
-    carrier->display.drawPixel(56, 33, color565(255, 55, 85));
+    // Pixel-art Deku Berry icon (5x6 px) with crystal dewdrop
+    carrier->display.drawPixel(55, 29, color565(60, 240, 100)); // Sprout leaf
+    carrier->display.drawPixel(56, 29, color565(60, 240, 100));
+    carrier->display.fillRect(54, 30, 4, 3, color565(255, 35, 75)); // Ruby strawberry body
+    carrier->display.drawPixel(55, 33, color565(255, 35, 75));
+    carrier->display.drawPixel(56, 33, color565(255, 35, 75));
+    carrier->display.drawPixel(54, 30, 0xFFFF);                  // Dewdrop glint
     carrier->display.drawPixel(55, 31, color565(255, 225, 75)); // Golden seed gleam
 
     carrier->display.setTextSize(1);
@@ -346,8 +422,8 @@ void UiMazeRenderer::drawHud(const MazeLogic& maze, bool force) {
   if (force || currentSec != lastSeconds) {
     carrier->display.fillRect(96, 28, 46, 14, nativeBg);
 
-    // Tiny 5x5 clock icon
-    carrier->display.drawCircle(99, 34, 3, color565(120, 185, 235));
+    // Tiny 5x5 clock icon with specular cut
+    carrier->display.drawCircle(99, 34, 3, color565(80, 220, 255));
     carrier->display.drawPixel(99, 34, 0xFFFF);
     carrier->display.drawPixel(100, 34, 0xFFFF);
 
@@ -391,7 +467,7 @@ void UiMazeRenderer::animateHazardsAndPortal(const MazeLogic& maze, uint8_t phas
 
   int ballC = ((int)maze.getBallX() - MazeLogic::ORIGIN_X) / MazeLogic::CELL_SIZE;
   int ballR = ((int)maze.getBallY() - MazeLogic::ORIGIN_Y) / MazeLogic::CELL_SIZE;
-  uint16_t nativeBg = color565(8, 12, 26);
+  uint16_t nativeBg = 0x0000;
 
   for (uint8_t r = 0; r < MAZE_ROWS; r++) {
     for (uint8_t c = 0; c < MAZE_COLS; c++) {
@@ -419,48 +495,68 @@ void UiMazeRenderer::animateHazardsAndPortal(const MazeLogic& maze, uint8_t phas
 void UiMazeRenderer::drawMiniLumi(int x, int y, float vx, float vy) {
   if (!carrier) return;
 
-  uint16_t lumiMint   = color565(110, 245, 150); // Vibrant mint body
-  uint16_t lumiShade  = color565(28, 135, 70);   // 3D bottom shading
-  uint16_t sproutGold = color565(255, 220, 60);
-  uint16_t blushPink  = color565(255, 115, 155); // Rosy anime blush
+  uint16_t lumiLime   = color565(85, 255, 140);  // Vivid candy lime body
+  uint16_t lumiShade  = color565(18, 115, 55);   // Deep 3D emerald shade
+  uint16_t sproutGold = color565(255, 225, 60);  // Golden sprout stalk
+  uint16_t blushPink  = color565(255, 105, 155); // Rosy anime blush
+  uint16_t glassWhite = 0xFFFF;                  // Specular glint
 
-  // Spherical shaded mochi body (radius 4)
-  carrier->display.fillCircle(x, y, 4, lumiMint);
-  // Bottom-right 3D shadow contour
+  // 1. Fairy Dust Trail: update and render dust particles when moving fast
+  float speedSq = (vx * vx) + (vy * vy);
+  if (speedSq > 0.08f) {
+    for (uint8_t d = 0; d < 2; d++) {
+      if (dustLife[d] == 0) {
+        dustX[d] = x - (int16_t)(vx * 2.8f) + ((d == 0) ? -1 : 1);
+        dustY[d] = y - (int16_t)(vy * 2.8f) + ((d == 0) ? 1 : -1);
+        dustLife[d] = 2;
+        break;
+      }
+    }
+  }
+
+  for (uint8_t d = 0; d < 2; d++) {
+    if (dustLife[d] > 0) {
+      uint16_t dustCol = (dustLife[d] == 2) ? color565(255, 235, 90) : color565(90, 245, 175);
+      carrier->display.drawPixel(dustX[d], dustY[d], dustCol);
+      if (dustLife[d] == 2) {
+        carrier->display.drawPixel(dustX[d], dustY[d] - 1, glassWhite);
+      }
+      dustLife[d]--;
+    }
+  }
+
+  // 2. Spherical 3D Mochi Body (Radius 4)
+  carrier->display.fillCircle(x, y, 4, lumiLime);
   carrier->display.drawCircle(x, y, 4, lumiShade);
 
-  // Glossy spherical shine (glass reflection)
-  carrier->display.drawPixel(x - 2, y - 2, 0xFFFF);
-  carrier->display.drawPixel(x - 1, y - 2, color565(210, 255, 230));
+  // 3. Dynamic Interactive Specular Highlight (shifts relative to tilt / velocity)
+  int hlDx = (vx > 0.15f) ? -1 : ((vx < -0.15f) ? 1 : 0);
+  int hlDy = (vy > 0.15f) ? -1 : ((vy < -0.15f) ? 1 : 0);
+  carrier->display.drawPixel(x - 2 + hlDx, y - 2 + hlDy, glassWhite);
+  carrier->display.drawPixel(x - 1 + hlDx, y - 2 + hlDy, color565(210, 255, 235));
 
-  // Directional highlight gleam on Lumi's head
-  int hlDx = (vx > 0.2f) ? 1 : ((vx < -0.2f) ? -1 : 0);
-  int hlDy = (vy > 0.2f) ? 1 : ((vy < -0.2f) ? -1 : 0);
-  carrier->display.drawPixel(x + hlDx, y - 3 + hlDy, 0xFFFF);
-
-  // Cute spirit leaf ears on sides
+  // 4. Cute Spirit Leaf Ears on sides
   carrier->display.drawPixel(x - 4, y - 2, lumiShade);
-  carrier->display.drawPixel(x - 4, y - 3, lumiMint);
+  carrier->display.drawPixel(x - 4, y - 3, lumiLime);
   carrier->display.drawPixel(x + 4, y - 2, lumiShade);
-  carrier->display.drawPixel(x + 4, y - 3, lumiMint);
+  carrier->display.drawPixel(x + 4, y - 3, lumiLime);
 
-  // Golden Sprout on top: sweeps back against movement velocity
-  int sproutDx = (vx > 0.4f) ? -1 : ((vx < -0.4f) ? 1 : 0);
-  int sproutDy = (vy > 0.4f) ? -1 : 0;
+  // 5. Golden Sprout on top: sweeps back against movement velocity
+  int sproutDx = (vx > 0.35f) ? -1 : ((vx < -0.35f) ? 1 : 0);
+  int sproutDy = (vy > 0.35f) ? -1 : 0;
   carrier->display.drawFastVLine(x, y - 6, 2, sproutGold);
   carrier->display.drawPixel(x + sproutDx, y - 7 + sproutDy, sproutGold);
-  carrier->display.drawPixel(x + sproutDx * 2, y - 8 + sproutDy, color565(255, 245, 130));
+  carrier->display.drawPixel(x + sproutDx * 2, y - 8 + sproutDy, color565(255, 245, 140));
 
-  // Determine emotional state: speed > 0.45 or rolling fast = Panicked/Shocked expression!
-  float speedSq = (vx * vx) + (vy * vy);
+  // 6. Facial Expressions (Anime eyes, blush, panic :O)
   bool isShocked = (speedSq > 0.35f);
 
   if (isShocked) {
     // SHOCKED / PANICKED: Wide white anime eyes with tiny dilated pupils & open mouth ":O"
-    carrier->display.drawPixel(x - 2, y - 2, 0xFFFF);
-    carrier->display.drawPixel(x - 2, y - 1, 0xFFFF);
-    carrier->display.drawPixel(x + 2, y - 2, 0xFFFF);
-    carrier->display.drawPixel(x + 2, y - 1, 0xFFFF);
+    carrier->display.drawPixel(x - 2, y - 2, glassWhite);
+    carrier->display.drawPixel(x - 2, y - 1, glassWhite);
+    carrier->display.drawPixel(x + 2, y - 2, glassWhite);
+    carrier->display.drawPixel(x + 2, y - 1, glassWhite);
 
     int eyeDx = (vx > 0.2f) ? 1 : ((vx < -0.2f) ? -1 : 0);
     int eyeDy = (vy > 0.2f) ? 1 : ((vy < -0.2f) ? -1 : 0);
@@ -469,7 +565,7 @@ void UiMazeRenderer::drawMiniLumi(int x, int y, float vx, float vy) {
 
     // Open gasping mouth in the center
     carrier->display.drawPixel(x, y + 1, 0x0000);
-    carrier->display.drawPixel(x, y + 2, color565(255, 70, 90));
+    carrier->display.drawPixel(x, y + 2, color565(255, 60, 90));
 
     // Rosy panic blush
     carrier->display.drawPixel(x - 3, y + 1, blushPink);
@@ -481,8 +577,8 @@ void UiMazeRenderer::drawMiniLumi(int x, int y, float vx, float vy) {
 
     carrier->display.drawPixel(x - 2 + eyeDx, y - 1 + eyeDy, 0x0000);
     carrier->display.drawPixel(x + 2 + eyeDx, y - 1 + eyeDy, 0x0000);
-    carrier->display.drawPixel(x - 2 + eyeDx, y - 2 + eyeDy, 0xFFFF); // gleam
-    carrier->display.drawPixel(x + 2 + eyeDx, y - 2 + eyeDy, 0xFFFF);
+    carrier->display.drawPixel(x - 2 + eyeDx, y - 2 + eyeDy, glassWhite); // Specular gleam
+    carrier->display.drawPixel(x + 2 + eyeDx, y - 2 + eyeDy, glassWhite);
 
     // Cute tiny smile
     carrier->display.drawPixel(x, y + 1, 0x0000);
@@ -525,9 +621,16 @@ void UiMazeRenderer::eraseMiniLumi(int x, int y, const MazeLogic& maze) {
   (void)maze;
   if (!carrier) return;
 
-  uint16_t nativeBg = color565(8, 12, 26);
-  // Clear 13x16 box covering ball, ears, and sprout with base floor color
-  carrier->display.fillRect(x - 6, y - 9, 13, 16, nativeBg);
+  uint16_t nativeBg = 0x0000;
+  // Clear 15x18 box covering ball, ears, and sprout with base floor color
+  carrier->display.fillRect(x - 7, y - 9, 15, 18, nativeBg);
+
+  // Erase fairy dust particles
+  for (uint8_t d = 0; d < 2; d++) {
+    if (dustLife[d] > 0 && dustX[d] != -1 && dustY[d] != -1) {
+      carrier->display.fillRect(dustX[d] - 1, dustY[d] - 1, 3, 3, nativeBg);
+    }
+  }
 }
 
 void UiMazeRenderer::drawVictoryScreen(const MazeLogic& maze) {
@@ -598,7 +701,7 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
     drawInitialScreen(maze);
   }
 
-  uint16_t nativeBg = color565(8, 12, 26);
+  uint16_t nativeBg = 0x0000;
   MazeState currentState = maze.getState();
   if (currentState != lastState) {
     if (currentState == MAZE_STATE_VICTORY) {
@@ -620,10 +723,10 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
 
       // Restore bottom hint on resume: Vip:Rul | T2:Pause
       carrier->display.fillRect(30, 194, 180, 14, nativeBg);
-      carrier->display.setTextColor(color565(95, 130, 175), nativeBg);
+      carrier->display.setTextColor(color565(130, 230, 185), nativeBg);
       const char* rHint = "Vip:Rul | T2:Pause";
       int rW = strlen(rHint) * 6;
-      carrier->display.setCursor((SCREEN_WIDTH - rW) / 2, 196);
+      carrier->display.setCursor((SCREEN_WIDTH - rW) / 2, 202);
       carrier->display.print(rHint);
     }
     if (currentState == MAZE_STATE_PITFALL_FALL) {

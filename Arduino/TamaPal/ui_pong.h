@@ -66,6 +66,10 @@ private:
   uint8_t lastLives;
   uint8_t scoreFlashTimer;
   uint8_t missFlashTimer;
+  uint8_t paddleFlashTimer;
+  int16_t wallRippleX;
+  int16_t wallRippleY;
+  uint8_t wallRippleTimer;
   PongState lastState;
   bool isInitialized;
 

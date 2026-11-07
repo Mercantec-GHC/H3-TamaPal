@@ -41,6 +41,9 @@ private:
   uint8_t lastCollectedBerries;
   uint16_t lastSeconds;
   uint8_t lastAnimPhase;
+  int16_t dustX[2];
+  int16_t dustY[2];
+  uint8_t dustLife[2];
   MazeState lastState;
   bool isInitialized;
 
