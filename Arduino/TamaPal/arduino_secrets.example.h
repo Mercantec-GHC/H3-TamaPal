@@ -14,5 +14,8 @@
 #define SECRET_MQTT_USER ""
 #define SECRET_MQTT_PASS ""
 
+// Set to true if YOUR physical board is mounted inside the plastic case (false for bare board):
+#define SECRET_USE_CASE false
+
 #endif // ARDUINO_SECRETS_H
 

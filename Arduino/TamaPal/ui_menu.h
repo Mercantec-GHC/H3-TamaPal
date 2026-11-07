@@ -22,9 +22,15 @@ public:
   // Draw or update the top menu bar (flicker-free dirty updates)
   void drawMenuBar(const MenuLogic& menu, bool forceRedrawAll);
 
+  // Games selection menu
+  void drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore, bool fullRedraw = true);
+
+  // House menu & Wardrobe selection screens
+  void drawHouseMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool isSleeping, bool fullRedraw = true);
+  void drawWardrobeMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool fullRedraw = true);
+
   // Helper screens
   void drawPlaceholderScreen(const char* title, const char* hint);
-  void drawChoosePlayerScreen();
 
 private:
   MKRIoTCarrier* carrier;
@@ -34,9 +40,11 @@ private:
   ScreenType lastDrawnScreen;
   bool isMenuInitialized;
 
-  // Vector drawing helpers for the 5 icons
+  // Vector drawing helpers for the 7 icons
   void drawIconFood(int centerX, int centerY, bool isSelected);
   void drawIconPlay(int centerX, int centerY, bool isSelected);
+  void drawIconHouse(int centerX, int centerY, bool isSelected);
+  void drawIconMedicin(int centerX, int centerY, bool isSelected);
   void drawIconScold(int centerX, int centerY, bool isSelected);
   void drawIconStats(int centerX, int centerY, bool isSelected);
   void drawIconConnect(int centerX, int centerY, bool isSelected);

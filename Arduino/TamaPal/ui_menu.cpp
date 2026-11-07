@@ -33,9 +33,9 @@ void UiMenuRenderer::drawInitialScreen() {
   // Touch button guide at the bottom of the screen (tightly centered so round bezel won't cut it off)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(color565(110, 140, 190));
-  carrier->display.setCursor(72, 206);
+  carrier->display.setCursor(72, 202);
   carrier->display.print("T0:<  T1:>  T2:OK");
-  carrier->display.setCursor(69, 218);
+  carrier->display.setCursor(69, 213);
   carrier->display.print("T3:Tilb  T4:Stats");
 }
 
@@ -107,7 +107,66 @@ void UiMenuRenderer::drawIconPlay(int centerX, int centerY, bool isSelected) {
   carrier->display.drawPixel(centerX - 3, centerY - 4, color565(255, 255, 255));
 }
 
-// Icon 2: Skæld ud (Cute angry mochi face with > < squint eyes, blush and 💢 anger mark)
+// Icon 2: Hjem (Lumis Hus: Cozy house with terracotta roof, chimney & door)
+void UiMenuRenderer::drawIconHouse(int centerX, int centerY, bool isSelected) {
+  if (carrier == nullptr) return;
+
+  uint16_t roofColor  = isSelected ? color565(255, 120, 60) : color565(200, 80, 40);   // Terracotta roof
+  uint16_t wallColor  = isSelected ? color565(255, 230, 180) : color565(200, 180, 140); // Cozy wooden wall
+  uint16_t doorColor  = color565(110, 60, 30);                                          // Dark brown door
+  uint16_t winColor   = isSelected ? color565(0, 240, 255) : color565(255, 220, 80);    // Glowing cyan/yellow window
+
+  // Triangular roof
+  carrier->display.drawPixel(centerX, centerY - 6, roofColor);
+  carrier->display.drawFastHLine(centerX - 1, centerY - 5, 3, roofColor);
+  carrier->display.drawFastHLine(centerX - 2, centerY - 4, 5, roofColor);
+  carrier->display.drawFastHLine(centerX - 3, centerY - 3, 7, roofColor);
+  carrier->display.drawFastHLine(centerX - 4, centerY - 2, 9, roofColor);
+  carrier->display.drawFastHLine(centerX - 5, centerY - 1, 11, roofColor);
+
+  // Chimney on right
+  carrier->display.drawFastVLine(centerX + 3, centerY - 6, 3, color565(150, 60, 30));
+
+  // House body
+  carrier->display.fillRect(centerX - 4, centerY, 9, 6, wallColor);
+
+  // Door in center
+  carrier->display.fillRect(centerX - 1, centerY + 2, 3, 4, doorColor);
+
+  // Window on left
+  carrier->display.drawPixel(centerX - 3, centerY + 2, winColor);
+}
+
+// Icon 3: Medicin (Apothecary medicine bottle with healing red cross +)
+void UiMenuRenderer::drawIconMedicin(int centerX, int centerY, bool isSelected) {
+  uint16_t capColor    = isSelected ? color565(200, 150, 90)  : color565(140, 100, 60); // Wood cork / cap
+  uint16_t liquidColor = isSelected ? color565(220, 245, 255) : color565(160, 190, 210); // Clear medical liquid
+  uint16_t outline     = isSelected ? color565(0, 210, 230)   : color565(50, 80, 100);
+  uint16_t crossRed    = isSelected ? color565(255, 40, 60)   : color565(200, 30, 45);   // Medical cross
+  uint16_t gleamWhite  = color565(255, 255, 255);
+
+  // 1. Cap / Cork (top)
+  carrier->display.fillRect(centerX - 2, centerY - 8, 5, 2, capColor);
+  carrier->display.drawPixel(centerX - 2, centerY - 8, color565(240, 190, 130)); // Cap highlight
+
+  // 2. Bottle neck
+  carrier->display.fillRect(centerX - 1, centerY - 6, 3, 2, liquidColor);
+
+  // 3. Bottle body (rounded rect)
+  carrier->display.fillRoundRect(centerX - 5, centerY - 4, 11, 12, 2, liquidColor);
+  carrier->display.drawRoundRect(centerX - 5, centerY - 4, 11, 12, 2, outline);
+
+  // 4. Specular glass highlight (left rim)
+  carrier->display.drawFastVLine(centerX - 4, centerY - 2, 7, gleamWhite);
+
+  // 5. Red medical cross (+)
+  // Horizontal bar
+  carrier->display.fillRect(centerX - 3, centerY + 1, 7, 3, crossRed);
+  // Vertical bar
+  carrier->display.fillRect(centerX - 1, centerY - 1, 3, 7, crossRed);
+}
+
+// Icon 3: Skæld ud (Cute angry mochi face with > < squint eyes, blush and 💢 anger mark)
 void UiMenuRenderer::drawIconScold(int centerX, int centerY, bool isSelected) {
   uint16_t faceColor   = isSelected ? color565(255, 80, 90)   : color565(190, 60, 70);
   uint16_t glossColor  = isSelected ? color565(255, 140, 150) : color565(210, 95, 105);
@@ -296,6 +355,8 @@ void UiMenuRenderer::drawMenuBar(const MenuLogic& menu, bool forceRedrawAll) {
     switch (icon) {
       case ICON_FOOD:    drawIconFood(iconCenterX, iconCenterY, isSelected); break;
       case ICON_PLAY:    drawIconPlay(iconCenterX, iconCenterY, isSelected); break;
+      case ICON_HOUSE:   drawIconHouse(iconCenterX, iconCenterY, isSelected); break;
+      case ICON_MEDICIN: drawIconMedicin(iconCenterX, iconCenterY, isSelected); break;
       case ICON_SCOLD:   drawIconScold(iconCenterX, iconCenterY, isSelected); break;
       case ICON_STATS:   drawIconStats(iconCenterX, iconCenterY, isSelected); break;
       case ICON_CONNECT: drawIconConnect(iconCenterX, iconCenterY, isSelected); break;
@@ -329,78 +390,291 @@ void UiMenuRenderer::drawMenuBar(const MenuLogic& menu, bool forceRedrawAll) {
 
 // Display temporary placeholder screen for other views (Stats, Controller, Action)
 void UiMenuRenderer::drawPlaceholderScreen(const char* title, const char* hint) {
-  if (carrier == nullptr) return;
+  if (carrier == nullptr || title == nullptr || hint == nullptr) return;
+
+  uint16_t boxBg = color565(12, 18, 38);
 
   // Clear center area of screen (matches the 152x120 viewport area of Lumi)
-  carrier->display.fillRect(38, 72, 164, 124, color565(12, 18, 38));
+  carrier->display.fillRect(38, 72, 164, 124, boxBg);
   carrier->display.drawRoundRect(42, 76, 156, 116, 6, color565(40, 80, 150));
 
   carrier->display.setTextSize(2);
-  carrier->display.setTextColor(color565(255, 230, 80));
+  carrier->display.setTextColor(color565(255, 230, 80), boxBg);
   int titleWidth = strlen(title) * 12;
   carrier->display.setCursor((SCREEN_WIDTH - titleWidth) / 2, 108);
   carrier->display.print(title);
 
   carrier->display.setTextSize(1);
-  carrier->display.setTextColor(color565(150, 190, 240));
+  carrier->display.setTextColor(color565(150, 190, 240), boxBg);
   int hintWidth = strlen(hint) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - hintWidth) / 2, 142);
   carrier->display.print(hint);
 }
 
-// Display player role selection screen (Spiller 1 vs Spiller 2)
-void UiMenuRenderer::drawChoosePlayerScreen() {
+// Display games selection menu (Solo Pong vs Labyrinth)
+void UiMenuRenderer::drawGamesMenu(uint8_t selectedGame, uint16_t pongHighScore, uint16_t mazeHighScore, bool fullRedraw) {
   if (carrier == nullptr) return;
 
-  uint16_t bgColor = color565(8, 12, 26);
-  carrier->display.fillScreen(bgColor);
+  uint16_t bgDark    = color565(8, 12, 26);
+  uint16_t cardBg    = color565(14, 22, 44);
+  uint16_t selCardBg = color565(22, 36, 72);
+  uint16_t selBorder = color565(0, 240, 255);
+  uint16_t unselBrd  = color565(40, 60, 100);
+  uint16_t goldText  = color565(255, 215, 60);
+  uint16_t whiteText = 0xFFFF;
+  uint16_t hintText  = color565(110, 150, 195);
 
-  // Outer ring guide
-  carrier->display.drawCircle(120, 120, 118, color565(25, 45, 80));
+  if (fullRedraw) {
+    carrier->display.fillScreen(bgDark);
 
-  // Header Title
+    // 1. Header
+    carrier->display.setTextSize(2);
+    carrier->display.setTextColor(goldText, bgDark);
+    const char* title = "MINISPIL";
+    int tw = strlen(title) * 12;
+    carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 24);
+    carrier->display.print(title);
+
+    // 4. Bottom controls hint
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(hintText, bgDark);
+    const char* bottomHint = "T0/T1:Skift | OK | T3:Exit";
+    int bw = strlen(bottomHint) * 6;
+    carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
+    carrier->display.print(bottomHint);
+  }
+
+  // 2. Card 0: SOLO PONG (Y = 56, H = 54, W = 196)
+  bool isPong = (selectedGame == 0);
+  uint16_t c0Bg = isPong ? selCardBg : cardBg;
+  uint16_t c0Br = isPong ? selBorder : unselBrd;
+  carrier->display.fillRoundRect(22, 56, 196, 54, 6, c0Bg);
+  carrier->display.drawRoundRect(22, 56, 196, 54, 6, c0Br);
+  if (isPong) {
+    carrier->display.drawRoundRect(21, 55, 198, 56, 7, color565(0, 140, 200));
+  }
+
   carrier->display.setTextSize(1);
-  carrier->display.setTextColor(color565(0, 230, 255), bgColor);
-  carrier->display.setCursor(87, 26);
-  carrier->display.print("HVEM ER DU?");
+  carrier->display.setTextColor(isPong ? color565(0, 240, 255) : whiteText, c0Bg);
+  carrier->display.setCursor(34, 66);
+  carrier->display.print(isPong ? "> 1. SOLO PONG" : "  1. SOLO PONG");
 
-  // Card 1: Spiller 1 (Left / Venstre) -> Cyan Theme
-  carrier->display.fillRoundRect(24, 48, 192, 54, 6, color565(14, 28, 52));
-  carrier->display.drawRoundRect(24, 48, 192, 54, 6, color565(0, 200, 255));
-  carrier->display.drawCircle(44, 75, 11, color565(0, 230, 255));
+  carrier->display.setTextColor(hintText, c0Bg);
+  carrier->display.setCursor(46, 80);
+  carrier->display.print("Mur-Pong bat & bold");
+
+  carrier->display.setTextColor(goldText, c0Bg);
+  carrier->display.setCursor(46, 94);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "Rekord: %u", pongHighScore);
+  carrier->display.print(buf);
+
+  // 3. Card 1: LABYRINT (Y = 118, H = 54, W = 196)
+  bool isMaze = (selectedGame == 1);
+  uint16_t c1Bg = isMaze ? selCardBg : cardBg;
+  uint16_t c1Br = isMaze ? selBorder : unselBrd;
+  carrier->display.fillRoundRect(22, 118, 196, 54, 6, c1Bg);
+  carrier->display.drawRoundRect(22, 118, 196, 54, 6, c1Br);
+  if (isMaze) {
+    carrier->display.drawRoundRect(21, 117, 198, 56, 7, color565(0, 140, 200));
+  }
+
   carrier->display.setTextSize(1);
-  carrier->display.setTextColor(color565(0, 230, 255), color565(14, 28, 52));
-  carrier->display.setCursor(41, 72);
-  carrier->display.print("0"); // Touch 0
+  carrier->display.setTextColor(isMaze ? color565(0, 240, 255) : whiteText, c1Bg);
+  carrier->display.setCursor(34, 128);
+  carrier->display.print(isMaze ? "> 2. LABYRINT" : "  2. LABYRINT");
 
-  carrier->display.setCursor(64, 63);
-  carrier->display.setTextColor(color565(255, 255, 255), color565(14, 28, 52));
-  carrier->display.print("T0: SPILLER 1");
-  carrier->display.setCursor(64, 79);
-  carrier->display.setTextColor(color565(130, 190, 240), color565(14, 28, 52));
-  carrier->display.print("Venstre ketsjer (P1)");
+  carrier->display.setTextColor(hintText, c1Bg);
+  carrier->display.setCursor(46, 142);
+  carrier->display.print("IMU marmor-kugle");
 
-  // Card 2: Spiller 2 (Right / Hoejre) -> Coral Theme
-  carrier->display.fillRoundRect(24, 112, 192, 54, 6, color565(42, 22, 28));
-  carrier->display.drawRoundRect(24, 112, 192, 54, 6, color565(255, 90, 70));
-  carrier->display.drawCircle(44, 139, 11, color565(255, 90, 70));
-  carrier->display.setTextSize(1);
-  carrier->display.setTextColor(color565(255, 90, 70), color565(42, 22, 28));
-  carrier->display.setCursor(41, 136);
-  carrier->display.print("1"); // Touch 1
-
-  carrier->display.setCursor(64, 127);
-  carrier->display.setTextColor(color565(255, 255, 255), color565(42, 22, 28));
-  carrier->display.print("T1: SPILLER 2");
-  carrier->display.setCursor(64, 143);
-  carrier->display.setTextColor(color565(255, 170, 150), color565(42, 22, 28));
-  carrier->display.print("Hoejre ketsjer (P2)");
-
-  // Bottom action hints
-  carrier->display.setTextColor(color565(100, 135, 180), bgColor);
-  carrier->display.setCursor(66, 188);
-  carrier->display.print("T2: Hurtig P1");
-  carrier->display.setCursor(76, 208);
-  carrier->display.print("T3: Tilbage");
+  carrier->display.setTextColor(goldText, c1Bg);
+  carrier->display.setCursor(46, 156);
+  if (mazeHighScore > 0) {
+    snprintf(buf, sizeof(buf), "Rekord: %u sek", mazeHighScore);
+  } else {
+    snprintf(buf, sizeof(buf), "Rekord: --");
+  }
+  carrier->display.print(buf);
 }
+
+// Draw cozy House sub-menu (Garderobe & Soevn)
+void UiMenuRenderer::drawHouseMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool isSleeping, bool fullRedraw) {
+  if (carrier == nullptr) return;
+
+  uint16_t bgDark    = color565(8, 12, 26);
+  uint16_t cardBg    = color565(14, 22, 44);
+  uint16_t selCardBg = color565(22, 36, 72);
+  uint16_t selBorder = color565(0, 240, 255);
+  uint16_t unselBrd  = color565(40, 60, 100);
+  uint16_t goldText  = color565(255, 215, 60);
+  uint16_t whiteText = 0xFFFF;
+  uint16_t hintText  = color565(110, 150, 195);
+  uint16_t cyanText  = color565(0, 220, 255);
+  uint16_t greenText = color565(80, 255, 120);
+
+  if (fullRedraw) {
+    carrier->display.fillScreen(bgDark);
+
+    // 1. Header
+    carrier->display.setTextSize(2);
+    carrier->display.setTextColor(goldText, bgDark);
+    const char* title = "LUMIS HUS";
+    int tw = strlen(title) * 12;
+    carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 22);
+    carrier->display.print(title);
+
+    // Bottom controls hint
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(hintText, bgDark);
+    const char* bottomHint = "T0/T1:Skift | OK | T3:Tilbage";
+    int bw = strlen(bottomHint) * 6;
+    carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
+    carrier->display.print(bottomHint);
+  }
+
+  // Card 0: Garderobe (Y = 56, H = 54, W = 196)
+  bool selGarderobe = (selectedOption == 0);
+  uint16_t bgCard0  = selGarderobe ? selCardBg : cardBg;
+  uint16_t brdCard0 = selGarderobe ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(22, 56, 196, 54, 6, bgCard0);
+  carrier->display.drawRoundRect(22, 56, 196, 54, 6, brdCard0);
+  if (selGarderobe) {
+    carrier->display.drawRoundRect(21, 55, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selGarderobe ? color565(0, 240, 255) : whiteText, bgCard0);
+  carrier->display.setCursor(34, 66);
+  carrier->display.print(selGarderobe ? "> 1. GARDEROBE (SKAB)" : "  1. GARDEROBE (SKAB)");
+
+  carrier->display.setTextColor(hintText, bgCard0);
+  carrier->display.setCursor(46, 80);
+  carrier->display.print("Skift toej og vinterhue");
+
+  carrier->display.setTextColor(currentOutfit == OUTFIT_WINTER ? cyanText : greenText, bgCard0);
+  carrier->display.setCursor(46, 94);
+  carrier->display.print(currentOutfit == OUTFIT_WINTER ? "Aktiv: Vinterhue PAA" : "Aktiv: Standard toej");
+
+  // Card 1: Sengetid / Soevn (Y = 118, H = 54, W = 196)
+  bool selSleep   = (selectedOption == 1);
+  uint16_t bgCard1  = selSleep ? selCardBg : cardBg;
+  uint16_t brdCard1 = selSleep ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(22, 118, 196, 54, 6, bgCard1);
+  carrier->display.drawRoundRect(22, 118, 196, 54, 6, brdCard1);
+  if (selSleep) {
+    carrier->display.drawRoundRect(21, 117, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selSleep ? color565(0, 240, 255) : whiteText, bgCard1);
+  carrier->display.setCursor(34, 128);
+  carrier->display.print(selSleep ? "> 2. SENGETID (SOEVN)" : "  2. SENGETID (SOEVN)");
+
+  carrier->display.setTextColor(hintText, bgCard1);
+  carrier->display.setCursor(46, 142);
+  carrier->display.print("Hvil & genoplad energi");
+
+  carrier->display.setTextColor(isSleeping ? cyanText : greenText, bgCard1);
+  carrier->display.setCursor(46, 156);
+  carrier->display.print(isSleeping ? "Status: SOVER Zzz [Tryk OK]" : "Status: VAAGEN [Tryk OK]");
+}
+
+// Draw Wardrobe dressing room screen
+void UiMenuRenderer::drawWardrobeMenu(uint8_t selectedOption, PetOutfit currentOutfit, bool fullRedraw) {
+  if (carrier == nullptr) return;
+
+  uint16_t bgDark    = color565(8, 12, 26);
+  uint16_t cardBg    = color565(14, 22, 44);
+  uint16_t selCardBg = color565(22, 36, 72);
+  uint16_t selBorder = color565(0, 240, 255);
+  uint16_t unselBrd  = color565(40, 60, 100);
+  uint16_t goldText  = color565(255, 215, 60);
+  uint16_t whiteText = 0xFFFF;
+  uint16_t hintText  = color565(110, 150, 195);
+  uint16_t greenText = color565(80, 255, 120);
+
+  if (fullRedraw) {
+    carrier->display.fillScreen(bgDark);
+
+    // 1. Header
+    carrier->display.setTextSize(2);
+    carrier->display.setTextColor(goldText, bgDark);
+    const char* title = "GARDEROBE";
+    int tw = strlen(title) * 12;
+    carrier->display.setCursor((SCREEN_WIDTH - tw) / 2, 22);
+    carrier->display.print(title);
+
+    // Bottom controls hint
+    carrier->display.setTextSize(1);
+    carrier->display.setTextColor(hintText, bgDark);
+    const char* bottomHint = "T0/T1:Skift | OK:Tag paa | T3:Exit";
+    int bw = strlen(bottomHint) * 6;
+    carrier->display.setCursor((SCREEN_WIDTH - bw) / 2, 198);
+    carrier->display.print(bottomHint);
+  }
+
+  // Card 0: Standard toej (Y = 56, H = 54, W = 196)
+  bool selStd   = (selectedOption == 0);
+  uint16_t bg0  = selStd ? selCardBg : cardBg;
+  uint16_t brd0 = selStd ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(22, 56, 196, 54, 6, bg0);
+  carrier->display.drawRoundRect(22, 56, 196, 54, 6, brd0);
+  if (selStd) {
+    carrier->display.drawRoundRect(21, 55, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selStd ? color565(0, 240, 255) : whiteText, bg0);
+  carrier->display.setCursor(34, 66);
+  carrier->display.print(selStd ? "> 1. STANDARDTOEJ" : "  1. STANDARDTOEJ");
+
+  carrier->display.setTextColor(hintText, bg0);
+  carrier->display.setCursor(46, 80);
+  carrier->display.print("Hue & toerklaede AF");
+
+  if (currentOutfit == OUTFIT_DEFAULT) {
+    carrier->display.setTextColor(greenText, bg0);
+    carrier->display.setCursor(46, 94);
+    carrier->display.print("[AKTIV PAA LUMI]");
+  } else {
+    carrier->display.setTextColor(hintText, bg0);
+    carrier->display.setCursor(46, 94);
+    carrier->display.print("[Tryk OK for at vaelge]");
+  }
+
+  // Card 1: Vintertoej (Y = 118, H = 54, W = 196)
+  bool selWin   = (selectedOption == 1);
+  uint16_t bg1  = selWin ? selCardBg : cardBg;
+  uint16_t brd1 = selWin ? selBorder : unselBrd;
+
+  carrier->display.fillRoundRect(22, 118, 196, 54, 6, bg1);
+  carrier->display.drawRoundRect(22, 118, 196, 54, 6, brd1);
+  if (selWin) {
+    carrier->display.drawRoundRect(21, 117, 198, 56, 7, color565(0, 140, 200));
+  }
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(selWin ? color565(0, 240, 255) : whiteText, bg1);
+  carrier->display.setCursor(34, 128);
+  carrier->display.print(selWin ? "> 2. VINTERTOEJ" : "  2. VINTERTOEJ");
+
+  carrier->display.setTextColor(hintText, bg1);
+  carrier->display.setCursor(46, 142);
+  carrier->display.print("Strikket hue & toerklaede");
+
+  if (currentOutfit == OUTFIT_WINTER) {
+    carrier->display.setTextColor(greenText, bg1);
+    carrier->display.setCursor(46, 156);
+    carrier->display.print("[AKTIV PAA LUMI]");
+  } else {
+    carrier->display.setTextColor(hintText, bg1);
+    carrier->display.setCursor(46, 156);
+    carrier->display.print("[Tryk OK for at vaelge]");
+  }
+}
+
 

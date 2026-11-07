@@ -4,6 +4,7 @@
 
 #include "ui_controller.h"
 #include <stdlib.h>
+#include <math.h>
 
 namespace {
   // Arena geometry constants
@@ -65,12 +66,20 @@ void UiControllerRenderer::drawInitialScreen(int playerId) {
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(titleColor, bgColor);
   if (playerId == 2) {
-    carrier->display.setCursor(76, 24);
+    carrier->display.setCursor(66, 24);
     carrier->display.print("P2: HOEJRE KONTROL");
   } else {
-    carrier->display.setCursor(74, 24);
+    carrier->display.setCursor(63, 24);
     carrier->display.print("P1: VENSTRE KONTROL");
   }
+
+  // Draw initial network status badge (FORBINDER)
+  carrier->display.fillRect(60, 36, 120, 14, bgColor);
+  carrier->display.fillCircle(78, 42, 3, color565(255, 180, 50)); // Amber dot
+  carrier->display.setTextColor(color565(255, 180, 50), bgColor);
+  carrier->display.setCursor(86, 39);
+  carrier->display.print("FORBINDER");
+  lastNetworkStatus = false;
 
   // 4. Center 2D circular tilt arena for Labyrinth
   carrier->display.fillCircle(ARENA_CX, ARENA_CY, ARENA_RADIUS, arenaBgColor);
@@ -113,14 +122,14 @@ void UiControllerRenderer::drawButtonUp(bool pressed) {
   carrier->display.drawRoundRect(BTN_UP_X, BTN_UP_Y, BTN_W, BTN_H, 4, borderCol);
 
   // Triangle arrow pointing UP
-  carrier->display.fillTriangle(BTN_UP_X + 9,  BTN_UP_Y + 16,
-                                BTN_UP_X + 15, BTN_UP_Y + 8,
-                                BTN_UP_X + 21, BTN_UP_Y + 16, textCol);
+  carrier->display.fillTriangle(BTN_UP_X + 7,  BTN_UP_Y + 16,
+                                BTN_UP_X + 13, BTN_UP_Y + 8,
+                                BTN_UP_X + 19, BTN_UP_Y + 16, textCol);
 
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(textCol, fillCol);
-  carrier->display.setCursor(BTN_UP_X + 26, BTN_UP_Y + 9);
-  carrier->display.print("OP");
+  carrier->display.setCursor(BTN_UP_X + 22, BTN_UP_Y + 9);
+  carrier->display.print("T0 OP");
 }
 
 void UiControllerRenderer::drawButtonDown(bool pressed) {
@@ -134,14 +143,14 @@ void UiControllerRenderer::drawButtonDown(bool pressed) {
   carrier->display.drawRoundRect(BTN_DN_X, BTN_DN_Y, BTN_W, BTN_H, 4, borderCol);
 
   // Triangle arrow pointing DOWN
-  carrier->display.fillTriangle(BTN_DN_X + 9,  BTN_DN_Y + 8,
-                                BTN_DN_X + 15, BTN_DN_Y + 16,
-                                BTN_DN_X + 21, BTN_DN_Y + 8, textCol);
+  carrier->display.fillTriangle(BTN_DN_X + 7,  BTN_DN_Y + 8,
+                                BTN_DN_X + 13, BTN_DN_Y + 16,
+                                BTN_DN_X + 19, BTN_DN_Y + 8, textCol);
 
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(textCol, fillCol);
-  carrier->display.setCursor(BTN_DN_X + 26, BTN_DN_Y + 9);
-  carrier->display.print("NED");
+  carrier->display.setCursor(BTN_DN_X + 22, BTN_DN_Y + 9);
+  carrier->display.print("T1 NED");
 }
 
 void UiControllerRenderer::drawButtonAction(bool pressed) {
@@ -213,14 +222,16 @@ void UiControllerRenderer::updateDisplay(const TiltLogic& tilt, bool isMqttConne
   int ballX = ARENA_CX + (int)(tiltX * MAX_BALL_OFFSET);
   int ballY = ARENA_CY + (int)(tiltY * MAX_BALL_OFFSET);
 
-  // Clamp within circular radius boundary
+  // Clamp within circular radius boundary (true vector normalization)
   int dx = ballX - ARENA_CX;
   int dy = ballY - ARENA_CY;
   int distSq = dx * dx + dy * dy;
   if (distSq > MAX_BALL_OFFSET * MAX_BALL_OFFSET) {
-    // Keep ball within boundary
-    ballX = ARENA_CX + (int)((float)dx * (MAX_BALL_OFFSET / 27.0f));
-    ballY = ARENA_CY + (int)((float)dy * (MAX_BALL_OFFSET / 27.0f));
+    float dist = sqrtf((float)distSq);
+    if (dist > 0.001f) {
+      ballX = ARENA_CX + (int)((dx / dist) * (float)MAX_BALL_OFFSET);
+      ballY = ARENA_CY + (int)((dy / dist) * (float)MAX_BALL_OFFSET);
+    }
   }
 
   // 2. Redraw 2D ball only when moved (zero-flicker localized update)
@@ -278,4 +289,60 @@ void UiControllerRenderer::updateDisplay(const TiltLogic& tilt, bool isMqttConne
     drawButtonAction(curAction);
     lastBtnAction = curAction;
   }
+}
+
+// Display player role selection screen (Spiller 1 vs Spiller 2)
+void UiControllerRenderer::drawChoosePlayerScreen() {
+  if (carrier == nullptr) return;
+
+  uint16_t bgColor = color565(8, 12, 26);
+  carrier->display.fillScreen(bgColor);
+
+  // Outer ring guide
+  carrier->display.drawCircle(120, 120, 118, color565(25, 45, 80));
+
+  // Header Title
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(color565(0, 230, 255), bgColor);
+  carrier->display.setCursor(87, 26);
+  carrier->display.print("HVEM ER DU?");
+
+  // Card 1: Spiller 1 (Left / Venstre) -> Cyan Theme
+  carrier->display.fillRoundRect(24, 48, 192, 54, 6, color565(14, 28, 52));
+  carrier->display.drawRoundRect(24, 48, 192, 54, 6, color565(0, 200, 255));
+  carrier->display.drawCircle(44, 75, 11, color565(0, 230, 255));
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(color565(0, 230, 255), color565(14, 28, 52));
+  carrier->display.setCursor(41, 72);
+  carrier->display.print("0"); // Touch 0
+
+  carrier->display.setCursor(64, 63);
+  carrier->display.setTextColor(color565(255, 255, 255), color565(14, 28, 52));
+  carrier->display.print("T0: SPILLER 1");
+  carrier->display.setCursor(64, 79);
+  carrier->display.setTextColor(color565(130, 190, 240), color565(14, 28, 52));
+  carrier->display.print("Venstre ketsjer (P1)");
+
+  // Card 2: Spiller 2 (Right / Hoejre) -> Coral Theme
+  carrier->display.fillRoundRect(24, 112, 192, 54, 6, color565(42, 22, 28));
+  carrier->display.drawRoundRect(24, 112, 192, 54, 6, color565(255, 90, 70));
+  carrier->display.drawCircle(44, 139, 11, color565(255, 90, 70));
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(color565(255, 90, 70), color565(42, 22, 28));
+  carrier->display.setCursor(41, 136);
+  carrier->display.print("1"); // Touch 1
+
+  carrier->display.setCursor(64, 127);
+  carrier->display.setTextColor(color565(255, 255, 255), color565(42, 22, 28));
+  carrier->display.print("T1: SPILLER 2");
+  carrier->display.setCursor(64, 143);
+  carrier->display.setTextColor(color565(255, 170, 150), color565(42, 22, 28));
+  carrier->display.print("Hoejre ketsjer (P2)");
+
+  // Bottom action hints
+  carrier->display.setTextColor(color565(100, 135, 180), bgColor);
+  carrier->display.setCursor(66, 188);
+  carrier->display.print("T2: Hurtig P1");
+  carrier->display.setCursor(76, 208);
+  carrier->display.print("T3: Tilbage");
 }

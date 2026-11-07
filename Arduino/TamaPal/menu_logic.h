@@ -24,6 +24,34 @@ public:
   void selectPlayer(int playerId);
   int getPlayerId() const;
 
+  // Direct screen state transition
+  void setScreen(ScreenType screen, unsigned long currentTimeMs = 0);
+
+  // Games menu helpers
+  uint8_t getSelectedGame() const;
+  void selectGame(uint8_t gameIndex);
+  void openGamesMenu();
+  void openPongGame();
+  void openMazeGame();
+
+  // House menu (Lumis Hus: Garderobe & Soevn) helpers
+  uint8_t getSelectedHouseOption() const;
+  void selectHouseOption(uint8_t optionIndex);
+  void openHouseMenu();
+
+  // Wardrobe helpers
+  uint8_t getSelectedWardrobeOption() const;
+  void selectWardrobeOption(uint8_t outfitIndex);
+  void openWardrobeMenu();
+
+  // Memorial gallery navigation
+  void openMemorial(uint16_t totalCount, ScreenType returnScreen = SCREEN_HOME);
+  uint16_t getMemorialIndex() const;
+  void setMemorialIndex(uint16_t index);
+  void memorialNext(uint16_t totalCount);
+  void memorialPrev(uint16_t totalCount);
+  ScreenType getMemorialReturnScreen() const;
+
   // Periodic update for animation interpolation and auto-close timers
   void update(unsigned long currentTimeMs);
 
@@ -45,7 +73,12 @@ public:
 
 private:
   ScreenType activeScreen;
+  ScreenType memorialReturnScreen;
   MenuIcon selectedIcon;
+  uint8_t selectedGame;
+  uint8_t selectedHouseOption;
+  uint8_t selectedWardrobeOption;
+  uint16_t memorialIndex;
   int playerId;
 
   float cursorPositionX;

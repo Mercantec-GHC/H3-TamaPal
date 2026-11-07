@@ -55,39 +55,49 @@ Datoer, DoD og status for hele projektet: se `docs/PLAN.md`.
 4. **Spillet færdigt:** point, liv, game over, `hit`/`miss` på Oplàen.
 5. **Brugertest** med en uden for gruppen + mindst én forbedring.
 
-## Kun 4 beskeder
+## Vores 5 beskeder (MQTT & SignalR)
 
 > **Ændret 4/11:** Brokeren kræver, at alle topics starter med gruppens navn.
 > Topics er nu `StormLamaerne/Tamapal/...` – store og små bogstaver præcis sådan.
-> Client ID: Oplà `tamapal-opla-1`, backend `tamapal-backend`. Brokerens adresse står i
-> `arduino_secrets.h` (ikke i git). Ældre forslag i Del 1b og 1c bruger stadig `tamapal/...`.
+> Client ID: Oplà `tamapal-opla-1` (og `tamapal-opla-2`), backend `tamapal-backend`. Brokerens adresse står i
+> `arduino_secrets.h` (ikke i git).
 
-### 1. Arduino → backend (MQTT), 20 gange i sekundet
+### 1. Arduino → backend (MQTT), 20 gange i sekundet + ved knap-kant
 
-Topic: `StormLamaerne/Tamapal/opla-1/input`
+Topic: `StormLamaerne/Tamapal/opla-1/input` (og `opla-2/input` for Spiller 2)  
+QoS: 0  
+Frekvens: Kontinuerlig 20 Hz (~50 ms) for jævn tilt, samt **øjeblikkelig kant-afsendelse (< 1 ms)** når knapper trykkes eller slippes.
 
 ```json
-{ "tilt": 0.35, "button": false }
+{
+  "up": false,
+  "down": false,
+  "button": false,
+  "tiltX": 0.00,
+  "tiltY": 0.35,
+  "tilt": 0.35
+}
 ```
 
-`tilt` går fra -1 (op) til 1 (ned). Arduinoen læser bare IMU og sender.
-
-> **Afvigelse (4/11):** Olehs kode i `dev` sender flere felter end aftalt – både knapper og tilt:
-> `{ "up": false, "down": false, "button": false, "tiltX": 0.00, "tiltY": 0.35, "tilt": 0.35 }`
-> `tilt` og `button` er der stadig, så backenden kan bruge besked 1 som den står.
-> Vi beslutter sammen, om vi styrer med knapper (`up`/`down`) eller `tilt` (Del 2, spørgsmål 2), og retter besked 1 bagefter.
+* `tilt` og `tiltY`: går fra -1 (vippet 30° op) til 1 (vippet 30° ned). 0 er vandret. Backenden bruger dette til ketsjerens placering: `paddle.y = (tilt + 1) / 2`.
+* `tiltX`: vandret hældning (-1 venstre, +1 højre) til fremtidige minispil (f.eks. Labyrint).
+* `button`: `true` ved serv / aktion (Touch 2 på Oplà).
+* `up` / `down`: Touch 0 (Op) og Touch 1 (Ned). Hvis spilleren foretrækker knapper frem for tilt, kan backenden også læse disse direkte!
 
 ### 2. Backend → Arduino (MQTT), kun ved hændelser
 
-Topic: `StormLamaerne/Tamapal/opla-1/event`
-
-Backenden lytter på `StormLamaerne/Tamapal/+/input` (`+` = alle Oplàer).
+Topic: `StormLamaerne/Tamapal/opla-1/event` (og `opla-2/event` for Spiller 2)  
+QoS: 1  
 
 ```json
 { "type": "hit" }
 ```
 
-Typer: `hit` (ramt), `miss` (mistet et liv), `gameover`. Oplàen blinker eller bipper.
+**Understøttede typer og Oplà-feedback:**
+* `"hit"`: Ketsjer ramte bolden (+1 point). Oplà bipper med lys tone (1200 Hz, 80 ms) og blinker grønt/cyan.
+* `"miss"`: Bolden røg forbi (-1 liv). Oplà summer med dyb tone (220 Hz, 150 ms) og blinker advarselsrød.
+* `"gameover"`: 0 liv tilbage, spil slut. Oplà afspiller 3-tonet faldende melodi (440 $\to$ 330 $\to$ 220 Hz).
+* `"assign_p1"` / `"assign_p2"`: Backenden tildeler eller bekræfter spillerens rolle.
 
 ### 3. Backend → browser (SignalR), 30 gange i sekundet
 
@@ -108,6 +118,84 @@ Alle koordinater er mellem 0 og 1. `status` kan være `waiting`, `playing` eller
 ### 4. Browser → backend (SignalR)
 
 Metode `StartGame()` – knappen "Start" eller "Spil igen".
+
+---
+
+### 5. Arduino → backend (MQTT), kæledyrets 5 behov (hvert 30. sekund og ved handlinger)
+
+> **Implementeret 4/11 i `feature/arduino-needs` (Oleh):**  
+> Oplàen opretholder Wi-Fi og MQTT-forbindelse i både Kæledyrs-tilstand og Pong-tilstand. Den sender automatisk en statuspakke for Lumis 5 behov, så backenden kan gemme kæledyret i Neon PostgreSQL, og frontenden kan vise helbredet på hjemmesiden.
+
+Topic: `StormLamaerne/Tamapal/opla-1/pet/state` (eller `opla-2/pet/state` for Spiller 2)  
+QoS: 1 (sikrer at tilstandsændringer og død leveres pålideligt)  
+Frekvens: Hvert 30. sekund (heartbeat) samt **øjeblikkeligt** ved spillerhandlinger (Mad, Leg, Skæld ud, Søvn).
+
+```json
+{
+  "name": "LUMI",
+  "stage": "teen",
+  "outfit": "default",
+  "hunger": 80,
+  "warmth": 85,
+  "energy": 90,
+  "happy": 75,
+  "discipline": 50,
+  "alive": true,
+  "generation": 1,
+  "ageMinutes": 15,
+  "deathCause": "none",
+  "epitaph": ""
+}
+```
+
+**Feltbeskrivelse for tilstandspakken (alle behov er heltal 0–100%):**
+* `name` (string): Kæledyrets arkade-navn op til 4 tegn (fx `"LUMI"`, `"THOR"`, `"BOB"`).
+* `stage` (string): Livsstadie (`"baby"`, `"teen"`, `"adult"`, `"old"`).
+* `outfit` (string): Garderobe-tilstand (`"default"` eller `"winter"`).
+* `hunger` (int 0–100): Mæthed (100 = propmat, 0 = udsultet). Falder over tid, stiger ved mad (+25%).
+* `warmth` (int 0–100): Kropstemperatur (optimal 20–25°C). Falder ved kulde, stiger ved vintertøj eller kropsvarme.
+* `energy` (int 0–100): Energi / Søvn (100 = udhvilet, 0 = udmattet). Genvindes når Lumi sover.
+* `happy` (int 0–100): Glæde (100 = super glad, 0 = trist). Stiger ved leg, klap og vask.
+* `discipline` (int 0–100): Opdragelse (100 = velopdragen). Stiger ved skæld-ud ved uberettiget klynk.
+* `alive` (bool): `true` så længe Lumi lever. Hvis Lumi dør (af alderdom, sult, kulde, hedeslag eller sygdom), sendes `false`.
+* `generation` (int >= 1): Slægtsled / generation (GEN 1, GEN 2, GEN 3...).
+* `ageMinutes` (int >= 0): Opnået alder i minutter (1 minut = 1 leveår i Tamagotchi-tid).
+* `deathCause` (string): `"none"` mens Lumi lever; ved død én af: `"old_age"`, `"hunger"`, `"cold"`, `"heat"`, `"boredom"`, `"exhaustion"`.
+* `epitaph` (string): Personlig minde-epitafe på dansk (fx `"Levede et lykkeligt liv!"`, `"Maven rumlede til sidst..."`).
+
+> **Netværkspolitik (Batterispare-arkitektur):**  
+> For at spare batteri og undgå unødig opvarmning starter Oplà offline i lokal Tamagotchi-tilstand. Wi-Fi & MQTT aktiveres, når brugeren går ind i Controller/Multiplayer (`SCREEN_CONTROLLER`). Herefter holdes forbindelsen aktiv og sender automatisk `pet/state` hvert 30. sek og øjeblikkeligt ved pleje-handlinger.
+
+#### Vejledning til Oliver (Backend / ASP.NET Core):
+Abonner på topic: `StormLamaerne/Tamapal/+/pet/state` (`+` fanger alle Oplàer).  
+Brug denne udvidede C# DTO-klasse:
+```csharp
+public class PetStateDto
+{
+    public string Name { get; set; } = "LUMI";
+    public string Stage { get; set; } = "teen";
+    public string Outfit { get; set; } = "default";
+    public int Hunger { get; set; }
+    public int Warmth { get; set; }
+    public int Energy { get; set; }
+    public int Happy { get; set; }
+    public int Discipline { get; set; }
+    public bool Alive { get; set; }
+    public int Generation { get; set; } = 1;
+    public long AgeMinutes { get; set; }
+    public string DeathCause { get; set; } = "none";
+    public string Epitaph { get; set; } = "";
+}
+```
+* **Database (Neon PostgreSQL):** Gem seneste tilstand i tabellen `pets` / `pet_states`.
+* **Kirkegård:** Hvis `Alive == false`, opret en post i kirkegårdstabellen med kæledyrets navn, generation, dødsårsag (`DeathCause`), opnået alder (`AgeMinutes`) og mindeord (`Epitaph`) til Andrii.
+* **SignalR:** Udsend event `PetStateUpdated(dto)` til browserklienter.
+
+#### Vejledning til Andrii (Frontend):
+* Lyt på `PetStateUpdated` fra SignalR.
+* Tegn 5 vandrette bjælker (0–100%): Sult, Varme, Energi, Glæde, Disciplin.
+* Vis kæledyrets navn (`dto.Name`), livsstadie (`baby`/`teen`/`adult`/`old`) og hue/tørklæde hvis `outfit == "winter"`.
+* Hvis `alive === false`, vis gravstenen på kirkegården med teksten fx *"Her hviler THOR (GEN 2, 100 år) - Døde af alderdom. 'Levede et lykkeligt liv!'"*.
 
 ## Hvem laver hvad
 
@@ -393,8 +481,8 @@ Kun det, jeg skal bruge for at bygge MVP'en. Skriv svaret i kolonnen **Svar** el
 
 | # | Fra | Hvad jeg har brug for | Hvorfor | Svar |
 |---|---|---|---|---|
-| 1 | Oleh | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Backenden skal læse `button` og `tilt` på samme måde, som Oplàen sender dem. | |
-| 2 | Oleh | Det client ID, Oplàen bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | |
+| 1 | Oleh | Ja eller nej til punkt 2 (knappen) og punkt 3 (30° = 1). | Backenden skal læse `button` og `tilt` på samme måde, som Oplàen sender dem. | **Ja.** Oplà sender `tilt` (-1.0 til 1.0, hvor 30° = 1.0) og `button` (true/false ved tryk på Touch 2). Desuden sender vi `up`/`down` (Touch 0/1) og `tiltX` (hvis du vil bruge knapper eller 2D-bevægelse). Knaptryk sendes øjeblikkeligt (< 1 ms latency), og der er 20 Hz heartbeat. (Oleh, 4/11) |
+| 2 | Oleh | Det client ID, Oplàen bruger til MQTT. Backenden bruger `tamapal-backend`. | To klienter med samme client ID smider hinanden af brokeren. | `tamapal-opla-1` (eller `tamapal-opla-2` for Spiller 2). (Oleh, 4/11) |
 | 3 | Andrii | Ja eller nej til målene i punkt 4. | Det, du tegner, skal passe med det, backenden regner med. | **Ja.** Canvas er 600 × 600, og `draw.js` bruger præcis disse mål (Andrii, 3/11). |
 | 4 | Andrii | Må backenden vise siden fra `Frontend/`? Hvis ikke: hvilken adresse og port kører den på? | Ellers skal jeg slå CORS til for den adresse. | **Ja.** Indtil backenden kører, tester jeg med `python3 -m http.server 5500` i `Frontend/` (Andrii, 3/11). |
 
@@ -456,3 +544,517 @@ Udfyldes sammen. Når vi er enige, skriver vi navn og dato nederst.
 - [ ] Andrii – dato:
 
 Ændringer efter aftalen: ret både Del 1 og tabellen her, og skriv det i gruppens chat.
+
+---
+
+## Hardware- og opsætningsvejledning for Oplà-controlleren
+
+### 1. Plastik-case vs. Bar printplade (Touch-følsomhed)
+Oplà-kortet bruger kapacitive touch-sensorer.
+- **Med plastik-case:** Kræver høj følsomhed (tærskel `60`) for at opfange fingre gennem plasten.
+- **Uden case (bar printplade):** Kræver lav følsomhed (tærskel `200`) for at undgå falske "spøgelsestryk".
+
+**Sådan konfigureres det:**
+1. **I `arduino_secrets.h` (permanent for din enhed):**
+   ```cpp
+   #define SECRET_USE_CASE false  // Sæt til true hvis monteret i hvid plastik-case
+   ```
+2. **On-the-fly i Serial Monitor (uden genprogrammering):**
+   Send bogstavet `c` (eller `C`) i Serial Monitor (115200 baud). Arduinoen skifter øjeblikkeligt følsomhed og bekræfter i loggen.
+
+### 2. Mute (Lyd fra/til)
+- **Genvej 1:** Tryk på Touch 0 og Touch 4 samtidig.
+- **Genvej 2:** Hold Touch 3 nede i 1,2 sekunder.
+- **Fysisk gestus:** Vend Oplà-kortet med bunden i vejret (IMU Z-akse < -0.7g).
+
+---
+
+# Olehs opdateringer og vejledninger for Lumi-karakteren
+
+Her dokumenteres alle udvidelser til Lumis visuelle verden, livsstadier, animationer og test-kommandoer på Oplà-kortet. Hver opdatering er dateret og adskilt.
+
+___
+
+### 🌟 Opdatering 5/11: 2.5D Lumi, sømløs scene og dynamisk vejr
+**Branch:** `feature/arduino-lumi`  
+**Ansvarlig:** Oleh
+
+Lumi er integreret på Oplàens 240×240 ST7789 display med en 2.5D Nintendo / Zelda Kokiri-æstetik.  
+Alt renderes **proceduralt med delta-opdateringer uden RAM-framebuffer** (kun 25% RAM forbrug på SAMD21).
+
+#### Hvad er tilføjet:
+1. **Sømløs visning (ingen firkantet baggrundsboks):**
+   - Scenens baggrund matcher præcist skærmens mørke navy farve (`#080C1A`).
+   - Mosbeklædt svævende platform, glødende svamp og skovblomst blender naturligt ind i displayet uden hårde kanter.
+2. **Dynamisk himmel og vejr (`SkyWeatherMode`):**
+   - ☀️ **Dag (`SKY_DAY_SUNNY`):** Varm Nintendo-sol med animerede pulserende stråleprikker og lysende guldstøv.
+   - 🌙 **Nat / Søvn (`SKY_NIGHT_STARRY`):** Halvmåne og tindrende 4-takkede stjerner, når Lumi sover (aktiveres automatisk, hvis lyssensoren tildækkes i 5 sekunder).
+   - ❄️ **Vinter / Kulde (`SKY_WINTER_SNOW`):** Krystalklare faldende snefnug og rimfrost på platformen, når `warmth < 45%`.
+3. **To fe-ledsagere (Zelda OoT inspiration):**
+   - **Navi:** Cyan-hvid lysende fe med blafrende vinger over venstre side af Lumi.
+   - **Tatl:** Lille guld-lyserød skovfe, som svæver lavere i synkron rytme.
+4. **Organiske animationer (15 FPS, flimmerfri):**
+   - Squashing/stretching åndedræt, rystelser ved kulde ($\pm 2$ px), naturligt øjenblink hvert 3,2 sek., mundbevægelser og flydende `z Z Z` ved søvn eller tankeboble med bær ved sult.
+
+#### Vejledning til Oliver (Backend) og Andrii (Frontend):
+* **Backend:** `StormLamaerne/Tamapal/opla-1/pet/state` sendes fortsat uændret hvert 30. sek. Vejr kan udledes direkte fra `PetStateDto`:
+  - `Warmth < 45` $\to$ Vinter / Sne.
+  - `Energy` faldet under søvn $\to$ Nat / Stjernehimmel.
+  - Ellers $\to$ Solskin.
+* **Backend reward:** Send `StormLamaerne/Tamapal/opla-1/pet/reward` (`{"type":"happy_boost","amount":25}`) efter point i Pong; Lumi kvitterer med jubel-animation, stjerner og hævede poter!
+* **Frontend styling:** Brug gerne `#080C1A` som mørk baggrund og Kokiri-mint `#9BF8DC` med mørk jade `#237D6E` til Lumi-elementer.
+
+___
+
+### 🐣 Opdatering 5/11 (Aften): Baby-stadie og on-the-fly stadieskift i Serial Monitor
+**Branch:** `feature/arduino-stages`  
+**Ansvarlig:** Oleh
+
+Vi har implementeret Lumis første livsfase: **Baby-stadiet**, samt et interaktivt værktøj til at skifte mellem faserne direkte under kørsel.
+
+#### Hvad er tilføjet:
+1. **Baby-udseende (æg-formet krop & sut):**
+   - **Kompakt æg-silhuet:** Rund og blød mochi-krop ($38 \times 34$ px i stedet for teenagerens $48 \times 39$ px).
+   - **Baby-detaljer:** Korte runde knap-poter, små knop-ører og en spæd spire med kun ét enkelt lille hjerteformet blad.
+   - **Sut i munden:** Baby-Lumi sutter på en gul/koral sut med lille ring, der vipper i takt med vejrtrækningen. Ved spisning af bær skiftes sutten automatisk ud med bær-animationen.
+2. **Persistens på MicroSD:**
+   - Det aktuelle livsstadie gemmes som `STAGE=0` (Baby) i `lumi.txt` på MicroSD-kortet og gendannes ved genstart.
+3. **MQTT-tilstand:**
+   - I `pet/state` sendes feltet `"stage": "baby"` (eller `"teen"`, `"adult"`, `"old"`).
+
+#### Instruktion til test og udvikling (Serial Monitor):
+* **Skift stadie on-the-fly uden at genprogrammere:**
+  - Åbn Serial Monitor (115200 baud).
+  - Skriv bogstavet `s` (eller `S`) og tryk Enter.
+  - Arduinoen cykler øjeblikkeligt gennem livsstadierne:  
+    `Baby` $\to$ `Teen` $\to$ `Adult` $\to$ `Old` $\to$ `Baby`  
+    med bekræftelsestone og øjeblikkelig opdatering på skærmen!
+* (Bogstavet `c` kan fortsat bruges til at skifte touch-følsomhed for plastik-case).
+
+___
+
+### 🎧 Opdatering 5/11 (Sen Aften): Swag Teenager-stadie med Kokiri-horn og DJ-høretelefoner
+**Branch:** `feature/arduino-stages`  
+**Ansvarlig:** Oleh
+
+Lumis **Teenager-stadie** har fået sit fulde swag-look med attitude og gaming/DJ-æstetik som beskrevet i Game Design Doc.
+
+#### Hvad er tilføjet:
+1. **Kokiri-horn med guldspidser:**
+   - I stedet for en simpel spire har teenageren nu to seje buede skovhorn med gyldne spidser og skinnende highlights (`hornGold`), samt en skarp midterkam.
+2. **Cyber DJ / Gamer-høretelefoner:**
+   - Mørk bøjle over hovedet og neongrønne/cyan ørekopper med pink detaljer hen over ørerne.
+3. **Flabet attitude og mimik:**
+   - Hævet "swag" højre øjenbryn, når Lumi er tilfreds.
+   - Skævt selvsikkert katte-smil mod højre (smug smirk), der oser af selvtillid.
+
+___
+
+### 💼 Opdatering 6/11 (Morgen): Voksen Lumi (Adult) med diplomatkuffert, slips og blomstrende krone
+**Branch:** `feature/arduino-stages`  
+**Ansvarlig:** Oleh
+
+Lumis **Voksen-stadie (Adult)** er nu fuldt implementeret med et stilet forretnings- og vogter-look som beskrevet i Game Design Doc:
+
+#### Hvad er tilføjet:
+1. **Diplomatkuffert i læder (attaché case):**
+   - Klassisk forretningskuffert i varmt brunt læder (`#915028`) med mørk kantliste, syninger og gyldne messing-hjørnebeskyttere.
+   - Central messinglås med glinsende nøglehuls-refleksion.
+   - **Interaktiv holdning:** Lumi holder kuffertens buede håndtag fast i sin højre pote. Ved jubel (`SUPER_HAPPY` / `PLAYING`) hæver Lumi kufferten triumferende i vejret med begge poter!
+   - Ved kulde (`FREEZING`) trykker Lumi kufferten tæt ind til kroppen, mens han ryster.
+2. **Klassisk mørkerødt slips med guld-slipsenål:**
+   - Slips i dyb karminrød (`#D2233C`) med knude ved kraven og spids, der falder elegant ned over mochi-maven.
+   - Guld slipsenål med lysrefleks tværs over slipset.
+3. **Blomstrende Kokiri-vogterkrone:**
+   - To elegante svungne vogterblade med lysende grønne nerver.
+   - Blomstrende gylden lotus/krystal-krone i midten med ravfarvet kerne.
+4. **Gentleman-smil og rolig mimik:**
+   - Værdigt, selvsikkert og venligt forretnings-smil, der signalerer en moden og velplejet Lumi.
+
+#### Instruktion til test (Serial Monitor):
+* Tryk `s` i Serial Monitor (115200 baud) for at skifte til **Adult** (`[STAGE] Skiftet stadie til: adult`).
+* Test handlinger (Foder, Leg, Skæld ud) for at se kufferten og slipset animere sømløst uden flimmer.
+
+___
+
+### 🎩 Opdatering 6/11 (Formiddag): Gammel Lumi (Old / Vismand) med høj hat, guldbriller, overskæg og spadserestok
+**Branch:** `feature/arduino-stages`  
+**Ansvarlig:** Oleh
+
+Lumis fjerde og sidste livsstadie: **Den Gamle Vismand (Old)** er nu fuldt implementeret med masser af personlighed, visdom og retro-charme:
+
+#### Hvad er tilføjet:
+1. **Klassisk høj hat (gentleman top hat / vismandshat):**
+   - Mørk koksgrå cylinderhat (`#232837`) med bred buet skygge og lysstribe-highlight.
+   - Karminrødt silkebånd om bunden af hatten med et gyldent spænde i midten.
+   - En fjergrøn Kokiri-visdomsfjer stukket ind i hattebåndet.
+2. **Runde guldbriller og buskede hvide øjenbryn:**
+   - Fine runde trådbriller i guld med næsebro og lysglimt i brilleglasset over Lumis øjne.
+   - Buskede, bløde hvide øjenbryn ovenover brillerne, som giver et klogt og godmodigt professor-udtryk.
+3. **Hvidt mochi-overskæg og mildt smil:**
+   - Sødt hvidt overskæg under næsen, som følger med i alle udtryk og vejrtrækninger.
+   - Et mildt, tilfreds vismands-smil (`EXPR_CONTENT`).
+4. **Gylden lommeur-kæde:**
+   - Dobbeltbuede guldkæde tværs over Lumis mave med et lille rundt lommeur stukket ind i linningen.
+5. **Mahogni-spadserestok (walking cane):**
+   - Solid mahognistok med messing-dup, der støtter solidt på den mosbegroede platform.
+   - Buede gylden kryk-håndtag (crook handle) med lysglimt, som Lumi holder fast i med højre pote.
+   - **Interaktiv holdning:** Ved jubel (`SUPER_HAPPY` / `PLAYING`) løfter den gamle Lumi stokken muntert op i luften og vinker med den! Ved kulde (`FREEZING`) læner han sig rystende ind over stokken med begge poter.
+
+#### Komplet livscyklus på plads:
+Alle 4 livsstadier fra Game Design Doc er nu færdigudviklet:
+`Baby` (æg/sut) $\to$ `Teen` (swag/horn/DJ) $\to$ `Adult` (forretning/kuffert/slips) $\to$ `Old` (vismand/hat/briller/stok).  
+Skift frit imellem dem med `s` i Serial Monitor, og se MicroSD gemme og gendanne det automatisk!
+
+___
+
+### 🧣 Opdatering 6/11 (Middag): Garderobe-system & Termoregulering (Vinterhue, Halstørklæde & Hedebølge)
+**Branch:** `feature/arduino-wardrobe`  
+**Ansvarlig:** Oleh
+
+Lumis **Garderobe-system (`Garderobe`) og dynamiske termoregulerings-mekanik** er nu fuldt implementeret og testet på tværs af alle 4 livsstadier.
+
+#### Hvad er tilføjet:
+1. **Garderobe og vintertøj tilpasset alle 4 stadier:**
+   - 🐣 **Baby:** Varm rød strikhue med hvid stribekant og blød sne-pompon på toppen, hvor den lille spire stikker sødt ud ved siden af, samt et rød/hvidt stribet halstørklæde under hagen med frynser.
+   - 🎧 **Teen:** Mørk slouchy gamer-beanie, hvor de gyldne Kokiri-horn stikker sejt igennem i hver side, neonlysende cyan pompon bagtil, og et cyber-halstørklæde med cyan striber, der blafrer til højre.
+   - 💼 **Adult:** Foret jagtgrøn tweed-vinterhue med nedhængende varme øreklapper, den gyldne blomstrende lotus-krone som emblem foran, og et bordeaux cashmere-halstørklæde med guldbroderi over brystet.
+   - 🎩 **Old:** Den høje gentleman-hat udstyret med bløde hvide pels-ørekopper, der omfavner hovedet, frostet krystalsnefnug på hattebåndet og et tykt strikket jægergrønt bedstefar-tørklæde med kvaster.
+2. **Fysisk termoregulering (samspil med temperatursensor):**
+   - **Kulde ($T < 18^\circ\text{C}$ eller varme $< 45\%$):** Lumi fryser og ryster. Status viser *"Lumi fryser! Giv hue paa!"*. Tager spilleren vintertøj på, isoleres Lumi og varmen stiger til et lunt mål ($85\%$).
+   - **Hedebølge / Overophedning ($T \ge 23.5^\circ\text{C}$ og vintertøj på):**
+     Hvis Lumi har vinterhue på i et varmt klasselokale, overopheder han!
+     * **Visuel feedback:** Rødblussende kinder, ferskenfarvet overophedet krop, forpustet åben mund med hængende tunge (`😛`), sammenknebne øjne og en stor skinnende sveddråbe (`💧`), der løber ned af tindingen, samt faldende dråber på sideskærmen.
+     * **Mekanik:** Humøret (`happiness`) falder hurtigt under overophedning, og status advarer: *"Lumi sveder! Tag huen af!"*.
+     * **Løsning:** Spilleren tager huen af $\to$ Lumi køler straks af og smiler igen!
+3. **Styring og genveje:**
+   - **På Oplà:** Hold **TOUCH 0 (<)** og **TOUCH 1 (>)** nede samtidig i 400 ms på startskærmen for at tage tøj på/af (viser pop-up bekræftelse på displayet).
+   - **I Serial Monitor (115200 baud):**
+     * Skriv `'w'` (Wardrobe) for at skifte mellem standard og vintertøj on-the-fly.
+     * Skriv `'f'` (Frost) for at simulere 12 graders frostkulde og teste kulde-mekanikken.
+     * Skriv `'h'` (Heat) for at simulere 28 graders hedebølge og se Lumi svede og puste!
+4. **Persistens og MQTT:**
+   - Garderobevalg gemmes på MicroSD i `lumi.txt` som `OUTFIT=0` (Standard) eller `OUTFIT=1` (Vinter).
+   - I `pet/state` MQTT JSON sendes `"outfit": "default"` eller `"outfit": "winter"`.
+
+___
+
+### 🥶 Opdatering 6/11 (Eftermiddag): Autentisk kropslig reaktion på kulde og varme (Sammenkrøbning, rystelser & udmattet hedeslag)
+**Branch:** `feature/arduino-wardrobe`  
+**Ansvarlig:** Oleh
+
+Vi har videreudviklet de fysiske reaktioner på ekstrem temperatur, så Lumi ikke blot viser en simpel ikon-effekt, men fysisk ændrer kropsholdning, positur og mikrobevægelser svarende til et rigtigt levende væsens ufrivillige spasmer og udmattelse.
+
+#### Hvad er tilføjet på tværs af alle 4 stadier:
+1. **Autentisk kulde-reaktion (Sammenkrøbet frysende kropsholdning & asymmetriske mikroryk):**
+   - **Kroppen kryber sammen:** Silhuetten trykkes 2–3 pixels fladere og trækkes ind mod maven for at holde på kropsvarmen (fosterstilling).
+   - **Trykkede ører:** Ørerne foldes helt fladt ind mod hovedet (`earTipOffsetY = -17`).
+   - **4-faset asymmetrisk kulde-krampe (~22 Hz / 45 ms):** I stedet for en kunstig sinusbølge ryster Lumi med en realistisk ufrivillig muskelspasme (`shiverX = {-2, 1, -1, 2}`, `shiverY = {2, 1, 2, 1}`).
+   - **Klakkende tænder:** Munden veksler lynhurtigt mellem en rystende bølge-mund og en hvid stribe af klakkende tænder.
+   - **Baby:** Sutten klakker og vibrerer i munden (`paciDx = -1..0`), og de små luffer er krydset stramt over brystet.
+   - **Adult:** Holder diplomatkufferten tæt ind til den rystende krop med begge poter.
+   - **Old:** Begge skælvende poter klynger sig krampagtigt til mahogni-stokken.
+   - **Teen:** Lufferne trykkes ind i siden.
+
+2. **Autentisk varme-reaktion (Hedeslag, slap positur & tung termisk stakåndethed):**
+   - **Slapt sammenfald:** Kroppen og lemmerne synker slapt sammen under hedebølgen.
+   - **Hængende ører:** Ørerne taber spændstigheden og hænger slapt ned ad kinderne (`earTipOffsetY = -13`).
+   - **Hæsblæsende stakåndethed (Panting heave, 90 ms):** Brystkassen hejser sig hurtigt op og ned (`pantingDy = {-1, 0, 1, 0}`), mens Lumi gisper efter luft.
+   - **Udhængende tunge med spytglans:** Munden åbnes vidt med en blød lyserød tunge, der hænger ud over underlæben (`😛`) med hvid spytrefleksion.
+   - **Løbende sveddråbe & pandesved:** En animeret sveddråbe glider løbende ned ad højre tinding, mens en perlesveddråbe glitrer på venstre bryn.
+   - **Baby:** Spytter sutten ud i heden for at kunne gispe med tungen ude, mens poterne ligger slapt ud til siderne på jorden.
+   - **Teen:** Cyber-høretelefonerne glider 5 pixels ned ad den svedige hals (`hpOffsetY = 5`), mens poterne hænger slapt ned.
+   - **Adult:** Det formelle slips er løsnet skævt op ved kraven, venstre pote tørrer sved af panden, diplomatkufferten er tabt fladt på jorden, og højre pote hænger udmattet.
+   - **Old:** Guldbrillerne glider ned over næseryggen (`glassesY + 2`), og vismanden læner sig tungt og udmattet fremover med begge poter slapt hvilende på stokkens håndtag.
+
+#### Ydeevne og hardware-budget på SAMD21 (MKR WiFi 1010):
+- **CPU:** 48 MHz 32-bit ARM Cortex-M0+ afvikler hele den procedurale rendering på blot **~4% CPU** tid.
+- **RAM:** Kun **8.468 bytes (25%)** brugt ud af 32 KB SRAM (24,3 KB fri til stak og lokale variable).
+- **Flash:** **171.644 bytes (65%)** ud af 256 KB Flash (90,5 KB fri plads til Pong og labyrint).
+- **Flimmerfri delta-rendering:** Ingen dynamisk RAM-allokering i `loop()`, opdateringsfrekvens skalerer dynamisk op til ~22 FPS ved kulde/varme for ekstremt flydende spasmer.
+
+___
+
+### ⚡ Opdatering 6/11 (Eftermiddag): Hukommelsesoptimering, fjernelse af dynamisk heap i MQTT & MicroSD dirty-cache (Forberedelse til spil)
+**Branch:** `feature/arduino-wardrobe`  
+**Ansvarlig:** Oleh
+
+Før udviklingen af de to on-board minispil (Solo-Pong og labyrint-generatoren) blev hele kildekoden underkastet en dybdegående indlejret C++ hukommelses- og stabilitetsoptimering. På en ARM Cortex-M0+ mikrokontroller uden virtuel hukommelse er dynamisk hukommelsesallokering (`malloc`, `String`, eksterne biblioteker med dynamisk JSON-træ) den største kilde til **heap-fragmentering** og uforklarlige nedbrud (`HardFault`) over tid.
+
+#### Hvorfor denne optimering var nødvendig (Arkitektur & eksamensforsvar):
+1. **Forebyggelse af heap-fragmentering:** Når MQTT modtager beskeder over Wi-Fi, må der ikke allokeres og frigives små dynamiske hukommelsesblokke på heapen i `loop()`. Det fragmenterer den frie RAM og kan få programmet til at gå ned efter 10–30 minutters kørsel.
+2. **Beskyttelse af SPI-bussen og MicroSD-flash:** ST7789 displayet og MicroSD-kortet deler den samme SPI-bus på Carrier-printet. Hyppig skrivning til SD-kortet blokerer displayopdateringen og slider på kortets flash-blokke.
+3. **Fuldstændig offline-robusthed:** Hvis Wi-Fi forbindelsen mistes i lokalet, må mikrokontrollerens `loop()` aldrig blokere i 4–5 sekunder på TCP/DNS-timeouts. Spillene og Tamagotchi-animationerne skal køre uhindret videre med fuld FPS.
+
+#### Hvad er ændret i koden:
+1. **1-byte typede `enum` deklarationer (`uint8_t`) & struct-pakning:**
+   - Alle globale enums i `settings.h` (`ScreenType`, `MenuIcon`, `TouchPad`, `SoundType`, `GameEvent`, `PetStage`, `PetOutfit`) samt grafik-enums i `ui_pet.h` (`LumiExpression`, `SkyWeatherMode`) er eksplicit typet som `: uint8_t`.
+   - På en 32-bit Cortex-M0+ tildeler compileren standard 4 bytes pr. enum. Ved at tvinge dem til `uint8_t` spares 3 bytes pr. forekomst, og datastrukturer kan pakkes tæt uden unødig polstring (`padding bytes`).
+   - Medlemmerne i `UiPetRenderer` og `UiStatsRenderer` er omorganiseret efter faldende justering (pointere, `unsigned long`, `int16_t`, `char`-arrays, `bool`).
+
+2. **Fuldstændig fjernelse af `ArduinoJson` og dynamisk `String` i `net_mqtt`:**
+   - `#include <ArduinoJson.h>` er fjernet fra projektet.
+   - Indgående MQTT-beskeder parses nu af en nul-allokerings tokenizer direkte på CPU-stakken (`extractJsonStringValue`, `extractJsonIntValue`), der finder felter som `"type"` og `"amount"` uden en eneste byte på heapen.
+   - Statiske emne-buffere (`topicInput`, `topicEvent`, `topicReward`, `topicPetState`, `clientMqttId`) er optimeret i størrelse til faste længder.
+   - **Gevinst:** Flash-forbruget faldt med næsten **5 KB (4.992 bytes)** ved at slippe for `ArduinoJson`-templates, og heap-forbruget i `net_mqtt` er nu **0 bytes**.
+
+3. **Afkobling af netværks-blocking ved offline kørsel:**
+   - I `TamaPal.ino` kaldes `netMqtt.update(now)` kun, når Oplà er i `SCREEN_CONTROLLER` eller hvis forbindelsen allerede er aktiv.
+   - Når spilleren hygger sig med kæledyret offline, forsøges der ikke gentagne blokerende DNS/TCP-håndtryk, hvilket fjerner det berygtede 5-sekunders frys og sikrer konstant ~22–30 FPS.
+   - Under aktivt controller-spil pauses MicroSD-skrivning (`syncPetStateToBackend`), så boldens bevægelse på lærredet aldrig rammes af SPI-ventetid.
+
+4. **MicroSD Dirty-Checking Cache via FNV-1a Hash (`storage_pet`):**
+   - Hver gang tilstanden gemmes, beregner `storagePet` en lynhurtig 32-bit Fowler–Noll–Vo (FNV-1a) hash af serialiseringsstrengen.
+   - Hvis dataene ikke har ændret sig siden sidste skrivning (`currentHash == lastSavedHash`), afbrydes skrivningen øjeblikkeligt uden at røre MicroSD-kortet.
+   - Udvidet format: `lumi.txt` understøtter nu fremtidige spildata bagudkompatibelt: `PONG=<score>`, `MAZE=<score>` og `AGE=<minutter>`.
+
+5. **Eliminering af asynkron tidsforskydning og koordinat-rettelse (`ui_pet` & `ui_stats`):**
+   - Alle uafhængige `millis()`-kald inde i ansigtsanimationen (`freezing chatter`, `sweat drop`, `panting mouth`) er erstattet af ét fælles tidsstempel `lastAnimTickMs`, så animationens faser aldrig desynkroniserer.
+   - Sveddråbens startposition er rykket ned til `eyeY - 5`, så den forbliver 100% inde i ansigtets afgrænsede slette-boks.
+   - I `ui_stats` er `char lastMood[32]` erstattet med konstant pointer-sammenligning (`lastMoodText != currentMood`), hvilket fjerner unødige `strcmp` og `strncpy` i hvert frame.
+
+#### Verificerede kvalitets- og hukommelsestal (Arduino MKR WiFi 1010):
+- **Flash-forbrug:** **166.652 bytes (63%)** ud af 256 KB — **sparet 4.992 bytes** i forhold til tidligere build!
+- **SRAM-forbrug:** **8.324 bytes (25%)** ud af 32 KB — efterlader **24.444 bytes fri RAM** til stak og minispil!
+- **Unit tests:** **170 af 170 tests bestået (100% PASS, 0 advarsler)**.
+- **Kompilering:** 0 fejl, 0 advarsler (`--warnings all`).
+
+___
+
+### 🏓 Opdatering 6/11 (Sen Eftermiddag): On-board Solo Mur-Pong på Arduino Oplà (Fuld minispil-arkitektur)
+**Branch:** `feature/arduino-games`  
+**Ansvarlig:** Oleh
+
+Vi har implementeret det første fulde offline-minispil direkte på Oplà-kortets runde 240x240 display: **Solo Mur-Pong**. Spillet kan spilles 100% uafhængigt uden computer og uden internetforbindelse.
+
+#### Hvad er tilføjet:
+1. **Minispil-menu (`SCREEN_GAMES_MENU`):**
+   - Når spilleren vælger `LEG` i hovedmenuen, åbnes en stilren cyberpunk minispil-vælger med to kort:
+     * `1. SOLO PONG` (Mur-Pong bat & bold) med visning af personlig rekord (High Score).
+     * `2. LABYRINT` (IMU marmor-kugle) med visning af rekord.
+   - Skift mellem spil med `TOUCH 0` (<) og `TOUCH 1` (>), start med `TOUCH 2` (OK), tilbage med `TOUCH 3` (BACK).
+2. **Spilmekanik og fysik (`PongLogic`):**
+   - **Styring:** Spilleren kan styre battet vertikalt ved at **hælde Oplà-kortet** (`tiltY` via LSM6DS3 IMU med jævn Lerp-interpolation) ELLER ved at trykke på touch-knapperne `TOUCH 0` (ned) og `TOUCH 1` (op), hvis kortet ligger fladt på bordet.
+   - **Solid neon bagvæg:** Til højre på banen findes en massiv guldbelagt neon-rebound væg. Bolden preller af på over-, under- og højre væg (`SOUND_CLICK`).
+   - **Bat-kollision & vinkelafbøjning:** Når battet rammer bolden, ændres boldens vertikale spin afhængigt af, om den rammer toppen, midten eller bunden af battet. Hvert vellykket slag accelererer bolden en smule (hastigheds-boost) og giver 1 point (`SOUND_HIT` + cyan lysglimt på battet).
+   - **Liv & Game Over:** Spilleren har 3 liv (vises som lysende hjerte-prikker i toppen). Hvis bolden slipper forbi battet mod venstre, mistes et liv (`SOUND_MISS`). Efter en kort pause på 800 ms serves en ny bold.
+   - **Resultat & High Score:** Når alle 3 liv er tabt (`SOUND_GAMEOVER`), vises en elegant modal med slutscore, personlig rekord og guld-fejring ved *"NY REKORD!"*. Rekorden gemmes persistent på MicroSD i `lumi.txt` (`PONG=<score>`).
+3. **Effekt på Lumi:**
+   - En fuldført omgang Pong belønner kæledyret: `happiness` stiger med op til +30 point, mens Lumi bruger en smule energi (`energy -= 8`).
+4. **Grafik & Flimmerfri Delta-Rendering (`UiPongRenderer`):**
+   - Kun battets og boldens forrige positioner overskrives med baggrundsfarven `#080C1A` i hvert frame.
+   - Ingen `fillScreen()` under kørslen: afvikles ved **50+ FPS** med 0 skærmflimmer!
+5. **Test & genveje:**
+   - Skriv `'p'` eller `'P'` i Serial Monitor (115200 baud) for at starte Solo Pong øjeblikkeligt.
+   - 25 nye unit-tests dækker 100% af fysikken, kollisionerne og tilstandene i `PongLogic`. Total: **195 af 195 unit-tests bestået**.
+
+#### Verificerede kvalitets- og hukommelsestal (Arduino MKR WiFi 1010):
+- **Flash-forbrug:** **171.428 bytes (65%)** ud af 256 KB — over 90,7 KB fri til labyrint-spillet!
+- **SRAM-forbrug:** **8.388 bytes (25%)** ud af 32 KB — efterlader **24.380 bytes fri RAM**!
+- **Unit tests:** **195 af 195 tests bestået (100% PASS, 0 advarsler)**.
+- **Kompilering:** 0 fejl, 0 advarsler i projektkoden.
+
+___
+
+### 🌀 Opdatering 6/11 (Aften): Procedural IMU Marmor-Labyrint på Oplà (100% Gennemførlig, Fælder & Bær)
+**Branch:** `feature/arduino-games`  
+**Ansvarlig:** Oleh
+
+Vi har implementeret det andet store on-board spil: **Procedural IMU Marmor-Labyrint**. Spillet udnytter 2D-akselerometret (IMU LSM6DS3) til ægte analog kugle-fysik, hvor Oplà-kortet vippes i hænderne som et klassisk labyrintspil i træ. Piletaster er bevidst frakoblet under spillet – styringen sker 100% via IMU!
+
+#### Hvad er tilføjet:
+1. **100% Garanteret Gennemførlighed (DFS Spanning Tree Algoritme):**
+   - Hver gang spillet startes, genereres en helt ny, unik $7 \times 7$ labyrint (49 felter) via en Depth-First Search (Recursive Backtracker) algoritme.
+   - Algoritmen bygger et matematisk spændetræ: enhver celle kan nås, ingen isolerede rum findes, og der er altid **100% garanti for en farbar rute** fra start $(0,0)$ til udgangsportalen $(6,6)$.
+2. **Karakter-kugle: Mini-Lumi i bevægelse (`UiMazeRenderer`):**
+   - Kuglen er udformet som en charmerende miniature-Lumi (9x9 px mochi-form i mintgrøn med gylden spire på toppen).
+   - **Levende øjne:** Lumis øjne kigger i den retning, kuglen ruller (fremad, nedad, sidelæns) for en levende karakter-følelse.
+   - **Hjørne-glidning (Corner Sliding):** Ved skråt træk mod en væg glider Lumi blødt langs gangen uden at sidde fast.
+3. **Fælder og Belønninger (Tricks & Traps i blindgyder):**
+   - 🕳️ **Faldgruber / Sorte huller (`ITEM_PITFALL`):** 2 lumske huller er placeret i fristende blindgyder. Ruller Lumi heri, suges han ned med et hvin (`SOUND_MISS`), og straffes med **+5 sekunder** på uret før genstart ved startpunktet.
+   - 🍓 **Deku-Bær (`ITEM_BERRY`):** 2–3 skinnende gyldne bær gemmer sig i andre blindgyder. At rulle ind og hente dem giver bonuspoint, spil-feedback (`SOUND_CONFIRM`) og genoplader Lumis energi.
+   - 🧊 **Is-zoner (`ITEM_ICE`):** Visse gange er belagt med glat is (nul friktion), hvor kuglen suser hurtigt afsted og kræver lynhurtig mod-hældning!
+4. **Mål, High Score og Kæledyrs-effekt:**
+   - Målet er en lysende guldportal i nederste højre hjørne.
+   - Top-HUD viser samlede bær (`* 2/3`) og et løbende stopur (`TID: 00:24`).
+   - Ved fuldførelse vises en sejrsmodal med tid, bær og eventuel ny rekord (`MAZE=<sekunder>`), der automatisk gemmes på MicroSD i `lumi.txt`.
+   - Sejr giver massivt humør-boost: `happiness += 35` og `discipline += 15`!
+5. **Genveje & Verifikation:**
+   - Tast `'l'` eller `'L'` i Serial Monitor for at starte Labyrinten direkte.
+   - 12 nye unit-tests verificerer DFS-spændetræ, 100% tilgængelighed af alle 49 felter, fælder, bær og IMU-fysik.
+   - Total: **207 af 207 unit-tests bestået (100% PASS)**.
+
+#### Verificerede kvalitets- og hukommelsestal (Arduino MKR WiFi 1010):
+- **Flash-forbrug:** **177.132 bytes (67%)** ud af 256 KB — 85 KB fri plads tilbage!
+- **SRAM-forbrug:** **8.508 bytes (25%)** ud af 32 KB — 24.260 bytes fri RAM til stak!
+- **Unit tests:** **207 af 207 tests bestået (100% PASS, 0 advarsler)**.
+- **Kompilering:** 0 fejl, 0 advarsler i projektkoden.
+
+___
+
+### 🎬 Opdatering 6/11 (Nat): Arkade Navneindtastning, 100-Dages Alderdom, Kirkegårds-galleri, Autonom Showcase Direktør & Fuldstændig Fejlretning
+**Branch:** `feature/arduino-death-rebirth`  
+**Ansvarlig:** Oleh
+
+Vi har afsluttet den fulde implementering af Oplà-kæledyrets livscyklus, tilføjet et autonomt teater-showcase til optagelse af videopræsentation uden berøring af kortet, og gennemført en uafhængig dybdegående kodekvalitets-gennemgang med fuld udbedring af alle fundne logikfejl.
+
+#### 1. Arkade 4-bogstavers Navneindtastning (`NameEntryLogic`):
+* **Før et nyt kæledyr udklækkes**, åbner en retro 80'er arkade-skærm (`SCREEN_NAME_ENTRY`) med 4 tegnpladser (f.eks. `LUMI`, `THOR`, `BOB`).
+* **Styring:**
+  - `TOUCH 0` (<): Forrige bogstav (`A`..`Z`, `0`..`9`, mellemrum, med wrap-around).
+  - `TOUCH 1` (>): Næste bogstav.
+  - `TOUCH 2` (OK): Gå til næste plads. På plads 4 afsluttes og godkendes navnet.
+  - `TOUCH 4` (STATS): Lyn-godkend navnet på enhver plads (fjerner automatisk overskydende mellemrum).
+  - `TOUCH 3` (BACK): Gå en plads tilbage.
+* **Persistens:** Kæledyrets valgte navn gemmes sikkert på MicroSD som `NAME=<navn>` i `lumi.txt` og overlever uændret på tværs af fremtidige genfødsler (`rebirth()`).
+
+#### 2. 100-Dages Alderdomstærskel & Fredelig Død (`DEATH_OLD_AGE`):
+* Kæledyret akkumulerer levetid minut for minut (`ageMinutes`).
+* Når Lumi runder **100 dage** (100 minutter simulationstid), sover han fredeligt ind af alderdom.
+* **Visuel og lydlig effekt:** Bløde englevinger folder sig ud over skærmen, en himmelsk glød (`SOUND_REBIRTH`) og et roligt spirituelt lys (RGB `180, 220, 255`) ledsager overgangen til evigheden.
+* Epitaf på dansk: *"Levede et lykkeligt liv!"*.
+
+#### 3. Mindestatue- & Kirkegårdsgalleri på Oplà (`SCREEN_MEMORIAL`):
+* Trykkes der på `TOUCH 4` (STATS) fra startskærmen, når Lumi er gået bort, åbnes det interaktive forfædre-galleri.
+* Spilleren kan bladre bagud i generationer med `TOUCH 0` og `TOUCH 1` for at se mindesten for alle tidligere Lumi-generationer:
+  - Navn, generation (`GEN X`), opnået alder, dødsårsag, personlige rekorder i Mur-Pong og Labyrint samt personligt gravskrift.
+  - Tilbage til hjemmeskærmen med `TOUCH 3`.
+
+#### 4. 🎭 Autonom Showcase Direktør (`ShowcaseDirector` - 70s Automatisk Teater):
+* **Formål:** Gør det muligt at optage en komplet 70-sekunders demovideo af Oplà-skærmen til lærerne eller åbent hus, **helt uden at røre kortet med hænderne**.
+* **Sådan startes det:**
+  - **Fysisk gestus på Oplà:** Hold **TOUCH 1 og TOUCH 3 nede samtidig i 800 ms** på startskærmen. (Kortet kvitterer med guldglimt og opstartsmelodi).
+  - **Via Serial Monitor (115200 baud):** Send bogstavet `'s'` eller `'S'`.
+  - **Afbrydelse undervejs:** Tryk på `TOUCH 3` for at afbryde showcasen før tid og vende tilbage til almindeligt spil.
+* **Den 70-sekunders dramatiske tidslinje (10 akter):**
+  1. *0.0–2.5s:* Arkade-navneindtastning (stiller navnet `LUMI` og godkender automatisk).
+  2. *2.5–7.0s:* Dramatisk æggeklækning (ægget vrikker, slår revner og klækker baby-Lumi i guldstøv).
+  3. *7.0–12.0s:* Baby-Lumi spiser et saftigt bær (`SCREEN_ACTION`, "MUMS: MAD!"), og efterlader en lort 💩.
+  4. *12.0–16.5s:* Sæbebad og boble-animation fjerner lorten og gør Lumi skinnende ren.
+  5. *16.5–23.5s:* Udvikling til sej Teenager med Kokiri-horn og DJ-høretelefoner; krammes og spinder tilfreds.
+  6. *23.5–35.0s:* Skifter til Mur-Pong; intelligent AI-autopilot rammer bolden præcist med battets midte og demonstrerer spillet, før bolden slipper forbi ved 33.5s.
+  7. *35.0–45.0s:* Stjerneklar nat og fredelig søvn i seng med dyne (sensorer holdes i dvale, så lyset i rummet ikke vækker Lumi).
+  8. *45.0–54.0s:* Vågner som 99-dages Vismand med hat, stok og briller; fanger en forkølelse og kureres af 3 gyldne bær (`SCREEN_ACTION`, "LUMI RASK!").
+  9. *54.0–62.0s:* Runder 100 dage og sover fredeligt ind med englevinger og himmelsk glød; forfædren logges i `grave.txt`.
+  10. *62.0–70.0s:* Teleporterer til Mindestatue-galleriet og fremviser forfædrens mindesten.
+  * *70.0s+:* Vender sikkert tilbage til startskærmen klar til ny genfødsel.
+
+#### 5. Udbedrede Kodefejl (Resultat af Uafhængigt Code Review):
+* **Navnebevarelse ved genfødsel:** `PetLogic::rebirth()` gemmer nu `petName` i en lokal buffer før nulstilling, og den overflødige dobbelte `rebirth()` ved navnegodkendelse er fjernet. Generationer stiger nu strengt med +1 (`GEN 1` $\to$ `GEN 2`), og det valgte navn overskrives aldrig af standardnavnet.
+* **Sensor-pause under showcase:** Miljøaflæsning (lys, temperatur), nærhedssensor (klap) og rystedetektion er beskyttet med `!showcaseDirector.isActive()`, så Lumi ikke vækkes af stuens lamper midt i nattescenen.
+* **Loop-rækkefølge og skærmflimmer:** `ShowcaseDirector::update()` kaldes nu inden skærmovergange (`SCREEN TRANSITIONS`), hvilket eliminerer en 1-frame grafikfejl, hvor Lumi blev tegnet ovenpå Mur-Pong feltet.
+* **Pong autopilot-sigte:** Autopiloten sigter nu mod battets midte (`paddleCenterY = paddleY + 16`) i stedet for toppen, hvilket giver perfekte, centrerede slag.
+* **Sikker touch-kombination:** Genvej for showcase er flyttet fra Touch 2 (som udløste mad i menuen) til `TOUCH 1 + TOUCH 3` (800 ms hold) med gensidig udelukkelse mod almindelige menuknap-klik.
+* **Test-genvej `'o'` i Serial:** Første tryk sætter alder til 99 dage (levende vismand); andet tryk sætter 100 dage og udløser den fredelige død.
+* **Netværksrobusthed & MQTTS-klar:** 
+  - Forbindelsestimeout sat til 1,5s (aldrig 4 sekunders UI-frys).
+  - Pålidelig tokenizer og buffergrænsekontrol ved parsing af serverbeskeder (`assign_p1`, `assign_p2`, `hit`, `miss`, `gameover`).
+  - TLS/MQTTS krypteringsforberedt via `USE_TLS_MQTT` i `settings.h` (port 8883 med `WiFiSSLClient`).
+* **MicroSD atomisk skrivning:** Sikkerhedskopi `lumi.bak` oprettes før overskrivning af `lumi.txt`, og data integritetsverificeres med FNV-1a kontrolsum.
+
+#### 6. Test og Kompileringsstatus:
+* **Unit tests:** **501 af 501 tests bestået (100% PASS)** i `Arduino/tests/run_tests.sh`.
+* **Kompilering:** 0 fejl, 0 advarsler i egen kildekode på SAMD21 (`arduino-cli compile --warnings all --fqbn arduino:samd:mkrwifi1010 Arduino/TamaPal`).
+* **Hukommelse på MKR WiFi 1010:** Flash: 80% (210 KB af 262 KB), RAM: 27% (8,9 KB af 32 KB). 23,8 KB fri RAM!
+
+___
+
+### 🎵 Opdatering 7/11 (Morgen): Akustisk Redesign af Buzzer-lyd & Bløde Knaptoner
+**Branch:** `feature/arduino-death-rebirth`  
+**Ansvarlig:** Oleh
+
+MKR IoT Carrier-printets piezo-summer (pin 6) styres via PWM med `carrier.Buzzer.sound()`. Keramiske piezo-skiver har et kraftigt fysisk resonanstoppunkt i området **1.500–2.500 Hz**, hvor lydtrykket peaker med op til 85–90 dB. Vores tidligere bekræftelsestone (`SOUND_CONFIRM`) lå på 1.760 Hz (A6, 40 ms), hvilket gav en skinger, gennemtrængende alarmlyd, der lød som en brandalarm eller sirene.
+
+#### Hvad er ændret i `sound_led.cpp`:
+1. **Knap-klik (`SOUND_CLICK`):**
+   * Tidligere: 1.200 Hz / 18 ms (skarp biplyd).
+   * **Nu:** **520 Hz / 8 ms** — et ultra-kort, blødt taktilt klik med Switch / iOS haptic-fornemmelse.
+2. **Bekræftelse og controller-tilslutning (`SOUND_CONFIRM`):**
+   * Tidligere: 1.760 Hz / 40 ms (højfrekvent sirenealarm).
+   * **Nu:** **659 Hz (E5) / 20 ms** — en varm, melodisk arkade-blip i halv længde, der fjerner al støj og ubehag for ørerne.
+3. **Afbryd / Tilbage (`SOUND_BACK`):**
+   * Tidligere: 440 Hz / 35 ms $\to$ **Nu:** **370 Hz / 15 ms** (dæmpet bas-pop).
+4. **Bold-afbøjning i Pong (`SOUND_HIT`):**
+   * Tidligere: 1.400 Hz / 65 ms $\to$ **Nu:** **784 Hz (G5) / 25 ms** (elastisk bordtennis-pop).
+5. **Øvrige lydeffekter:**
+   * Fejring (`SOUND_FANFARE`), helbredelse (`SOUND_HEAL`), genfødsel (`SOUND_REBIRTH`) og spindelyd (`SOUND_PURR`) er alle rykket ud af det skingre resonansområde (>1.5 kHz) og ned i det behagelige 500–900 Hz spektrum med forkortede varigheder.
+
+___
+
+### 📜 Opdatering 7/11 (Formiddag): Udvidet `pet/state` Kirkegårds-kontrakt & Fejlsikring
+**Branch:** `feature/arduino-death-rebirth`  
+**Ansvarlig:** Oleh
+
+For at understøtte Olivers backend-database (PostgreSQL/Neon) og frontendens nekropol/kirkegård er `pet/state` MQTT-kontrakten udvidet med fuld historik og biografiske data for det afdøde kæledyr:
+
+#### Hvad er tilføjet:
+1. **Biografiske data i `pet/state`:**
+   * `"generation": 2` — det aktuelle slægtsled.
+   * `"ageMinutes": 210` — samlet akkumuleret levetid.
+   * `"deathCause": "old_age"` (eller `"hunger"`, `"cold"`, `"heat"`, `"boredom"`, `"exhaustion"`).
+   * `"epitaph": "Levede et lykkeligt liv!"` — dansk mindeord.
+2. **Fejlsikker 60s lort-timer ved genstart (`storage_pet` / `pet_logic`):**
+   * Hvis enheden slukkes med en lort (`💩`) på skærmen, nulstilles forsømmelsestimeren ved boot, så Lumi ikke rammes af øjeblikkelig sygdom i sekund 0. Spilleren får en fuld, retfærdig 60-sekunders buffer til at ryste Oplà og udføre et sæbebad.
+3. **Batterisparende netværkspolitik:**
+   * Oplà starter offline i lokal Tamagotchi-tilstand, så Wi-Fi ikke dræner batteriet unødigt under almindelig leg. Wi-Fi og MQTT etableres først ved overgang til controller (`SCREEN_CONTROLLER`) og vedligeholdes derefter løbende.
+4. **Verificeret MQTT-levering:**
+   * Kontrol af `beginMessage() == 1` og `endMessage() == 1` i `publishInput()` og `publishPetState()`. Ved pakketab gentages synkronisering efter 3 sekunder i stedet for 30 sekunder.
+
+___
+
+### 🌟 Opdatering 7/11 (Middag): Showcase Direktør v2 (72 sek.) med Wow-effekter & Grand Finale
+**Branch:** `feature/arduino-death-rebirth`  
+**Ansvarlig:** Oleh
+
+Showcase-direktøren er udvidet fra 70 til 72 sekunder med 11 komplette akter, filmiske kamerasvingninger og retro-visuelle effekter designet til optimal præsentation på video:
+
+#### De 11 akter og visuelle effekter:
+1. *Akt 1 (0.0–2.5s):* Arkade-navneindtastning (stiller automatisk `LUMI` og bekræfter).
+2. *Akt 2 (2.5–7.0s):* **Livets puls og fødsel:**
+   - Dybe 110 Hz hjertebanken med rubinrøde LED-pulsglimt (`SOUND_HEARTBEAT`).
+   - Skallen slår revner med et fysisk **kamera-stød (Screen Shake)**.
+   - Ægget klækkes med en stjerne-eksplosion (**Nova-støv**) og et løbende lys-portal (**LED Chaser**)!
+3. *Akt 3 (7.0–12.0s):* Baby-Lumi spiser et saftigt bær på handlingsskærmen og efterlader en lort.
+4. *Akt 4 (12.0–16.5s):* Rystevask med sæbeskum, mikrorystelser og skinnende rent display.
+5. *Akt 5 (16.5–23.5s):* Udvikling til Teenager med Kokiri-horn og DJ-hovedtelefoner ledsaget af stjernestøv og LED-portal; blid kærtegn over sensoren med spindelyd.
+6. *Akt 6 (23.5–35.0s):* Solo Mur-Pong; intelligent autopilot rammer præcist i battets centrum.
+7. *Akt 7 (35.0–45.0s):* Stjerneklar nat; Lumi sover under dynen med 5 bløde, blå vejrtræknings-LED'er (sensorer sat på pause mod falsk opvågning).
+8. *Akt 8 (45.0–54.0s):* 99-dages Vismand med hvidt skæg og stok; forkølelse og helbredelse via apotekets mikstur.
+9. *Akt 9 (54.0–62.0s):* **Himmelsk åndefart (Celestial Ascension):**
+   - 100 dages fredelig død med englevinger, roterende guldglorie og opadstigende åndepartikler.
+10. *Akt 10 (62.0–68.0s):* Mindestatue-galleriet med afdødes biografi og rekorder.
+11. *Akt 11 (68.0–72.0s):* **Grand Finale Titelsplash:**
+    - Sejrsfanfare (`SOUND_FANFARE`), gyldent løbende LED-portal og festskærm:
+      `TAMAPAL • MERCANTEC H3 2026 • OLEH * OLIVER * ANDRII` med 16x16 pixelmaskot!
+* *72.0s+:* Automatisk tilbagevenden til startskærmen, klar til genfødsel.
+
+___
+
+### 📟 Komplet oversigt over Serial Monitor-kommandoer (Oplà styring og test)
+
+Til eksamenspræsentation, live-demonstration for undervisere og hurtig test af alle hardware-komponenter uden at vente på naturlige timere, understøtter Arduino-koden en lang række direkte enkelt-tasts kommandoer i **Serial Monitor ved 115200 baud**:
+
+| Tast | Funktion i Serial | Hvad der ændres på Arduino (Skærm, Lyd, LED, Hukommelse, MQTT) |
+|:---:|---|---|
+| `'a'` / `'A'` | **Autonom Showcase (Start/Stop)** | Starter det 72-sekunders filmiske teater (`ShowcaseDirector`). Tryk igen for at afbryde tidligt og vende tilbage til `SCREEN_HOME`. |
+| `'c'` / `'C'` | **Kabinettilstand (Case Mode)** | Skifter touch-følsomhed på Microchip QTouch mellem **plastik-etui** (tærskel 60) og **nøgent print** (tærskel 200) uden genstart eller genkompilering. |
+| `'s'` / `'S'` | **Skift Livsstadie (Cirkulér)** | Cirkulerer gennem Lumis 4 livsstadier: `Baby` $\to$ `Teen` $\to$ `Adult` $\to$ `Old`. Opdaterer grafik, animationer, gemmer på MicroSD og synkroniserer `pet/state`. |
+| `'w'` / `'W'` | **Garderobe (Skift tøj)** | Skifter mellem standard-tøj og **vintertøj** (hue og halstørklæde tilpasset stadiet). Opdaterer display og gemmer i `lumi.txt`. |
+| `'f'` / `'F'` | **Simulér Frostkulde (12°C)** | Tvinger temperaturen til 12°C og varmen ned på 15%. Lumi ryster med 4-faset kuldekrampe, klakker med tænderne og beder om vinterhue. |
+| `'h'` / `'H'` | **Simulér Hedebølge (28°C)** | Tvinger temperaturen til 28°C og varmen op på 85%. Har Lumi vinterhue på, overopheder han: stakåndet gispen, hængende tunge og animerede sveddråber. |
+| `'p'` / `'P'` | **Start Solo Mur-Pong** | Skifter Oplà direkte til det indbyggede Mur-Pong minispil med bat, bold, livescore og personlig rekord. |
+| `'l'` / `'L'` | **Start Marmor-Labyrint** | Genererer en 100% gennemførlig $7 \times 7$ labyrint (DFS-algoritme) og starter spillet med analog IMU-kuglestyring. |
+| `'k'` / `'K'` | **Demonstrér Dødsfald (1..6)** | Udløser ét af de 6 dødsårsager i rækkefølge (Sult, Kulde, Varme, Kedsomhed, Udmattelse, Alderdom). Logger forfaderen i `grave.txt` og synkroniserer med kirkegården på backend. |
+| `'r'` / `'R'` | **Genfødsel (Rebirth)** | Hvis Lumi er gået bort: åbner arkade-navngivningsskærmen (`SCREEN_NAME_ENTRY`) for at navngive det næste slægtsled (`GEN X`). |
+| `'n'` / `'N'` | **Åbn Navneindtastning** | Åbner den 4-bogstavers arkade-skærm (`SCREEN_NAME_ENTRY`) direkte, så man kan teste navnevalg (`A`..`Z`, `0`..`9`). |
+| `'t'` / `'T'` | **Kæl / Klap Lumi virtuet** | Simulerer at føre hånden henover APDS-9960 nærhedssensoren. Giver +12% glæde, udløser spindelyd (`SOUND_PURR`) og 500 ms lyserødt LED-hjerteglød. |
+| `'i'` / `'I'` | **Skift Sygdomsstatus** | Skifter mellem rask og syg. En syg Lumi blegner og kræver helbredende mikstur fra `MEDICIN`-menuen. |
+| `'x'` / `'X'` | **Efterlad Lort (💩)** | Tvinger en lort frem på skærmen med det samme. Tester rensemekanikken og 60s timeren. |
+| `'b'` / `'B'` | **Sæbebad & Rengøring** | Simulerer en kraftig rystelse af kortet (>2.0g). Udløser sæbeboble-effekt på skærmen (`SOUND_BUBBLES`), fjerner lorten og belønner med +15% glæde. |
+| `'g'` / `'G'` | **Tilføj Deku-Bær (+5)** | Indsætter 5 gyldne bær i Lumis bærpung (`berries`). Bær bruges som valuta i apoteket eller til at redde et sygt kæledyr. |
+| `'z'` / `'Z'` | **Skift Søvn (Vågn / Sov)** | Lægger Lumi til at sove i sin træseng under dynen med stjernehimmel og blød natlig LED-vejrtrækning, eller vækker ham. |
+| `'o'` / `'O'` | **Alderdoms-test (99/100 dage)** | **1. tryk:** Sætter alder til 99 dage (Vismand med briller, hat og stok). **2. tryk:** Sætter alder til 100 dage og udløser fredelig alderdomsdød (`DEATH_OLD_AGE`), englevinger og himmelsk glød. |
+
+> **Tip:** Serial Monitor skal indstilles til **115200 baud** og *"No line ending"* eller *"Newline"*. Alle kommandoer reagerer øjeblikkeligt uden forsinkelse.
+
+

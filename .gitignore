@@ -499,3 +499,8 @@ OLEH_SUMMARY.md
 # Unit test binaries (Mac/Linux)
 Arduino/tests/test_runner
 
+# Clangd / LSP compilation database
+compile_commands.json
+.clangd
+
+
