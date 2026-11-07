@@ -22,8 +22,11 @@ public:
   // High-performance flicker-free frame update
   void updateDisplay(const PongLogic& pong, bool forceRedraw = false);
 
-  // Trigger wall ricochet sparks (only when ball bounces off a wall)
+  // Trigger wall ricochet sparks (top/bottom walls or bot paddle)
   void triggerWallSparks(float ballX, float ballY, float ballVx, float ballVy);
+
+  // Trigger electric cyan sparks on player paddle hit
+  void triggerPaddleSparks(float ballX, float ballY);
 
   // Trigger Lumi cheerleader celebration jump when player hits the ball
   void triggerCheer();
@@ -61,6 +64,8 @@ private:
   uint16_t lastScore;
   uint16_t lastHighScore;
   uint8_t lastLives;
+  uint8_t scoreFlashTimer;
+  uint8_t missFlashTimer;
   PongState lastState;
   bool isInitialized;
 

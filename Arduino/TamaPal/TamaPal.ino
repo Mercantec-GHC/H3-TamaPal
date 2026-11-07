@@ -1407,6 +1407,7 @@ void loop() {
     if (pongLogic.popPaddleHit()) {
       soundLed.flashColor(0, 255, 220, 100); // 100 ms cyan flash on paddle hit
       uiPong.triggerCheer();                  // Lumi cheerleader mascot celebrates!
+      uiPong.triggerPaddleSparks(pongLogic.getBallX(), pongLogic.getBallY());
     }
     if (pongLogic.popWallHit()) {
       uiPong.triggerWallSparks(pongLogic.getBallX(), pongLogic.getBallY(), pongLogic.getBallVx(), pongLogic.getBallVy());

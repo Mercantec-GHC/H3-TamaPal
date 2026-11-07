@@ -33,6 +33,10 @@ private:
 
   int16_t lastBallX;
   int16_t lastBallY;
+  int16_t berryBurstX;
+  int16_t berryBurstY;
+  uint8_t berryBurstTimer;
+  uint8_t berryHudFlashTimer;
   uint8_t lastBerries;
   uint8_t lastCollectedBerries;
   uint16_t lastSeconds;
@@ -47,6 +51,7 @@ private:
   void animateHazardsAndPortal(const MazeLogic& maze, uint8_t phase);
   void repairMazeRegion(const MazeLogic& maze, int16_t centerPxX, int16_t centerPxY);
   void drawHud(const MazeLogic& maze, bool force);
+  void drawPauseModal();
   void drawMiniLumi(int x, int y, float vx, float vy);
   void eraseMiniLumi(int x, int y, const MazeLogic& maze);
 

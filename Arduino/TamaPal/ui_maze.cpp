@@ -10,6 +10,10 @@ UiMazeRenderer::UiMazeRenderer()
   : carrier(nullptr),
     lastBallX(-1),
     lastBallY(-1),
+    berryBurstX(-1),
+    berryBurstY(-1),
+    berryBurstTimer(0),
+    berryHudFlashTimer(0),
     lastBerries(255),
     lastCollectedBerries(0),
     lastSeconds(9999),
@@ -21,6 +25,8 @@ void UiMazeRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
   isInitialized = false;
   lastCollectedBerries = 0;
+  berryBurstTimer = 0;
+  berryHudFlashTimer = 0;
 }
 
 void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
@@ -48,6 +54,10 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
   // 3. Reset cached state and draw HUD
   lastBallX   = -1;
   lastBallY   = -1;
+  berryBurstX = -1;
+  berryBurstY = -1;
+  berryBurstTimer = 0;
+  berryHudFlashTimer = 0;
   lastBerries = 255;
   lastCollectedBerries = maze.getBerriesCollected();
   lastSeconds = 9999;
@@ -96,20 +106,31 @@ void UiMazeRenderer::drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8
     carrier->display.drawFastHLine(left, top + MazeLogic::CELL_SIZE - 1, MazeLogic::CELL_SIZE + 1, wallCore);
   }
 
-  // Narrow Pinch Passage (MAZE_ITEM_ICE / MAZE_ITEM_NARROW): inward-protruding stone ledges (3px thick on each side)
+  // Narrow Ice/Crystal Pinch Passage (MAZE_ITEM_ICE): glacial blue ledges with frost notches
   if (cell & MAZE_ITEM_ICE) {
-    uint16_t ledgeFill = color565(22, 105, 145);
-    uint16_t ledgeEdge = color565(90, 225, 250);
+    uint16_t iceFill  = color565(35, 135, 215);
+    uint16_t iceEdge  = color565(180, 245, 255);
+    uint16_t iceGleam = 0xFFFF;
     if ((cell & MAZE_WALL_NORTH) && (cell & MAZE_WALL_SOUTH)) {
-      carrier->display.fillRect(left + 2, top + 2, MazeLogic::CELL_SIZE - 3, 2, ledgeFill);
-      carrier->display.drawFastHLine(left + 2, top + 4, MazeLogic::CELL_SIZE - 3, ledgeEdge);
-      carrier->display.fillRect(left + 2, top + MazeLogic::CELL_SIZE - 3, MazeLogic::CELL_SIZE - 3, 2, ledgeFill);
-      carrier->display.drawFastHLine(left + 2, top + MazeLogic::CELL_SIZE - 4, MazeLogic::CELL_SIZE - 3, ledgeEdge);
+      carrier->display.fillRect(left + 2, top + 2, MazeLogic::CELL_SIZE - 3, 2, iceFill);
+      carrier->display.drawFastHLine(left + 2, top + 4, MazeLogic::CELL_SIZE - 3, iceEdge);
+      carrier->display.fillRect(left + 2, top + MazeLogic::CELL_SIZE - 3, MazeLogic::CELL_SIZE - 3, 2, iceFill);
+      carrier->display.drawFastHLine(left + 2, top + MazeLogic::CELL_SIZE - 4, MazeLogic::CELL_SIZE - 3, iceEdge);
+      // Crystalline diagonal frost notches
+      carrier->display.drawPixel(left + 6,  top + 3, iceGleam);
+      carrier->display.drawPixel(left + 12, top + 4, iceGleam);
+      carrier->display.drawPixel(left + 8,  top + MazeLogic::CELL_SIZE - 3, iceGleam);
+      carrier->display.drawPixel(left + 14, top + MazeLogic::CELL_SIZE - 4, iceGleam);
     } else if ((cell & MAZE_WALL_WEST) && (cell & MAZE_WALL_EAST)) {
-      carrier->display.fillRect(left + 2, top + 2, 2, MazeLogic::CELL_SIZE - 3, ledgeFill);
-      carrier->display.drawFastVLine(left + 4, top + 2, MazeLogic::CELL_SIZE - 3, ledgeEdge);
-      carrier->display.fillRect(left + MazeLogic::CELL_SIZE - 3, top + 2, 2, MazeLogic::CELL_SIZE - 3, ledgeFill);
-      carrier->display.drawFastVLine(left + MazeLogic::CELL_SIZE - 4, top + 2, MazeLogic::CELL_SIZE - 3, ledgeEdge);
+      carrier->display.fillRect(left + 2, top + 2, 2, MazeLogic::CELL_SIZE - 3, iceFill);
+      carrier->display.drawFastVLine(left + 4, top + 2, MazeLogic::CELL_SIZE - 3, iceEdge);
+      carrier->display.fillRect(left + MazeLogic::CELL_SIZE - 3, top + 2, 2, MazeLogic::CELL_SIZE - 3, iceFill);
+      carrier->display.drawFastVLine(left + MazeLogic::CELL_SIZE - 4, top + 2, MazeLogic::CELL_SIZE - 3, iceEdge);
+      // Crystalline diagonal frost notches
+      carrier->display.drawPixel(left + 3, top + 6,  iceGleam);
+      carrier->display.drawPixel(left + 4, top + 12, iceGleam);
+      carrier->display.drawPixel(left + MazeLogic::CELL_SIZE - 3, top + 8,  iceGleam);
+      carrier->display.drawPixel(left + MazeLogic::CELL_SIZE - 4, top + 14, iceGleam);
     }
   }
 }
@@ -165,7 +186,10 @@ void UiMazeRenderer::drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8
 
   // 3. Start marker at (0, 0)
   if (c == 0 && r == 0) {
-    carrier->display.drawCircle(cx, cy, 5, color565(30, 80, 50));
+    // Runic emerald start seal
+    carrier->display.drawCircle(cx, cy, 6, color565(25, 95, 55));
+    carrier->display.drawCircle(cx, cy, 4, color565(60, 210, 110));
+    carrier->display.drawPixel(cx, cy, 0xFFFF);
   }
 
   // 4. Magic Exit Portal at (6, 6)
@@ -220,25 +244,41 @@ void UiMazeRenderer::drawHud(const MazeLogic& maze, bool force) {
   uint16_t timeCyan   = color565(210, 245, 255);
   uint16_t goldRecord = color565(255, 215, 60);
 
-  // 1. Berries counter (Left, calibrated at X=58, Y=31 inside top circular arc)
-  if (force || maze.getBerriesCollected() != lastBerries) {
-    carrier->display.fillRect(56, 29, 40, 12, nativeBg);
+  // 1. Berries counter with pixel-art berry icon (Left, X=52, Y=31)
+  if (force || maze.getBerriesCollected() != lastBerries || berryHudFlashTimer > 0) {
+    carrier->display.fillRect(52, 28, 44, 14, nativeBg);
+
+    // Pixel-art Deku Berry icon (5x6 px)
+    carrier->display.drawPixel(55, 29, color565(60, 220, 90)); // Sprout leaf
+    carrier->display.drawPixel(56, 29, color565(60, 220, 90));
+    carrier->display.fillRect(54, 30, 4, 3, color565(255, 55, 85)); // Strawberry body
+    carrier->display.drawPixel(55, 33, color565(255, 55, 85));
+    carrier->display.drawPixel(56, 33, color565(255, 55, 85));
+    carrier->display.drawPixel(55, 31, color565(255, 225, 75)); // Golden seed gleam
+
     carrier->display.setTextSize(1);
-    carrier->display.setTextColor(berryPink, nativeBg);
-    carrier->display.setCursor(58, 31);
+    uint16_t bCol = (berryHudFlashTimer > 0) ? goldRecord : berryPink;
+    carrier->display.setTextColor(bCol, nativeBg);
+    carrier->display.setCursor(60, 31);
     char buf[16];
-    snprintf(buf, sizeof(buf), "*%u/%u", maze.getBerriesCollected(), maze.getTotalBerries());
+    snprintf(buf, sizeof(buf), "%u/%u", maze.getBerriesCollected(), maze.getTotalBerries());
     carrier->display.print(buf);
     lastBerries = maze.getBerriesCollected();
   }
 
-  // 2. Elapsed Timer (Center, X=102, Y=31)
+  // 2. Elapsed Timer with pixel-art clock icon (Center, X=96, Y=31)
   uint16_t currentSec = maze.getElapsedSeconds();
   if (force || currentSec != lastSeconds) {
-    carrier->display.fillRect(98, 29, 44, 12, nativeBg);
+    carrier->display.fillRect(96, 28, 46, 14, nativeBg);
+
+    // Tiny 5x5 clock icon
+    carrier->display.drawCircle(99, 34, 3, color565(120, 185, 235));
+    carrier->display.drawPixel(99, 34, 0xFFFF);
+    carrier->display.drawPixel(100, 34, 0xFFFF);
+
     carrier->display.setTextSize(1);
     carrier->display.setTextColor(timeCyan, nativeBg);
-    carrier->display.setCursor(102, 31);
+    carrier->display.setCursor(105, 31);
     char buf[16];
     uint16_t m = currentSec / 60;
     uint16_t s = currentSec % 60;
@@ -247,12 +287,19 @@ void UiMazeRenderer::drawHud(const MazeLogic& maze, bool force) {
     lastSeconds = currentSec;
   }
 
-  // 3. Best record (Right, X=148, Y=31 -> ends at X=172, safely inside circular bezel)
+  // 3. Best record with star badge (Right, X=144, Y=31)
   if (force) {
-    carrier->display.fillRect(146, 29, 36, 12, nativeBg);
+    carrier->display.fillRect(144, 28, 40, 14, nativeBg);
+
+    // Golden star glyph
+    carrier->display.drawPixel(146, 34, goldRecord);
+    carrier->display.drawPixel(146, 33, 0xFFFF);
+    carrier->display.drawPixel(147, 34, goldRecord);
+    carrier->display.drawPixel(145, 34, goldRecord);
+
     carrier->display.setTextSize(1);
     carrier->display.setTextColor(goldRecord, nativeBg);
-    carrier->display.setCursor(148, 31);
+    carrier->display.setCursor(150, 31);
     char buf[16];
     if (maze.getBestSeconds() > 0) {
       snprintf(buf, sizeof(buf), "%us", maze.getBestSeconds());
@@ -269,6 +316,7 @@ void UiMazeRenderer::animateHazardsAndPortal(const MazeLogic& maze, uint8_t phas
 
   int ballC = ((int)maze.getBallX() - MazeLogic::ORIGIN_X) / MazeLogic::CELL_SIZE;
   int ballR = ((int)maze.getBallY() - MazeLogic::ORIGIN_Y) / MazeLogic::CELL_SIZE;
+  uint16_t nativeBg = color565(8, 12, 26);
 
   for (uint8_t r = 0; r < MAZE_ROWS; r++) {
     for (uint8_t c = 0; c < MAZE_COLS; c++) {
@@ -279,6 +327,14 @@ void UiMazeRenderer::animateHazardsAndPortal(const MazeLogic& maze, uint8_t phas
       if (isPitfall || isPortal) {
         // Skip redraw if ball is currently inside this cell to prevent flickering
         if (c == ballC && r == ballR) continue;
+
+        int left = MazeLogic::ORIGIN_X + c * MazeLogic::CELL_SIZE;
+        int top  = MazeLogic::ORIGIN_Y + r * MazeLogic::CELL_SIZE;
+        int cx   = left + MazeLogic::CELL_SIZE / 2;
+        int cy   = top  + MazeLogic::CELL_SIZE / 2;
+
+        // Clear previous accretion/portal particle frame completely to eliminate stray pixels
+        carrier->display.fillRect(cx - 8, cy - 8, 17, 17, nativeBg);
         drawSingleCellItems(maze, c, r);
       }
     }
@@ -293,9 +349,14 @@ void UiMazeRenderer::drawMiniLumi(int x, int y, float vx, float vy) {
   uint16_t sproutGold = color565(255, 220, 60);
   uint16_t blushPink  = color565(255, 120, 160);
 
-  // Mint-green mochi body (radius 4)
+  // Mint-green mochi body (radius 4) with luminous outline
   carrier->display.fillCircle(x, y, 4, lumiMint);
   carrier->display.drawCircle(x, y, 4, lumiBorder);
+
+  // Directional highlight gleam on Lumi's head
+  int hlDx = (vx > 0.2f) ? 1 : ((vx < -0.2f) ? -1 : 0);
+  int hlDy = (vy > 0.2f) ? 1 : ((vy < -0.2f) ? -1 : 0);
+  carrier->display.drawPixel(x + hlDx, y - 3 + hlDy, 0xFFFF);
 
   // Cute tiny spirit ears on sides
   carrier->display.drawPixel(x - 4, y - 3, lumiBorder);
@@ -346,6 +407,36 @@ void UiMazeRenderer::drawMiniLumi(int x, int y, float vx, float vy) {
     carrier->display.drawPixel(x - 3, y, blushPink);
     carrier->display.drawPixel(x + 3, y, blushPink);
   }
+}
+
+void UiMazeRenderer::drawPauseModal() {
+  if (!carrier) return;
+  uint16_t cardBg     = color565(12, 20, 42);
+  uint16_t goldBorder = color565(255, 215, 60);
+  uint16_t cyanHint   = color565(80, 220, 255);
+  uint16_t textWhite  = 0xFFFF;
+
+  // Frosted dark modal card
+  carrier->display.fillRoundRect(38, 80, 164, 72, 8, cardBg);
+  carrier->display.drawRoundRect(38, 80, 164, 72, 8, goldBorder);
+  carrier->display.drawRoundRect(40, 82, 160, 68, 6, color565(30, 60, 110));
+
+  // Pause icon: two gold vertical bars ||
+  carrier->display.fillRect(115, 90, 3, 10, goldBorder);
+  carrier->display.fillRect(122, 90, 3, 10, goldBorder);
+
+  carrier->display.setTextSize(1);
+  carrier->display.setTextColor(textWhite, cardBg);
+  const char* pTxt = "SPIL SAT PAA PAUSE";
+  int pw = strlen(pTxt) * 6;
+  carrier->display.setCursor((SCREEN_WIDTH - pw) / 2, 108);
+  carrier->display.print(pTxt);
+
+  carrier->display.setTextColor(cyanHint, cardBg);
+  const char* hTxt = "T2:Fortsaet | T3:Afslut";
+  int hw = strlen(hTxt) * 6;
+  carrier->display.setCursor((SCREEN_WIDTH - hw) / 2, 128);
+  carrier->display.print(hTxt);
 }
 
 void UiMazeRenderer::eraseMiniLumi(int x, int y, const MazeLogic& maze) {
@@ -434,22 +525,16 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
       return;
     }
     if (currentState == MAZE_STATE_PAUSED) {
-      carrier->display.fillRect(98, 29, 44, 12, nativeBg);
-      carrier->display.setTextSize(1);
-      carrier->display.setTextColor(color565(255, 215, 60), nativeBg);
-      carrier->display.setCursor(102, 31);
-      carrier->display.print("PAUSE");
-
-      // Update bottom hint while paused: T2:Fortsaet | T3:Afslut
-      carrier->display.fillRect(30, 194, 180, 14, nativeBg);
-      carrier->display.setTextColor(color565(255, 215, 60), nativeBg);
-      const char* pHint = "T2:Fortsaet | T3:Afslut";
-      int pW = strlen(pHint) * 6;
-      carrier->display.setCursor((SCREEN_WIDTH - pW) / 2, 196);
-      carrier->display.print(pHint);
+      drawPauseModal();
     } else if (lastState == MAZE_STATE_PAUSED) {
+      // Clear pause modal card and restore maze
+      carrier->display.fillRect(38, 80, 164, 72, nativeBg);
+      drawAllWalls(maze);
+      drawCellItems(maze);
+      lastBallX = -1;
+      lastBallY = -1;
       lastSeconds = 9999; // Force timer redraw on resume
-      drawHud(maze, false);
+      drawHud(maze, true);
 
       // Restore bottom hint on resume: Vip:Rul | T2:Pause
       carrier->display.fillRect(30, 194, 180, 14, nativeBg);
@@ -486,7 +571,7 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
     return; // Don't delta-render behind modal
   }
 
-  // 1. Berry collection cleanup
+  // 1. Berry collection cleanup and spark burst trigger
   if (maze.getBerriesCollected() != lastCollectedBerries) {
     lastCollectedBerries = maze.getBerriesCollected();
     int bcX = (int)maze.getBallX();
@@ -500,6 +585,33 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
       repairMazeRegion(maze, cellCx, cellCy);
       lastBallX = -1;
       lastBallY = -1;
+
+      // Trigger sparkle burst and golden HUD counter flash
+      berryBurstX = cellCx;
+      berryBurstY = cellCy;
+      berryBurstTimer = 4;
+      berryHudFlashTimer = 8;
+    }
+  }
+
+  // Animate berry collection sparkles
+  if (berryBurstTimer > 0) {
+    int d = 5 - berryBurstTimer;
+    carrier->display.drawPixel(berryBurstX - d, berryBurstY - d, color565(255, 230, 80));
+    carrier->display.drawPixel(berryBurstX + d, berryBurstY - d, color565(255, 230, 80));
+    carrier->display.drawPixel(berryBurstX - d, berryBurstY + d, color565(255, 230, 80));
+    carrier->display.drawPixel(berryBurstX + d, berryBurstY + d, color565(255, 230, 80));
+    berryBurstTimer--;
+    if (berryBurstTimer == 0) {
+      repairMazeRegion(maze, berryBurstX, berryBurstY);
+    }
+  }
+
+  // Decrement berry HUD flash timer
+  if (berryHudFlashTimer > 0) {
+    berryHudFlashTimer--;
+    if (berryHudFlashTimer == 0) {
+      drawHud(maze, true);
     }
   }
 

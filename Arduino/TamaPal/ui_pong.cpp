@@ -18,6 +18,8 @@ UiPongRenderer::UiPongRenderer()
     lastScore(9999),
     lastHighScore(9999),
     lastLives(255),
+    scoreFlashTimer(0),
+    missFlashTimer(0),
     lastState(PONG_STATE_READY),
     isInitialized(false) {
   for (uint8_t i = 0; i < TRAIL_LEN; i++) {
@@ -32,24 +34,58 @@ UiPongRenderer::UiPongRenderer()
 void UiPongRenderer::begin(MKRIoTCarrier* hardwareCarrier) {
   carrier = hardwareCarrier;
   isInitialized = false;
+  scoreFlashTimer = 0;
+  missFlashTimer = 0;
 }
 
 void UiPongRenderer::triggerCheer() {
   cheerTimer = 18; // ~360 ms cheering jump animation
 }
 
+void UiPongRenderer::triggerPaddleSparks(float ballX, float ballY) {
+  int16_t cx = (int16_t)ballX + PongLogic::BALL_SIZE;
+  int16_t cy = (int16_t)ballY + PongLogic::BALL_SIZE / 2;
+
+  // Electric cyan and pure white shockwave sparks spraying rightward
+  uint16_t sparkColors[3] = {
+    color565(80, 245, 255),   // Electric neon cyan
+    0xFFFF,                   // White-hot shock spark
+    color565(0, 190, 255)     // Brilliant cyan
+  };
+
+  int8_t spreadX[6] = {  2,  3,  4,  4,  3,  2 };
+  int8_t spreadY[6] = { -3, -2, -1,  1,  2,  3 };
+
+  for (uint8_t i = 0; i < MAX_SPARKS; i++) {
+    sparks[i].x     = cx;
+    sparks[i].y     = cy;
+    sparks[i].prevX = cx;
+    sparks[i].prevY = cy;
+    sparks[i].vx    = spreadX[i];
+    sparks[i].vy    = spreadY[i];
+    sparks[i].life  = 5 + (i & 1);
+    sparks[i].color = sparkColors[i % 3];
+  }
+}
+
 void UiPongRenderer::triggerWallSparks(float ballX, float ballY, float ballVx, float ballVy) {
   int16_t cx = (int16_t)ballX + PongLogic::BALL_SIZE / 2;
   int16_t cy = (int16_t)ballY + PongLogic::BALL_SIZE / 2;
 
-  uint16_t sparkColors[3] = {
-    color565(255, 235, 80),  // Bright solar gold
-    color565(255, 115, 20),  // Blazing orange
-    color565(80, 245, 255)   // Electric neon cyan
-  };
-
   bool hitTop    = (ballY <= (float)(PongLogic::FIELD_TOP + 4));
   bool hitBottom = (ballY >= (float)(PongLogic::FIELD_BOTTOM - PongLogic::BALL_SIZE - 4));
+
+  uint16_t sparkColors[3];
+  if (hitTop || hitBottom) {
+    sparkColors[0] = color565(255, 240, 120); // Solar white-gold
+    sparkColors[1] = color565(80, 220, 255);  // Electric blue
+    sparkColors[2] = 0xFFFF;                  // White ricochet spark
+  } else {
+    // Right wall / Bot hit: Solar flame sparks
+    sparkColors[0] = color565(255, 215, 40);  // Pure solar gold
+    sparkColors[1] = color565(255, 120, 20);  // Blazing orange
+    sparkColors[2] = color565(255, 60, 20);   // Crimson ember
+  }
 
   for (uint8_t i = 0; i < MAX_SPARKS; i++) {
     sparks[i].x     = cx;
@@ -72,7 +108,7 @@ void UiPongRenderer::triggerWallSparks(float ballX, float ballY, float ballVx, f
       sparks[i].vx = spreadX[i];
       sparks[i].vy = spreadY[i];
     } else {
-      // Right wall ricochet: spray leftward and fan vertically
+      // Right wall / Bot ricochet: spray leftward and fan vertically
       int8_t spreadX[6] = { -2, -3, -4, -3, -2, -4 };
       int8_t spreadY[6] = { -3, -2, -1,  1,  2,  3 };
       sparks[i].vx = (ballVx < 0.0f) ? spreadX[i] : -spreadX[i];
@@ -107,9 +143,11 @@ void UiPongRenderer::drawInitialScreen(const PongLogic& pong) {
   carrier->display.drawFastHLine(PongLogic::FIELD_LEFT, PongLogic::FIELD_BOTTOM + 1,
                                 PongLogic::FIELD_RIGHT - PongLogic::FIELD_LEFT + 1, color565(0, 90, 140));
 
-  // Center court dotted net (X = 120)
+  // Center court dotted net (X = 120) - skips mascot stadium circle (Y=60..94)
   for (int y = PongLogic::FIELD_TOP + 4; y < PongLogic::FIELD_BOTTOM - 2; y += 6) {
-    carrier->display.drawFastVLine(120, y, 3, color565(30, 55, 95));
+    if (y < 60 || y > 94) {
+      carrier->display.drawFastVLine(120, y, 3, color565(30, 55, 95));
+    }
   }
 
   // Left & Right goal lines (subtle dotted lines behind player & bot paddles)
@@ -189,10 +227,10 @@ void UiPongRenderer::drawCheerleaderLumi(const PongLogic& pong, bool force) {
   uint16_t pomOrange   = color565(255, 140, 30);
   uint16_t blushPink   = color565(255, 115, 150);
 
-  // Clear mascot zone (X=102..138, Y=58..92) and restore center dotted net behind Lumi
-  carrier->display.fillRect(cx - 17, cy - 17, 35, 34, nativeBg);
+  // Clear mascot zone (X=102..138, Y=58..94)
+  carrier->display.fillRect(cx - 17, cy - 17, 35, 35, nativeBg);
   for (int y = PongLogic::FIELD_TOP + 4; y < PongLogic::FIELD_BOTTOM - 2; y += 6) {
-    if (y >= cy - 18 && y <= cy + 17) {
+    if ((y < 60 || y > 94) && y >= cy - 18 && y <= cy + 17) {
       carrier->display.drawFastVLine(120, y, 3, color565(30, 55, 95));
     }
   }
@@ -266,18 +304,20 @@ void UiPongRenderer::drawHud(const PongLogic& pong, bool force) {
 
   uint16_t nativeBg  = color565(8, 12, 26);
   uint16_t scoreCyan = color565(210, 245, 255);
+  uint16_t scoreGold = color565(255, 235, 80);
   uint16_t highGold  = color565(255, 215, 60);
 
-  // 1. Lives (Left, calibrated at X=58..78, Y=35 inside top circular arc)
+  // 1. Lives (Left, calibrated at X=52..86, Y=32 inside top circular arc)
   if (force || pong.getLives() != lastLives) {
     drawLives(pong.getLives());
     lastLives = pong.getLives();
   }
 
-  // 2. Score (Center, Y=32)
-  if (force || pong.getScore() != lastScore) {
+  // 2. Score (Center, Y=32) - flashes radiant gold when a point is scored!
+  if (force || pong.getScore() != lastScore || scoreFlashTimer > 0) {
     carrier->display.setTextSize(1);
-    carrier->display.setTextColor(scoreCyan, nativeBg);
+    uint16_t sColor = (scoreFlashTimer > 0) ? scoreGold : scoreCyan;
+    carrier->display.setTextColor(sColor, nativeBg);
     carrier->display.setCursor(92, 32);
     char buf[16];
     snprintf(buf, sizeof(buf), "SCORE:%02u", pong.getScore());
@@ -300,21 +340,51 @@ void UiPongRenderer::drawHud(const PongLogic& pong, bool force) {
 void UiPongRenderer::drawLives(uint8_t lives) {
   if (!carrier) return;
 
-  uint16_t nativeBg  = color565(8, 12, 26);
-  uint16_t activeRed = color565(255, 65, 95);   // Glowing red heart/life dot
-  uint16_t lostGray  = color565(55, 65, 85);    // Muted lost life
+  uint16_t nativeBg   = color565(8, 12, 26);
+  uint16_t activeRed  = color565(255, 45, 75);   // Glowing red heart
+  uint16_t activeDark = color565(170, 20, 45);   // Shaded lower edge
+  uint16_t lostGray   = color565(55, 65, 85);    // Muted lost life outline
 
-  // Clear lives area (calibrated inside top circle chord at Y=30..41)
-  carrier->display.fillRect(54, 30, 32, 12, nativeBg);
+  // Clear lives area (calibrated inside top circle chord at Y=29..41)
+  carrier->display.fillRect(52, 29, 36, 12, nativeBg);
 
-  // Draw 3 life dots (radius 3 at X=59, 68, 77, Y=35)
+  // Draw 3 pixel-art hearts (7x6 px each at X=56, 67, 78, Y=31)
   for (int i = 0; i < 3; i++) {
-    int cx = 59 + (i * 9);
-    int cy = 35;
-    uint16_t col = (i < lives) ? activeRed : lostGray;
-    carrier->display.fillCircle(cx, cy, 3, col);
+    int hx = 56 + (i * 11);
+    int hy = 32;
+
     if (i < lives) {
-      carrier->display.drawPixel(cx - 1, cy - 1, 0xFFFF); // Highlight gleam
+      // Row 0: . X X . X X .
+      carrier->display.drawFastHLine(hx + 1, hy, 2, activeRed);
+      carrier->display.drawFastHLine(hx + 4, hy, 2, activeRed);
+      // Row 1: X X X X X X X
+      carrier->display.drawFastHLine(hx, hy + 1, 7, activeRed);
+      carrier->display.drawPixel(hx + 1, hy + 1, 0xFFFF); // White sheen gleam
+      // Row 2: X X X X X X X
+      carrier->display.drawFastHLine(hx, hy + 2, 7, activeRed);
+      // Row 3: . X X X X X .
+      carrier->display.drawFastHLine(hx + 1, hy + 3, 5, activeRed);
+      // Row 4: . . X X X . .
+      carrier->display.drawFastHLine(hx + 2, hy + 4, 3, activeDark);
+      // Row 5: . . . X . . .
+      carrier->display.drawPixel(hx + 3, hy + 5, activeDark);
+    } else {
+      // Broken / depleted heart outline with diagonal crack
+      carrier->display.drawPixel(hx + 1, hy, lostGray);
+      carrier->display.drawPixel(hx + 2, hy, lostGray);
+      carrier->display.drawPixel(hx + 4, hy, lostGray);
+      carrier->display.drawPixel(hx + 5, hy, lostGray);
+      carrier->display.drawPixel(hx, hy + 1, lostGray);
+      carrier->display.drawPixel(hx + 6, hy + 1, lostGray);
+      carrier->display.drawPixel(hx, hy + 2, lostGray);
+      carrier->display.drawPixel(hx + 6, hy + 2, lostGray);
+      carrier->display.drawPixel(hx + 1, hy + 3, lostGray);
+      carrier->display.drawPixel(hx + 5, hy + 3, lostGray);
+      carrier->display.drawPixel(hx + 2, hy + 4, lostGray);
+      carrier->display.drawPixel(hx + 4, hy + 4, lostGray);
+      carrier->display.drawPixel(hx + 3, hy + 5, lostGray);
+      // Crack through center
+      carrier->display.drawPixel(hx + 3, hy + 2, lostGray);
     }
   }
 }
@@ -353,13 +423,15 @@ void UiPongRenderer::drawGameOverScreen(const PongLogic& pong) {
 
   uint16_t modalBg   = color565(14, 20, 42);
   uint16_t redBorder = color565(255, 65, 75);
+  uint16_t redInner  = color565(130, 25, 40);
   uint16_t textWhite = 0xFFFF;
   uint16_t textGold  = color565(255, 215, 60);
   uint16_t cyanHint  = color565(80, 210, 255);
 
-  // Central modal box
+  // Central modal box with double neon rim
   carrier->display.fillRoundRect(36, 66, 168, 106, 8, modalBg);
   carrier->display.drawRoundRect(36, 66, 168, 106, 8, redBorder);
+  carrier->display.drawRoundRect(38, 68, 164, 102, 6, redInner);
 
   // 1. GAME OVER Header
   carrier->display.setTextSize(2);
@@ -369,11 +441,11 @@ void UiPongRenderer::drawGameOverScreen(const PongLogic& pong) {
   carrier->display.setCursor((SCREEN_WIDTH - headerW) / 2, 76);
   carrier->display.print(header);
 
-  // 2. Final Score
+  // 2. Final Score with broken heart indicator
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(textWhite, modalBg);
   char buf[32];
-  snprintf(buf, sizeof(buf), "Score: %u", pong.getScore());
+  snprintf(buf, sizeof(buf), "Score: %u  [ 0 LIV ]", pong.getScore());
   int scoreW = strlen(buf) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - scoreW) / 2, 100);
   carrier->display.print(buf);
@@ -502,16 +574,48 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     } else if (currentState == PONG_STATE_BALL_LOST) {
       clearFireballAndTrail();
       mascotOverlapped = true;
+      // Red stadium alert ring & MISS! badge
+      carrier->display.drawCircle(120, 120, 114, color565(255, 45, 60));
+      carrier->display.drawCircle(120, 120, 112, color565(180, 20, 40));
+      carrier->display.fillRoundRect(92, 110, 56, 20, 4, color565(180, 25, 45));
+      carrier->display.drawRoundRect(92, 110, 56, 20, 4, 0xFFFF);
+      carrier->display.setTextSize(1);
+      carrier->display.setTextColor(0xFFFF, color565(180, 25, 45));
+      carrier->display.setCursor(104, 116);
+      carrier->display.print("MISS!");
     } else if (currentState == PONG_STATE_GAMEOVER) {
       drawGameOverScreen(pong);
       lastState = currentState;
       return;
+    }
+
+    if (lastState == PONG_STATE_BALL_LOST && currentState != PONG_STATE_BALL_LOST) {
+      // Restore stadium guide rings to calm blue
+      carrier->display.drawCircle(120, 120, 114, color565(20, 42, 78));
+      carrier->display.drawCircle(120, 120, 112, color565(35, 80, 135));
+      // Erase MISS! prompt
+      carrier->display.fillRect(90, 108, 60, 24, nativeBg);
+      // Restore center net
+      for (int y = 106; y <= 134; y += 6) {
+        carrier->display.drawFastVLine(120, y, 3, color565(30, 55, 95));
+      }
     }
     lastState = currentState;
   }
 
   if (currentState == PONG_STATE_GAMEOVER) {
     return; // Don't redraw court while modal is up
+  }
+
+  // Detect score increment to trigger gold flash
+  if (pong.getScore() != lastScore && lastScore != 9999) {
+    scoreFlashTimer = 8;
+  }
+  if (scoreFlashTimer > 0) {
+    scoreFlashTimer--;
+    if (scoreFlashTimer == 0) {
+      drawHud(pong, true);
+    }
   }
 
   // 1. HUD updates
@@ -556,7 +660,7 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
         }
         if (ex <= 122 && ex + PongLogic::BALL_SIZE + 2 >= 118) {
           for (int y = PongLogic::FIELD_TOP + 4; y < PongLogic::FIELD_BOTTOM - 2; y += 6) {
-            if (y >= ey - 4 && y <= ey + PongLogic::BALL_SIZE + 4) {
+            if ((y < 60 || y > 94) && y >= ey - 4 && y <= ey + PongLogic::BALL_SIZE + 4) {
               carrier->display.drawFastVLine(120, y, 3, color565(30, 55, 95));
             }
           }
@@ -616,14 +720,18 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     carrier->display.drawPixel(bcx, bcy, 0xFFFF);
   }
 
-  // 6. Player Paddle (Left, cyan) delta-rendering
+  // 6. Player Paddle (Left, cyan) delta-rendering with 1px outer glow
   int16_t newPaddleY = (int16_t)pong.getPaddleY();
   if (newPaddleY != lastPaddleY) {
     if (lastPaddleY != -1) {
-      carrier->display.fillRect(PongLogic::PADDLE_X, lastPaddleY,
-                                PongLogic::PADDLE_WIDTH, PongLogic::PADDLE_HEIGHT, nativeBg);
+      carrier->display.fillRect(PongLogic::PADDLE_X - 1, lastPaddleY - 1,
+                                PongLogic::PADDLE_WIDTH + 2, PongLogic::PADDLE_HEIGHT + 2, nativeBg);
     }
 
+    // Outer luminescence glow (1px around paddle: deep cyan)
+    carrier->display.drawRoundRect(PongLogic::PADDLE_X - 1, newPaddleY - 1,
+                                  PongLogic::PADDLE_WIDTH + 2, PongLogic::PADDLE_HEIGHT + 2, 2, color565(0, 95, 140));
+    // Vibrant paddle body
     carrier->display.fillRoundRect(PongLogic::PADDLE_X, newPaddleY,
                                   PongLogic::PADDLE_WIDTH, PongLogic::PADDLE_HEIGHT, 2, paddleCyan);
     carrier->display.drawFastVLine(PongLogic::PADDLE_X + 2, newPaddleY + 2,
@@ -631,7 +739,7 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
     lastPaddleY = newPaddleY;
   }
 
-  // 7. AI Bot Opponent Paddle (Right, coral-gold, tracks ball vertically to return shots)
+  // 7. AI Bot Opponent Paddle (Right, coral-gold) delta-rendering with 1px outer glow
   int16_t targetBotY = (int16_t)(pong.getBallY() + (PongLogic::BALL_SIZE - PongLogic::PADDLE_HEIGHT) * 0.5f);
   const int16_t minBotY = PongLogic::FIELD_TOP + 2;
   const int16_t maxBotY = PongLogic::FIELD_BOTTOM - PongLogic::PADDLE_HEIGHT - 2;
@@ -641,10 +749,13 @@ void UiPongRenderer::updateDisplay(const PongLogic& pong, bool forceRedraw) {
   if (targetBotY != lastBotY) {
     const int16_t botX = PongLogic::FIELD_RIGHT - 2;
     if (lastBotY != -1) {
-      carrier->display.fillRect(botX, lastBotY,
-                                PongLogic::PADDLE_WIDTH, PongLogic::PADDLE_HEIGHT, nativeBg);
+      carrier->display.fillRect(botX - 1, lastBotY - 1,
+                                PongLogic::PADDLE_WIDTH + 2, PongLogic::PADDLE_HEIGHT + 2, nativeBg);
     }
     uint16_t botGold = color565(255, 165, 50);
+    // Outer luminescence glow (1px around bot paddle: deep amber)
+    carrier->display.drawRoundRect(botX - 1, targetBotY - 1,
+                                  PongLogic::PADDLE_WIDTH + 2, PongLogic::PADDLE_HEIGHT + 2, 2, color565(130, 75, 15));
     carrier->display.fillRoundRect(botX, targetBotY,
                                   PongLogic::PADDLE_WIDTH, PongLogic::PADDLE_HEIGHT, 2, botGold);
     carrier->display.drawFastVLine(botX + 2, targetBotY + 2,
