@@ -33,10 +33,8 @@ void UiMenuRenderer::drawInitialScreen() {
   // Touch button guide at the bottom of the screen (tightly centered so round bezel won't cut it off)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(color565(110, 140, 190));
-  carrier->display.setCursor(72, 202);
+  carrier->display.setCursor(72, 206);
   carrier->display.print("T0:<  T1:>  T2:OK");
-  carrier->display.setCursor(69, 213);
-  carrier->display.print("T3:Tilb  T4:Stats");
 }
 
 // Icon 0: Mad (Ramen bowl with noodles lifted by chopsticks, 2.5D shading and steam)

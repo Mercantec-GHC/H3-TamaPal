@@ -39,7 +39,7 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
   // 2. Bottom controls hint (calibrated at Y=196 inside circular bottom arc)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(color565(95, 130, 175), nativeBg);
-  const char* hint = "Vip:Rul | T2:Pause T3:Ud";
+  const char* hint = "Vip:Rul | T2:Pause";
   int hintW = strlen(hint) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 196);
   carrier->display.print(hint);
@@ -366,9 +366,25 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
       carrier->display.setTextColor(color565(255, 215, 60), nativeBg);
       carrier->display.setCursor(102, 31);
       carrier->display.print("PAUSE");
+
+      // Update bottom hint while paused: T2:Fortsaet | T3:Afslut
+      carrier->display.fillRect(30, 194, 180, 14, nativeBg);
+      carrier->display.setTextColor(color565(255, 215, 60), nativeBg);
+      const char* pHint = "T2:Fortsaet | T3:Afslut";
+      int pW = strlen(pHint) * 6;
+      carrier->display.setCursor((SCREEN_WIDTH - pW) / 2, 196);
+      carrier->display.print(pHint);
     } else if (lastState == MAZE_STATE_PAUSED) {
       lastSeconds = 9999; // Force timer redraw on resume
       drawHud(maze, false);
+
+      // Restore bottom hint on resume: Vip:Rul | T2:Pause
+      carrier->display.fillRect(30, 194, 180, 14, nativeBg);
+      carrier->display.setTextColor(color565(95, 130, 175), nativeBg);
+      const char* rHint = "Vip:Rul | T2:Pause";
+      int rW = strlen(rHint) * 6;
+      carrier->display.setCursor((SCREEN_WIDTH - rW) / 2, 196);
+      carrier->display.print(rHint);
     }
     if (currentState == MAZE_STATE_PITFALL_FALL) {
       drawPitfallSplash(maze.getBallX(), maze.getBallY());

@@ -102,8 +102,6 @@ uint32_t frameCount = 0;
 unsigned long lastTouchTimeMs = 0;
 
 // Non-blocking Mute toggle state (prevents multi-trigger and screen blinking)
-bool combo04Fired = false;
-unsigned long combo04StartTime = 0;
 bool touch3HoldFired = false;
 unsigned long touch3StartTime = 0;
 unsigned long muteMessageEndTimeMs = 0;
@@ -172,31 +170,9 @@ void setCaseMode(bool enableCase, bool reinitHardware = false) {
   }
 }
 
-// Non-blocking Mute toggle gesture processing
+// Non-blocking Mute toggle gesture processing (Hold TOUCH3 alone for 1.2 seconds on HOME screen)
 void processMuteGestures(unsigned long now, bool touch0, bool touch3, bool touch4, ScreenType currentScreen) {
-  // GESTURE 1: TOUCH0 + TOUCH4 combo (Hold both for 300 ms on HOME)
-  if (currentScreen == SCREEN_HOME && touch0 && touch4) {
-    if (combo04StartTime == 0) {
-      combo04StartTime = now;
-    } else if (!combo04Fired && (now - combo04StartTime >= 300)) {
-      soundLed.toggleMute();
-      combo04Fired = true;
-      muteMessageEndTimeMs = now + 1400; // Toast visible for 1.4 seconds
-
-      if (soundLed.isMuted()) {
-        uiMenu.drawPlaceholderScreen("LYD: SLUKKET", "Lyd er slaaet fra");
-      } else {
-        uiMenu.drawPlaceholderScreen("LYD: TAENDT", "Lyd er slaaet til");
-        soundLed.playSound(SOUND_CONFIRM);
-      }
-    }
-  } else if (!touch0 && !touch4) {
-    // Reset ONLY when BOTH fingers are lifted off
-    combo04Fired = false;
-    combo04StartTime = 0;
-  }
-
-  // GESTURE 2: Hold TOUCH3 alone for 1.2 seconds on HOME screen
+  // Hold TOUCH3 alone for 1.2 seconds on HOME screen to toggle Mute cleanly
   if (currentScreen == SCREEN_HOME && touch3 && !touch0 && !touch4) {
     if (touch3StartTime == 0) {
       touch3StartTime = now;
@@ -587,10 +563,10 @@ void loop() {
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
         menuLogic.onButtonOk(now);
-        lastTouchTimeMs = now;
+        lastTouchTimeMs = now + 250;
       } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
         menuLogic.onButtonBack();
-        lastTouchTimeMs = now;
+        lastTouchTimeMs = now + 250;
       }
     }
   } else if (currentScreen == SCREEN_HOUSE_MENU) {
@@ -720,17 +696,29 @@ void loop() {
           lastTouchTimeMs = now;
         } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
           menuLogic.onButtonBack();
-          lastTouchTimeMs = now;
+          lastTouchTimeMs = now + 250;
         }
-      } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
-        if (pongLogic.getScore() > 0) {
-          if (pongLogic.getScore() > petLogic.getHighScorePong()) {
-            petLogic.setHighScorePong(pongLogic.getScore());
-            storagePet.savePet(petLogic);
+      } else if (pongLogic.getState() == PONG_STATE_PLAYING) {
+        // While ball is actively in play: accidental tap of TOUCH3 does NOT exit!
+        // Require holding TOUCH3 for 1.2s to forfeit/exit early:
+        static unsigned long pongTouch3HoldMs = 0;
+        if (touch3) {
+          if (pongTouch3HoldMs == 0) {
+            pongTouch3HoldMs = now;
+          } else if (now - pongTouch3HoldMs >= 1200) {
+            pongTouch3HoldMs = 0;
+            if (pongLogic.getScore() > 0) {
+              if (pongLogic.getScore() > petLogic.getHighScorePong()) {
+                petLogic.setHighScorePong(pongLogic.getScore());
+                storagePet.savePet(petLogic);
+              }
+            }
+            menuLogic.onButtonBack();
+            lastTouchTimeMs = now + 250;
           }
+        } else {
+          pongTouch3HoldMs = 0;
         }
-        menuLogic.onButtonBack(); // Exit game early
-        lastTouchTimeMs = now;
       }
     }
   } else if (currentScreen == SCREEN_MINIGAME_MAZE) {
@@ -771,18 +759,39 @@ void loop() {
           // TOUCH3: Return to games menu
           menuLogic.onButtonBack();
         }
-        lastTouchTimeMs = now;
+        lastTouchTimeMs = now + 250;
       }
     } else {
-      // During active play: TOUCH2 toggles Pause, TOUCH3 exits back to menu
+      // During active play:
+      // TOUCH2 toggles Pause (playing -> paused or paused -> playing)
       if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH2)) {
         bool shouldPause = (mazeLogic.getState() != MAZE_STATE_PAUSED);
         mazeLogic.setPaused(shouldPause, now);
         soundLed.playSound(SOUND_CLICK);
         lastTouchTimeMs = now;
-      } else if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
-        menuLogic.onButtonBack();
-        lastTouchTimeMs = now;
+      }
+      // If game is PAUSED: TOUCH3 exits cleanly back to games menu
+      else if (mazeLogic.getState() == MAZE_STATE_PAUSED) {
+        if ((now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) && carrier.Buttons.onTouchDown(TOUCH3)) {
+          menuLogic.onButtonBack();
+          lastTouchTimeMs = now + 250;
+        }
+      }
+      // While actively rolling: accidental tap of TOUCH3 does NOT exit!
+      // Must hold TOUCH3 for 1.2s to force exit without pausing:
+      else {
+        static unsigned long mazeTouch3HoldMs = 0;
+        if (touch3) {
+          if (mazeTouch3HoldMs == 0) {
+            mazeTouch3HoldMs = now;
+          } else if (now - mazeTouch3HoldMs >= 1200) {
+            mazeTouch3HoldMs = 0;
+            menuLogic.onButtonBack();
+            lastTouchTimeMs = now + 250;
+          }
+        } else {
+          mazeTouch3HoldMs = 0;
+        }
       }
     }
   } else if (currentScreen == SCREEN_NAME_ENTRY) {
@@ -833,7 +842,7 @@ void loop() {
     }
   } else {
     // Normal menu screens (HOME, STATS, ACTION):
-    bool inAnyCombo = (touch0 && touch4) || (touch0 && touch1) || (touch1 && touch3) || combo04Fired || combo01Fired || combo13Fired || touch3HoldFired;
+    bool inAnyCombo = (touch0 && touch1) || (touch1 && touch3) || combo01Fired || combo13Fired || touch3HoldFired;
 
     if (currentScreen == SCREEN_HOME && !petLogic.isAlive()) {
       // While Lumi is a ghost/cenotaph:
@@ -846,14 +855,14 @@ void loop() {
           soundLed.playSound(SOUND_CONFIRM);
           Serial.print(F("[LIVSCYKLUS] Aabner arkade-navngivning foer Generation: "));
           Serial.println((unsigned int)(petLogic.getGeneration() + 1));
-          lastTouchTimeMs = now;
+          lastTouchTimeMs = now + 250;
         } else if (carrier.Buttons.onTouchDown(TOUCH4)) {
           menuLogic.openMemorial(storagePet.getGraveRecordCount(), SCREEN_HOME);
-          lastTouchTimeMs = now;
+          lastTouchTimeMs = now + 250;
         }
       }
     } else if (!inAnyCombo && (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS)) {
-      if (!touch4 && carrier.Buttons.onTouchDown(TOUCH0)) {
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
         menuLogic.onButtonPrev(); // Previous icon (<)
         lastTouchTimeMs = now;
       }
@@ -868,21 +877,19 @@ void loop() {
             lastTouchTimeMs = now;
           } else {
             menuLogic.onButtonOk(now); // OK / Select
-            lastTouchTimeMs = now;
+            lastTouchTimeMs = now + 250;
           }
         } else {
           menuLogic.onButtonOk(now); // OK / Select
-          lastTouchTimeMs = now;
+          lastTouchTimeMs = now + 250;
         }
       }
       else if (carrier.Buttons.onTouchDown(TOUCH3)) {
         menuLogic.onButtonBack(); // Back to Home
-        lastTouchTimeMs = now;
+        lastTouchTimeMs = now + 250;
       }
-      else if (!touch0 && carrier.Buttons.onTouchDown(TOUCH4)) {
-        menuLogic.onButtonStatsShortcut(); // Quick toggle Stats
-        lastTouchTimeMs = now;
-      }
+      // Note: TOUCH4 shortcut for STATS is completely removed per user request!
+      // Users access stats cleanly by navigating to the STATUS icon and pressing TOUCH2 (OK).
     }
   }
 
