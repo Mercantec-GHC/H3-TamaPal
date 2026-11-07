@@ -109,6 +109,10 @@ public:
   uint16_t getGraveRecordCount();
   bool loadGraveRecord(uint16_t index, GraveRecord& outRecord);
 
+  // Cemetery grove view queries (ensures at least 3 historical founder graves if no deaths yet)
+  uint16_t getCemeteryCount();
+  bool loadCemeteryRecord(uint16_t index, GraveRecord& outRecord);
+
   // Pure logic parser for a single line from grave.txt (unit testable without SD)
   static bool parseGraveLine(const char* line, GraveRecord& outRecord);
 

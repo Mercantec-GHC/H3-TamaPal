@@ -13,6 +13,7 @@ MenuLogic::MenuLogic()
     selectedHouseOption(0),
     selectedWardrobeOption(0),
     memorialIndex(0),
+    memorialViewMode(MEMORIAL_VIEW_GROVE),
     playerId(1),
     cursorPositionX(0.0f),
     targetPositionX(0.0f),
@@ -131,6 +132,14 @@ void MenuLogic::onButtonOk(unsigned long currentTimeMs) {
     return;
   }
 
+  if (activeScreen == SCREEN_MEMORIAL) {
+    if (memorialViewMode == MEMORIAL_VIEW_GROVE) {
+      memorialViewMode = MEMORIAL_VIEW_DETAIL; // Enter life cycle detail inspection
+      pendingSound = SOUND_CONFIRM;
+    }
+    return;
+  }
+
   if (activeScreen == SCREEN_HOME) {
     pendingSound = SOUND_CONFIRM;
 
@@ -195,6 +204,7 @@ void MenuLogic::openMazeGame() {
 void MenuLogic::openMemorial(uint16_t totalCount, ScreenType returnScreen) {
   memorialReturnScreen = returnScreen;
   memorialIndex = (totalCount > 0) ? (totalCount - 1) : 0;
+  memorialViewMode = MEMORIAL_VIEW_GROVE; // Always start in Sacred Cemetery Grove!
   activeScreen = SCREEN_MEMORIAL;
   pendingSound = SOUND_CONFIRM;
 }
@@ -205,6 +215,14 @@ uint16_t MenuLogic::getMemorialIndex() const {
 
 void MenuLogic::setMemorialIndex(uint16_t index) {
   memorialIndex = index;
+}
+
+MemorialViewMode MenuLogic::getMemorialViewMode() const {
+  return memorialViewMode;
+}
+
+void MenuLogic::setMemorialViewMode(MemorialViewMode mode) {
+  memorialViewMode = mode;
 }
 
 void MenuLogic::memorialNext(uint16_t totalCount) {
@@ -243,6 +261,11 @@ void MenuLogic::onButtonBack() {
     return;
   }
   if (activeScreen == SCREEN_MEMORIAL) {
+    if (memorialViewMode == MEMORIAL_VIEW_DETAIL) {
+      memorialViewMode = MEMORIAL_VIEW_GROVE; // Return from Life Cycle detail back to Cemetery Grove!
+      pendingSound = SOUND_BACK;
+      return;
+    }
     activeScreen = memorialReturnScreen;
     pendingSound = SOUND_BACK;
     return;

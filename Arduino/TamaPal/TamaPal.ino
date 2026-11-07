@@ -242,6 +242,29 @@ void processShowcaseGestures(unsigned long now, bool touch1, bool touch3, Screen
   }
 }
 
+// Redraws the Sacred Cemetery Grove or detailed Life Cycle Chronicle
+void drawMemorialScreen() {
+  uint16_t total = storagePet.getCemeteryCount();
+  uint16_t idx = menuLogic.getMemorialIndex();
+  if (idx >= total) {
+    idx = (total > 0) ? (total - 1) : 0;
+    menuLogic.setMemorialIndex(idx);
+  }
+
+  if (menuLogic.getMemorialViewMode() == MEMORIAL_VIEW_GROVE) {
+    soundLed.setMoodColor(40, 60, 160); // Mystical deep twilight glow
+    uiMemorial.drawCemeteryGrove(idx, total, storagePet, petLogic.getGeneration());
+  } else {
+    soundLed.setMoodColor(80, 110, 190); // Mystical blue-violet glow
+    GraveRecord rec;
+    if (storagePet.loadCemeteryRecord(idx, rec)) {
+      uiMemorial.drawLifeCycleDetail(idx, total, rec, petLogic.getGeneration());
+    } else {
+      uiMemorial.drawEmpty(petLogic.getGeneration());
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -446,6 +469,10 @@ void loop() {
       Serial.print(F("[BAER-PUNG] +5 gyldne baer tilfoejet! Total i pungen: "));
       Serial.println((unsigned int)petLogic.getBerries());
       syncPetStateToBackend(true);
+    } else if (c == 'm' || c == 'M') {
+      menuLogic.openMemorial(storagePet.getCemeteryCount(), SCREEN_HOME);
+      soundLed.playSound(SOUND_CONFIRM);
+      Serial.println(F("[MINDELUND] Aabner De Doedes Skov og Mindelund!"));
     } else if (c == 'z' || c == 'Z') {
       petLogic.setSleeping(!petLogic.isSleeping());
       soundLed.playSound(SOUND_CLICK);
@@ -606,7 +633,7 @@ void loop() {
           menuLogic.setScreen(SCREEN_HOME, now);
         } else {
           // 3. Open Graveyard / Mindelund with ancestor chronicles from MicroSD card
-          menuLogic.openMemorial(storagePet.getGraveRecordCount(), SCREEN_HOUSE_MENU);
+          menuLogic.openMemorial(storagePet.getCemeteryCount(), SCREEN_HOUSE_MENU);
         }
         lastTouchTimeMs = now;
       } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
@@ -639,8 +666,44 @@ void loop() {
         menuLogic.onButtonBack();
         if (menuLogic.getActiveScreen() == SCREEN_HOUSE_MENU) {
           uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true,
-                               storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                               storagePet.getCemeteryCount(), petLogic.getGeneration(),
                                petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
+        }
+        lastTouchTimeMs = now;
+      }
+    }
+  } else if (currentScreen == SCREEN_MEMORIAL) {
+    // Cemetery & Memorial Gallery (Grove meadow and Life Cycle detail):
+    // TOUCH0: Previous grave (<)
+    // TOUCH1: Next grave (>)
+    // TOUCH2: OK / Livscyklus (Open detailed ancestor life cycle)
+    // TOUCH3: Back (returns from detail to grove, or from grove to previous screen)
+    if (now - lastTouchTimeMs >= TOUCH_COOLDOWN_MS) {
+      uint16_t total = storagePet.getCemeteryCount();
+
+      if (carrier.Buttons.onTouchDown(TOUCH0)) {
+        menuLogic.memorialPrev(total);
+        drawMemorialScreen();
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH1)) {
+        menuLogic.memorialNext(total);
+        drawMemorialScreen();
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH2)) {
+        if (menuLogic.getMemorialViewMode() == MEMORIAL_VIEW_GROVE) {
+          menuLogic.setMemorialViewMode(MEMORIAL_VIEW_DETAIL);
+          soundLed.playSound(SOUND_CONFIRM);
+          drawMemorialScreen();
+        }
+        lastTouchTimeMs = now;
+      } else if (carrier.Buttons.onTouchDown(TOUCH3)) {
+        if (menuLogic.getMemorialViewMode() == MEMORIAL_VIEW_DETAIL) {
+          menuLogic.setMemorialViewMode(MEMORIAL_VIEW_GROVE);
+          soundLed.playSound(SOUND_BACK);
+          drawMemorialScreen();
+        } else {
+          menuLogic.onButtonBack();
+          soundLed.playSound(SOUND_BACK);
         }
         lastTouchTimeMs = now;
       }
@@ -871,7 +934,7 @@ void loop() {
           Serial.println((unsigned int)(petLogic.getGeneration() + 1));
           lastTouchTimeMs = now + 250;
         } else if (carrier.Buttons.onTouchDown(TOUCH4)) {
-          menuLogic.openMemorial(storagePet.getGraveRecordCount(), SCREEN_HOME);
+          menuLogic.openMemorial(storagePet.getCemeteryCount(), SCREEN_HOME);
           lastTouchTimeMs = now + 250;
         }
       }
@@ -1122,7 +1185,7 @@ void loop() {
       case SCREEN_HOUSE_MENU:
         Serial.println(F("[UI] Skærm: LUMIS HUS (1. Garderobe, 2. Sengetid, 3. Mindelund)"));
         uiMenu.drawHouseMenu(menuLogic.getSelectedHouseOption(), petLogic.getOutfitEnum(), petLogic.isSleeping(), true,
-                             storagePet.getGraveRecordCount(), petLogic.getGeneration(),
+                             storagePet.getCemeteryCount(), petLogic.getGeneration(),
                              petLogic.getHighScorePong(), petLogic.getHighScoreMaze());
         soundLed.setMoodColor(255, 180, 80); // Warm cozy home glow
         break;
@@ -1149,17 +1212,8 @@ void loop() {
         break;
 
       case SCREEN_MEMORIAL:
-        Serial.println(F("[UI] Skærm: MINDELUND (Lumis Slægtsbog)"));
-        soundLed.setMoodColor(80, 110, 190); // Mystical blue-violet glow
-        {
-          uint16_t total = storagePet.getGraveRecordCount();
-          GraveRecord rec;
-          if (total > 0 && storagePet.loadGraveRecord(menuLogic.getMemorialIndex(), rec)) {
-            uiMemorial.drawRecord(menuLogic.getMemorialIndex(), total, rec);
-          } else {
-            uiMemorial.drawEmpty(petLogic.getGeneration());
-          }
-        }
+        Serial.println(F("[UI] Skærm: MINDELUND (De Dødes Skov & Livscyklus)"));
+        drawMemorialScreen();
         break;
 
       case SCREEN_GAMES_MENU:

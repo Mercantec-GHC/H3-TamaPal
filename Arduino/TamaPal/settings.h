@@ -106,6 +106,12 @@ enum ScreenType : uint8_t {
   SCREEN_WARDROBE          // Wardrobe dressing room: choose standard vs winter outfit
 };
 
+// View modes inside SCREEN_MEMORIAL (Mindelund / Kirkegård)
+enum MemorialViewMode : uint8_t {
+  MEMORIAL_VIEW_GROVE = 0,   // Forest meadow / cemetery field with gravestones (лесок с гробиками)
+  MEMORIAL_VIEW_DETAIL = 1   // Detailed life cycle inspection of selected ancestor (жизненный цикл)
+};
+
 // The 7 icons in the top navigation menu
 enum MenuIcon : uint8_t {
   ICON_FOOD = 0,           // 0: Mad (Feed berry to Lumi)

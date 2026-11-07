@@ -1328,6 +1328,33 @@ void testMemorialGallery() {
   CHECK(menu.getActiveScreen() == SCREEN_MEMORIAL, "Opened from STATS");
   menu.onButtonBack();
   CHECK(menu.getActiveScreen() == SCREEN_STATS, "Returns to STATS screen via onButtonBack");
+
+  // 4. Test Cemetery Grove & Life Cycle Inspection Mode
+  StoragePet cemeteryStorage;
+  uint16_t cemCount = cemeteryStorage.getCemeteryCount();
+  CHECK(cemCount >= 3, "Cemetery always contains at least 3 historical/ancestor graves");
+
+  GraveRecord histRec;
+  bool loadedHist = cemeteryStorage.loadCemeteryRecord(0, histRec);
+  CHECK(loadedHist, "Loads first cemetery grave record successfully");
+  CHECK(strlen(histRec.name) > 0, "Cemetery grave record has a valid name");
+
+  menu.openMemorial(cemCount, SCREEN_HOUSE_MENU);
+  CHECK(menu.getActiveScreen() == SCREEN_MEMORIAL, "Mindelund opened from HOUSE_MENU");
+  CHECK(menu.getMemorialViewMode() == MEMORIAL_VIEW_GROVE, "Starts in MEMORIAL_VIEW_GROVE (Forest meadow & graves)");
+
+  // Pressing OK enters detailed Life Cycle inspection
+  menu.onButtonOk(1000);
+  CHECK(menu.getMemorialViewMode() == MEMORIAL_VIEW_DETAIL, "onButtonOk enters MEMORIAL_VIEW_DETAIL (Life Cycle Chronicle)");
+
+  // Pressing Back inside Detail returns to Grove
+  menu.onButtonBack();
+  CHECK(menu.getActiveScreen() == SCREEN_MEMORIAL, "Still on SCREEN_MEMORIAL");
+  CHECK(menu.getMemorialViewMode() == MEMORIAL_VIEW_GROVE, "onButtonBack returns to MEMORIAL_VIEW_GROVE");
+
+  // Pressing Back inside Grove returns to HOUSE_MENU
+  menu.onButtonBack();
+  CHECK(menu.getActiveScreen() == SCREEN_HOUSE_MENU, "Second onButtonBack returns to SCREEN_HOUSE_MENU");
 }
 
 void testEggHatchingAndPettingLogic() {
