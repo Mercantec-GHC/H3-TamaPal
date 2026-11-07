@@ -211,6 +211,11 @@ void PetLogic::update(unsigned long currentTimeMs) {
 
   if (!alive) return; // Simulation stops if Lumi is deceased
 
+  // If pet loaded with poop from SD, initialize poop timer on first active frame
+  if (hasPoop && poopTimeMs == 0) {
+    poopTimeMs = currentTimeMs;
+  }
+
   if (!decayInitialized) {
     lastDecayTimeMs = currentTimeMs;
     decayInitialized = true;
@@ -429,6 +434,23 @@ const char* PetLogic::getDeathCauseName(DeathCause cause) {
   }
 }
 
+const char* PetLogic::getDeathCauseCode() const {
+  if (alive) return "none";
+  return getDeathCauseCode(getDeathCause());
+}
+
+const char* PetLogic::getDeathCauseCode(DeathCause cause) {
+  switch (cause) {
+    case DEATH_HUNGER:     return "hunger";
+    case DEATH_COLD:       return "cold";
+    case DEATH_HEAT:       return "heat";
+    case DEATH_BOREDOM:    return "boredom";
+    case DEATH_EXHAUSTION: return "exhaustion";
+    case DEATH_OLD_AGE:    return "old_age";
+    default:               return "none";
+  }
+}
+
 const char* PetLogic::getDeathEpitaph() const {
   switch (deathCause) {
     case DEATH_HUNGER:
@@ -558,9 +580,11 @@ void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char
 
   const char* name = (petName != nullptr && petName[0] != '\0' && strcmp(petName, "Lumi") != 0) ? petName : this->petName;
   const char* stage = (petStage != nullptr && petStage[0] != '\0') ? petStage : getStage();
+  const char* causeCode = getDeathCauseCode();
+  const char* epitaphStr = !isAlive() ? getDeathEpitaph() : "";
 
   snprintf(buffer, bufferSize,
-           "{\"name\":\"%s\",\"stage\":\"%s\",\"outfit\":\"%s\",\"hunger\":%d,\"warmth\":%d,\"energy\":%d,\"happy\":%d,\"discipline\":%d,\"alive\":%s}",
+           "{\"name\":\"%s\",\"stage\":\"%s\",\"outfit\":\"%s\",\"hunger\":%d,\"warmth\":%d,\"energy\":%d,\"happy\":%d,\"discipline\":%d,\"alive\":%s,\"generation\":%u,\"ageMinutes\":%lu,\"deathCause\":\"%s\",\"epitaph\":\"%s\"}",
            name,
            stage,
            getOutfit(),
@@ -569,7 +593,11 @@ void PetLogic::formatStateJson(char* buffer, unsigned int bufferSize, const char
            getEnergy(),
            getHappiness(),
            getDiscipline(),
-           isAlive() ? "true" : "false");
+           isAlive() ? "true" : "false",
+           (unsigned int)getGeneration(),
+           (unsigned long)getAgeMinutes(),
+           causeCode,
+           epitaphStr);
 }
 
 uint16_t PetLogic::getHighScorePong() const {
@@ -658,7 +686,7 @@ bool PetLogic::getHasPoop() const {
 void PetLogic::setHasPoop(bool poop, unsigned long nowMs) {
   hasPoop = poop;
   if (hasPoop) {
-    poopTimeMs = (nowMs > 0) ? nowMs : 1;
+    poopTimeMs = nowMs;
   } else {
     poopTimeMs = 0;
   }

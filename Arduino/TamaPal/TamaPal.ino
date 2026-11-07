@@ -125,7 +125,6 @@ void syncPetStateToBackend(bool forceImmediate) {
   if (!forceImmediate && (now - lastPetStatePublishTimeMs < MQTT_PET_STATE_INTERVAL_MS)) {
     return;
   }
-  lastPetStatePublishTimeMs = now;
 
   // 1. Save to local MicroSD card (avoid SPI access during active controller gameplay)
   if (forceImmediate || menuLogic.getActiveScreen() != SCREEN_CONTROLLER) {
@@ -134,9 +133,16 @@ void syncPetStateToBackend(bool forceImmediate) {
 
   // 2. Publish to MQTT broker if connected
   if (netMqtt.isConnected()) {
-    char petJson[160];
+    char petJson[280];
     petLogic.formatStateJson(petJson, sizeof(petJson), petLogic.getName(), petLogic.getStage());
-    netMqtt.publishPetState(petJson);
+    if (netMqtt.publishPetState(petJson)) {
+      lastPetStatePublishTimeMs = now; // Only advance interval on successful transmission
+    } else {
+      // Temporary network hitch: retry in 3 seconds instead of skipping full 30s cycle
+      lastPetStatePublishTimeMs = (now > (MQTT_PET_STATE_INTERVAL_MS - 3000)) ? (now - MQTT_PET_STATE_INTERVAL_MS + 3000) : 0;
+    }
+  } else {
+    lastPetStatePublishTimeMs = now;
   }
 }
 
@@ -1034,7 +1040,10 @@ void loop() {
     }
   }
 
-  // 5. NETWORK & MQTT (Update connection if in Controller mode or already connected)
+  // 5. NETWORK & MQTT (Forbindelsespolitik: bevidst batterispare-arkitektur)
+  // Oplà starter offline i lokal Tamagotchi-tilstand, saa batteriet ikke draenes unaedigt.
+  // Wi-Fi & MQTT aktiveres, naar brugeren gaar ind i multiplayer/controller (SCREEN_CONTROLLER).
+  // Naar forbindelsen er etableret, vedligeholdes den kontinuerligt og synkroniserer pet/state.
   if (currentScreen == SCREEN_CONTROLLER || netMqtt.isConnected()) {
     netMqtt.update(now);
   }

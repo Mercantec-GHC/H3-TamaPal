@@ -140,7 +140,11 @@ Frekvens: Hvert 30. sekund (heartbeat) samt **øjeblikkeligt** ved spillerhandli
   "energy": 90,
   "happy": 75,
   "discipline": 50,
-  "alive": true
+  "alive": true,
+  "generation": 1,
+  "ageMinutes": 15,
+  "deathCause": "none",
+  "epitaph": ""
 }
 ```
 
@@ -154,10 +158,17 @@ Frekvens: Hvert 30. sekund (heartbeat) samt **øjeblikkeligt** ved spillerhandli
 * `happy` (int 0–100): Glæde (100 = super glad, 0 = trist). Stiger ved leg, klap og vask.
 * `discipline` (int 0–100): Opdragelse (100 = velopdragen). Stiger ved skæld-ud ved uberettiget klynk.
 * `alive` (bool): `true` så længe Lumi lever. Hvis Lumi dør (af alderdom, sult, kulde, hedeslag eller sygdom), sendes `false`.
+* `generation` (int >= 1): Slægtsled / generation (GEN 1, GEN 2, GEN 3...).
+* `ageMinutes` (int >= 0): Opnået alder i minutter (1 minut = 1 leveår i Tamagotchi-tid).
+* `deathCause` (string): `"none"` mens Lumi lever; ved død én af: `"old_age"`, `"hunger"`, `"cold"`, `"heat"`, `"boredom"`, `"exhaustion"`.
+* `epitaph` (string): Personlig minde-epitafe på dansk (fx `"Levede et lykkeligt liv!"`, `"Maven rumlede til sidst..."`).
+
+> **Netværkspolitik (Batterispare-arkitektur):**  
+> For at spare batteri og undgå unødig opvarmning starter Oplà offline i lokal Tamagotchi-tilstand. Wi-Fi & MQTT aktiveres, når brugeren går ind i Controller/Multiplayer (`SCREEN_CONTROLLER`). Herefter holdes forbindelsen aktiv og sender automatisk `pet/state` hvert 30. sek og øjeblikkeligt ved pleje-handlinger.
 
 #### Vejledning til Oliver (Backend / ASP.NET Core):
 Abonner på topic: `StormLamaerne/Tamapal/+/pet/state` (`+` fanger alle Oplàer).  
-Brug denne C# DTO-klasse:
+Brug denne udvidede C# DTO-klasse:
 ```csharp
 public class PetStateDto
 {
@@ -170,17 +181,21 @@ public class PetStateDto
     public int Happy { get; set; }
     public int Discipline { get; set; }
     public bool Alive { get; set; }
+    public int Generation { get; set; } = 1;
+    public long AgeMinutes { get; set; }
+    public string DeathCause { get; set; } = "none";
+    public string Epitaph { get; set; } = "";
 }
 ```
 * **Database (Neon PostgreSQL):** Gem seneste tilstand i tabellen `pets` / `pet_states`.
-* **Kirkegård:** Hvis `Alive == false`, opret en post i kirkegårdstabellen med kæledyrets navn, generation, dødsårsag og opnået alder til Andrii.
+* **Kirkegård:** Hvis `Alive == false`, opret en post i kirkegårdstabellen med kæledyrets navn, generation, dødsårsag (`DeathCause`), opnået alder (`AgeMinutes`) og mindeord (`Epitaph`) til Andrii.
 * **SignalR:** Udsend event `PetStateUpdated(dto)` til browserklienter.
 
 #### Vejledning til Andrii (Frontend):
 * Lyt på `PetStateUpdated` fra SignalR.
-* Tegn 5 vandrette bjælker (0–100%): Sult (Sulten $\to$ Mæt), Varme (Kold $\to$ Varm), Energi (Træt $\to$ Frisk), Glæde (Trist $\to$ Glad), Disciplin.
+* Tegn 5 vandrette bjælker (0–100%): Sult, Varme, Energi, Glæde, Disciplin.
 * Vis kæledyrets navn (`dto.Name`), livsstadie (`baby`/`teen`/`adult`/`old`) og hue/tørklæde hvis `outfit == "winter"`.
-* Hvis `alive === false`, vis gravstenen på kirkegården med teksten fx *"Her hviler THOR (GEN 2) - Døde af alderdom"*.
+* Hvis `alive === false`, vis gravstenen på kirkegården med teksten fx *"Her hviler THOR (GEN 2, 100 år) - Døde af alderdom. 'Levede et lykkeligt liv!'"*.
 
 ## Hvem laver hvad
 

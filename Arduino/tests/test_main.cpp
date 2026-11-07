@@ -405,6 +405,10 @@ void testPetSerialization() {
   CHECK(strstr(buf, "\"happy\":75") != NULL, "JSON contains happy 75");
   CHECK(strstr(buf, "\"discipline\":50") != NULL, "JSON contains discipline 50");
   CHECK(strstr(buf, "\"alive\":true") != NULL, "JSON contains alive true");
+  CHECK(strstr(buf, "\"generation\":1") != NULL, "JSON contains generation 1");
+  CHECK(strstr(buf, "\"ageMinutes\":0") != NULL, "JSON contains ageMinutes 0");
+  CHECK(strstr(buf, "\"deathCause\":\"none\"") != NULL, "JSON contains deathCause none when alive");
+  CHECK(strstr(buf, "\"epitaph\":\"\"") != NULL, "JSON contains empty epitaph when alive");
 
   pet.setOutfit(OUTFIT_WINTER);
   pet.formatStateJson(buf, sizeof(buf));
@@ -416,11 +420,14 @@ void testPetSerialization() {
   CHECK(strstr(buf, "\"name\":\"Sparky\"") != NULL, "JSON contains custom name Sparky");
   CHECK(strstr(buf, "\"stage\":\"baby\"") != NULL, "JSON contains custom stage baby");
 
-  // Dead state: all vitals 0
-  pet.setVitals(0, 0, 0, 0, 0);
-  CHECK(!pet.isAlive(), "Lumi is not alive when all vitals reach 0");
+  // Dead state: old age death with cause and epitaph
+  pet.setAgeMinutes(100);
+  pet.triggerDeath(DEATH_OLD_AGE);
+  CHECK(!pet.isAlive(), "Lumi is not alive after triggerDeath");
   pet.formatStateJson(buf, sizeof(buf));
   CHECK(strstr(buf, "\"alive\":false") != NULL, "JSON contains alive false when dead");
+  CHECK(strstr(buf, "\"deathCause\":\"old_age\"") != NULL, "JSON contains deathCause old_age");
+  CHECK(strstr(buf, "\"epitaph\":\"Levede et lykkeligt liv!\"") != NULL, "JSON contains Danish epitaph");
 }
 
 void testPetStorageSerialization() {
@@ -1479,6 +1486,14 @@ void testStorageCarePersistence() {
   CHECK(berries == 25, "Deserialized berries count is 25");
   CHECK(sick == true, "Deserialized sick status is true");
   CHECK(poop == true, "Deserialized poop status is true");
+
+  // Verify boot recovery: booting with poop gives a fresh 60s timer and does not instantly trigger sickness!
+  PetLogic reloadedPet;
+  reloadedPet.setHasPoop(poop); // loads POOP=1 with default timestamp
+  reloadedPet.update(5000);     // first loop tick at 5s after boot
+  CHECK(!reloadedPet.isSick(), "Pet does not get sick immediately after booting with poop");
+  reloadedPet.update(66000);    // 61s after first loop tick
+  CHECK(reloadedPet.isSick(), "Pet gets sick after full 60s neglect from boot");
 }
 
 void testNameEntryLogic() {

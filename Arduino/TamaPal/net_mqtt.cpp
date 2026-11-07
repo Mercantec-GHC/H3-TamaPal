@@ -133,6 +133,7 @@ void NetMqttClient::attemptConnection(unsigned long now) {
     #if defined(SECRET_WIFI_SSID) && defined(SECRET_WIFI_PASS)
     if (strlen(SECRET_WIFI_SSID) == 0) {
       Serial.println(F("[WiFi] FEJL: SECRET_WIFI_SSID er tom! Udfyld arduino_secrets.h."));
+      connectingState = false;
       return;
     }
 
@@ -145,10 +146,12 @@ void NetMqttClient::attemptConnection(unsigned long now) {
     Serial.println(wifiStatusToString(wifiStatus));
 
     if (wifiStatus != WL_CONNECTED) {
+      connectingState = false;
       return;
     }
     #else
     Serial.println(F("[WiFi] FEJL: Ingen arduino_secrets.h fundet!"));
+    connectingState = false;
     return;
     #endif
   }
@@ -239,6 +242,7 @@ void NetMqttClient::attemptConnection(unsigned long now) {
       } else if (err == MQTT_CONNECTION_TIMEOUT || err == MQTT_CONNECTION_REFUSED) {
         Serial.println(F("[MQTT] TIP: Timeout / Afvist. Tjek om skolens Wi-Fi blokerer port 1883, eller proev mobil hotspot (2.4 GHz)."));
       }
+      connectingState = false;
     }
     #endif
   }
@@ -346,9 +350,13 @@ bool NetMqttClient::publishInput(const char* jsonPayload, unsigned long now, boo
   lastPublishTime = now;
 
   // Publish to dynamic input topic (tamapal/opla-1/input or opla-2/input) with QoS 0
-  mqttClient.beginMessage(topicInput, false, 0, false);
+  if (mqttClient.beginMessage(topicInput, false, 0, false) != 1) {
+    return false;
+  }
   mqttClient.print(jsonPayload);
-  mqttClient.endMessage();
+  if (mqttClient.endMessage() != 1) {
+    return false;
+  }
 
   if (!hasPublishedFirstPacket) {
     hasPublishedFirstPacket = true;
@@ -372,9 +380,15 @@ bool NetMqttClient::publishPetState(const char* jsonPayload) {
   }
 
   // Publish to pet state topic with QoS 1 for reliable delivery to backend
-  mqttClient.beginMessage(topicPetState, false, 1, false);
+  if (mqttClient.beginMessage(topicPetState, false, 1, false) != 1) {
+    Serial.println(F("[MQTT TX Pet] FEJL: beginMessage() afvist!"));
+    return false;
+  }
   mqttClient.print(jsonPayload);
-  mqttClient.endMessage();
+  if (mqttClient.endMessage() != 1) {
+    Serial.println(F("[MQTT TX Pet] FEJL: endMessage() mislykkedes!"));
+    return false;
+  }
 
   Serial.print(F("[MQTT TX Pet] "));
   Serial.print(topicPetState);
