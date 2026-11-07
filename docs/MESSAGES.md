@@ -953,14 +953,108 @@ Vi har afsluttet den fulde implementering af Oplà-kæledyrets livscyklus, tilf�
 * **MicroSD atomisk skrivning:** Sikkerhedskopi `lumi.bak` oprettes før overskrivning af `lumi.txt`, og data integritetsverificeres med FNV-1a kontrolsum.
 
 #### 6. Test og Kompileringsstatus:
-* **Unit tests:** **479 af 479 tests bestået (100% PASS)** i `Arduino/tests/run_tests.sh`.
+* **Unit tests:** **501 af 501 tests bestået (100% PASS)** i `Arduino/tests/run_tests.sh`.
 * **Kompilering:** 0 fejl, 0 advarsler i egen kildekode på SAMD21 (`arduino-cli compile --warnings all --fqbn arduino:samd:mkrwifi1010 Arduino/TamaPal`).
-* **Hukommelse på MKR WiFi 1010:** Flash: 78% (206 KB af 256 KB), RAM: 27% (8,9 KB af 32 KB). 23,8 KB fri RAM!
+* **Hukommelse på MKR WiFi 1010:** Flash: 80% (210 KB af 262 KB), RAM: 27% (8,9 KB af 32 KB). 23,8 KB fri RAM!
 
+___
 
+### 🎵 Opdatering 7/11 (Morgen): Akustisk Redesign af Buzzer-lyd & Bløde Knaptoner
+**Branch:** `feature/arduino-death-rebirth`  
+**Ansvarlig:** Oleh
 
+MKR IoT Carrier-printets piezo-summer (pin 6) styres via PWM med `carrier.Buzzer.sound()`. Keramiske piezo-skiver har et kraftigt fysisk resonanstoppunkt i området **1.500–2.500 Hz**, hvor lydtrykket peaker med op til 85–90 dB. Vores tidligere bekræftelsestone (`SOUND_CONFIRM`) lå på 1.760 Hz (A6, 40 ms), hvilket gav en skinger, gennemtrængende alarmlyd, der lød som en brandalarm eller sirene.
 
+#### Hvad er ændret i `sound_led.cpp`:
+1. **Knap-klik (`SOUND_CLICK`):**
+   * Tidligere: 1.200 Hz / 18 ms (skarp biplyd).
+   * **Nu:** **520 Hz / 8 ms** — et ultra-kort, blødt taktilt klik med Switch / iOS haptic-fornemmelse.
+2. **Bekræftelse og controller-tilslutning (`SOUND_CONFIRM`):**
+   * Tidligere: 1.760 Hz / 40 ms (højfrekvent sirenealarm).
+   * **Nu:** **659 Hz (E5) / 20 ms** — en varm, melodisk arkade-blip i halv længde, der fjerner al støj og ubehag for ørerne.
+3. **Afbryd / Tilbage (`SOUND_BACK`):**
+   * Tidligere: 440 Hz / 35 ms $\to$ **Nu:** **370 Hz / 15 ms** (dæmpet bas-pop).
+4. **Bold-afbøjning i Pong (`SOUND_HIT`):**
+   * Tidligere: 1.400 Hz / 65 ms $\to$ **Nu:** **784 Hz (G5) / 25 ms** (elastisk bordtennis-pop).
+5. **Øvrige lydeffekter:**
+   * Fejring (`SOUND_FANFARE`), helbredelse (`SOUND_HEAL`), genfødsel (`SOUND_REBIRTH`) og spindelyd (`SOUND_PURR`) er alle rykket ud af det skingre resonansområde (>1.5 kHz) og ned i det behagelige 500–900 Hz spektrum med forkortede varigheder.
 
+___
 
+### 📜 Opdatering 7/11 (Formiddag): Udvidet `pet/state` Kirkegårds-kontrakt & Fejlsikring
+**Branch:** `feature/arduino-death-rebirth`  
+**Ansvarlig:** Oleh
+
+For at understøtte Olivers backend-database (PostgreSQL/Neon) og frontendens nekropol/kirkegård er `pet/state` MQTT-kontrakten udvidet med fuld historik og biografiske data for det afdøde kæledyr:
+
+#### Hvad er tilføjet:
+1. **Biografiske data i `pet/state`:**
+   * `"generation": 2` — det aktuelle slægtsled.
+   * `"ageMinutes": 210` — samlet akkumuleret levetid.
+   * `"deathCause": "old_age"` (eller `"hunger"`, `"cold"`, `"heat"`, `"boredom"`, `"exhaustion"`).
+   * `"epitaph": "Levede et lykkeligt liv!"` — dansk mindeord.
+2. **Fejlsikker 60s lort-timer ved genstart (`storage_pet` / `pet_logic`):**
+   * Hvis enheden slukkes med en lort (`💩`) på skærmen, nulstilles forsømmelsestimeren ved boot, så Lumi ikke rammes af øjeblikkelig sygdom i sekund 0. Spilleren får en fuld, retfærdig 60-sekunders buffer til at ryste Oplà og udføre et sæbebad.
+3. **Batterisparende netværkspolitik:**
+   * Oplà starter offline i lokal Tamagotchi-tilstand, så Wi-Fi ikke dræner batteriet unødigt under almindelig leg. Wi-Fi og MQTT etableres først ved overgang til controller (`SCREEN_CONTROLLER`) og vedligeholdes derefter løbende.
+4. **Verificeret MQTT-levering:**
+   * Kontrol af `beginMessage() == 1` og `endMessage() == 1` i `publishInput()` og `publishPetState()`. Ved pakketab gentages synkronisering efter 3 sekunder i stedet for 30 sekunder.
+
+___
+
+### 🌟 Opdatering 7/11 (Middag): Showcase Direktør v2 (72 sek.) med Wow-effekter & Grand Finale
+**Branch:** `feature/arduino-death-rebirth`  
+**Ansvarlig:** Oleh
+
+Showcase-direktøren er udvidet fra 70 til 72 sekunder med 11 komplette akter, filmiske kamerasvingninger og retro-visuelle effekter designet til optimal præsentation på video:
+
+#### De 11 akter og visuelle effekter:
+1. *Akt 1 (0.0–2.5s):* Arkade-navneindtastning (stiller automatisk `LUMI` og bekræfter).
+2. *Akt 2 (2.5–7.0s):* **Livets puls og fødsel:**
+   - Dybe 110 Hz hjertebanken med rubinrøde LED-pulsglimt (`SOUND_HEARTBEAT`).
+   - Skallen slår revner med et fysisk **kamera-stød (Screen Shake)**.
+   - Ægget klækkes med en stjerne-eksplosion (**Nova-støv**) og et løbende lys-portal (**LED Chaser**)!
+3. *Akt 3 (7.0–12.0s):* Baby-Lumi spiser et saftigt bær på handlingsskærmen og efterlader en lort.
+4. *Akt 4 (12.0–16.5s):* Rystevask med sæbeskum, mikrorystelser og skinnende rent display.
+5. *Akt 5 (16.5–23.5s):* Udvikling til Teenager med Kokiri-horn og DJ-hovedtelefoner ledsaget af stjernestøv og LED-portal; blid kærtegn over sensoren med spindelyd.
+6. *Akt 6 (23.5–35.0s):* Solo Mur-Pong; intelligent autopilot rammer præcist i battets centrum.
+7. *Akt 7 (35.0–45.0s):* Stjerneklar nat; Lumi sover under dynen med 5 bløde, blå vejrtræknings-LED'er (sensorer sat på pause mod falsk opvågning).
+8. *Akt 8 (45.0–54.0s):* 99-dages Vismand med hvidt skæg og stok; forkølelse og helbredelse via apotekets mikstur.
+9. *Akt 9 (54.0–62.0s):* **Himmelsk åndefart (Celestial Ascension):**
+   - 100 dages fredelig død med englevinger, roterende guldglorie og opadstigende åndepartikler.
+10. *Akt 10 (62.0–68.0s):* Mindestatue-galleriet med afdødes biografi og rekorder.
+11. *Akt 11 (68.0–72.0s):* **Grand Finale Titelsplash:**
+    - Sejrsfanfare (`SOUND_FANFARE`), gyldent løbende LED-portal og festskærm:
+      `TAMAPAL • MERCANTEC H3 2026 • OLEH * OLIVER * ANDRII` med 16x16 pixelmaskot!
+* *72.0s+:* Automatisk tilbagevenden til startskærmen, klar til genfødsel.
+
+___
+
+### 📟 Komplet oversigt over Serial Monitor-kommandoer (Oplà styring og test)
+
+Til eksamenspræsentation, live-demonstration for undervisere og hurtig test af alle hardware-komponenter uden at vente på naturlige timere, understøtter Arduino-koden en lang række direkte enkelt-tasts kommandoer i **Serial Monitor ved 115200 baud**:
+
+| Tast | Funktion i Serial | Hvad der ændres på Arduino (Skærm, Lyd, LED, Hukommelse, MQTT) |
+|:---:|---|---|
+| `'a'` / `'A'` | **Autonom Showcase (Start/Stop)** | Starter det 72-sekunders filmiske teater (`ShowcaseDirector`). Tryk igen for at afbryde tidligt og vende tilbage til `SCREEN_HOME`. |
+| `'c'` / `'C'` | **Kabinettilstand (Case Mode)** | Skifter touch-følsomhed på Microchip QTouch mellem **plastik-etui** (tærskel 60) og **nøgent print** (tærskel 200) uden genstart eller genkompilering. |
+| `'s'` / `'S'` | **Skift Livsstadie (Cirkulér)** | Cirkulerer gennem Lumis 4 livsstadier: `Baby` $\to$ `Teen` $\to$ `Adult` $\to$ `Old`. Opdaterer grafik, animationer, gemmer på MicroSD og synkroniserer `pet/state`. |
+| `'w'` / `'W'` | **Garderobe (Skift tøj)** | Skifter mellem standard-tøj og **vintertøj** (hue og halstørklæde tilpasset stadiet). Opdaterer display og gemmer i `lumi.txt`. |
+| `'f'` / `'F'` | **Simulér Frostkulde (12°C)** | Tvinger temperaturen til 12°C og varmen ned på 15%. Lumi ryster med 4-faset kuldekrampe, klakker med tænderne og beder om vinterhue. |
+| `'h'` / `'H'` | **Simulér Hedebølge (28°C)** | Tvinger temperaturen til 28°C og varmen op på 85%. Har Lumi vinterhue på, overopheder han: stakåndet gispen, hængende tunge og animerede sveddråber. |
+| `'p'` / `'P'` | **Start Solo Mur-Pong** | Skifter Oplà direkte til det indbyggede Mur-Pong minispil med bat, bold, livescore og personlig rekord. |
+| `'l'` / `'L'` | **Start Marmor-Labyrint** | Genererer en 100% gennemførlig $7 \times 7$ labyrint (DFS-algoritme) og starter spillet med analog IMU-kuglestyring. |
+| `'k'` / `'K'` | **Demonstrér Dødsfald (1..6)** | Udløser ét af de 6 dødsårsager i rækkefølge (Sult, Kulde, Varme, Kedsomhed, Udmattelse, Alderdom). Logger forfaderen i `grave.txt` og synkroniserer med kirkegården på backend. |
+| `'r'` / `'R'` | **Genfødsel (Rebirth)** | Hvis Lumi er gået bort: åbner arkade-navngivningsskærmen (`SCREEN_NAME_ENTRY`) for at navngive det næste slægtsled (`GEN X`). |
+| `'n'` / `'N'` | **Åbn Navneindtastning** | Åbner den 4-bogstavers arkade-skærm (`SCREEN_NAME_ENTRY`) direkte, så man kan teste navnevalg (`A`..`Z`, `0`..`9`). |
+| `'t'` / `'T'` | **Kæl / Klap Lumi virtuet** | Simulerer at føre hånden henover APDS-9960 nærhedssensoren. Giver +12% glæde, udløser spindelyd (`SOUND_PURR`) og 500 ms lyserødt LED-hjerteglød. |
+| `'i'` / `'I'` | **Skift Sygdomsstatus** | Skifter mellem rask og syg. En syg Lumi blegner og kræver helbredende mikstur fra `MEDICIN`-menuen. |
+| `'x'` / `'X'` | **Efterlad Lort (💩)** | Tvinger en lort frem på skærmen med det samme. Tester rensemekanikken og 60s timeren. |
+| `'b'` / `'B'` | **Sæbebad & Rengøring** | Simulerer en kraftig rystelse af kortet (>2.0g). Udløser sæbeboble-effekt på skærmen (`SOUND_BUBBLES`), fjerner lorten og belønner med +15% glæde. |
+| `'g'` / `'G'` | **Tilføj Deku-Bær (+5)** | Indsætter 5 gyldne bær i Lumis bærpung (`berries`). Bær bruges som valuta i apoteket eller til at redde et sygt kæledyr. |
+| `'z'` / `'Z'` | **Skift Søvn (Vågn / Sov)** | Lægger Lumi til at sove i sin træseng under dynen med stjernehimmel og blød natlig LED-vejrtrækning, eller vækker ham. |
+| `'o'` / `'O'` | **Alderdoms-test (99/100 dage)** | **1. tryk:** Sætter alder til 99 dage (Vismand med briller, hat og stok). **2. tryk:** Sætter alder til 100 dage og udløser fredelig alderdomsdød (`DEATH_OLD_AGE`), englevinger og himmelsk glød. |
+
+> **Tip:** Serial Monitor skal indstilles til **115200 baud** og *"No line ending"* eller *"Newline"*. Alle kommandoer reagerer øjeblikkeligt uden forsinkelse.
 
 
