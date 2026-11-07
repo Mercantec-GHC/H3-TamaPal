@@ -13,6 +13,7 @@ UiMazeRenderer::UiMazeRenderer()
     lastBerries(255),
     lastCollectedBerries(0),
     lastSeconds(9999),
+    lastAnimPhase(255),
     lastState(MAZE_STATE_READY),
     isInitialized(false) {}
 
@@ -64,22 +65,25 @@ void UiMazeRenderer::drawInitialScreen(const MazeLogic& maze) {
 void UiMazeRenderer::drawSingleCellWalls(const MazeLogic& maze, uint8_t c, uint8_t r) {
   if (!carrier || c >= MAZE_COLS || r >= MAZE_ROWS) return;
 
-  uint16_t wallCyan = color565(0, 190, 220);
-  uint16_t wallCore = color565(120, 240, 255);
+  uint16_t wallCyan   = color565(0, 190, 220);
+  uint16_t wallCore   = color565(120, 240, 255);
+  uint16_t wallShadow = color565(4, 18, 38);   // 2.5D ambient drop shadow under walls
 
   int left = MazeLogic::ORIGIN_X + c * MazeLogic::CELL_SIZE;
   int top  = MazeLogic::ORIGIN_Y + r * MazeLogic::CELL_SIZE;
   uint8_t cell = maze.getCell(c, r);
 
-  // North wall (2px thick)
+  // North wall (2px thick + 1px drop shadow)
   if (cell & MAZE_WALL_NORTH) {
     carrier->display.drawFastHLine(left, top, MazeLogic::CELL_SIZE + 1, wallCyan);
     carrier->display.drawFastHLine(left, top + 1, MazeLogic::CELL_SIZE + 1, wallCore);
+    carrier->display.drawFastHLine(left + 1, top + 2, MazeLogic::CELL_SIZE - 1, wallShadow);
   }
-  // West wall (2px thick)
+  // West wall (2px thick + 1px drop shadow)
   if (cell & MAZE_WALL_WEST) {
     carrier->display.drawFastVLine(left, top, MazeLogic::CELL_SIZE + 1, wallCyan);
     carrier->display.drawFastVLine(left + 1, top, MazeLogic::CELL_SIZE + 1, wallCore);
+    carrier->display.drawFastVLine(left + 2, top + 1, MazeLogic::CELL_SIZE - 1, wallShadow);
   }
   // East wall (2px thick)
   if (cell & MAZE_WALL_EAST) {
@@ -124,7 +128,6 @@ void UiMazeRenderer::drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8
   uint16_t berryRed     = color565(255, 60, 90);
   uint16_t berryYellow  = color565(255, 220, 60);
   uint16_t berryGreen   = color565(60, 220, 90);
-  uint16_t bhOuterSwirl = color565(75, 20, 120);
   uint16_t bhHorizon    = color565(195, 60, 255);
   uint16_t bhCore       = color565(2, 2, 6);
   uint16_t portalGold   = color565(255, 215, 50);
@@ -143,16 +146,21 @@ void UiMazeRenderer::drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8
     carrier->display.drawPixel(cx + 1, cy - 4, berryGreen);
   }
 
-  // 2. Cosmic Black Hole (MAZE_ITEM_PITFALL) with gravitational swirl
+  // 2. Cosmic Black Hole (MAZE_ITEM_PITFALL) with pulsating gravitational accretion vortex
   if (cell & MAZE_ITEM_PITFALL) {
-    carrier->display.drawCircle(cx, cy, 7, bhOuterSwirl);
+    uint8_t pulse = (uint8_t)((millis() / 180) % 3);
+    uint16_t outerRing = (pulse == 0) ? color565(110, 30, 175) : ((pulse == 1) ? color565(80, 20, 135) : color565(140, 45, 215));
+    carrier->display.drawCircle(cx, cy, 7, outerRing);
     carrier->display.drawCircle(cx, cy, 5, bhHorizon);
     carrier->display.fillCircle(cx, cy, 4, bhCore);
-    // Gravitational accretion swirl sparks
-    carrier->display.drawPixel(cx - 6, cy - 3, bhHorizon);
-    carrier->display.drawPixel(cx + 6, cy + 3, bhHorizon);
-    carrier->display.drawPixel(cx + 3, cy - 6, color565(235, 160, 255));
-    carrier->display.drawPixel(cx - 3, cy + 6, color565(235, 160, 255));
+    // Swirling accretion disk particles that rotate with pulse!
+    int8_t sOffset[3][4] = {
+      { -6, -3,  6,  3 },
+      { -3, -6,  3,  6 },
+      { -5,  4,  5, -4 }
+    };
+    carrier->display.drawPixel(cx + sOffset[pulse][0], cy + sOffset[pulse][1], bhHorizon);
+    carrier->display.drawPixel(cx + sOffset[pulse][2], cy + sOffset[pulse][3], color565(245, 175, 255));
   }
 
   // 3. Start marker at (0, 0)
@@ -160,12 +168,18 @@ void UiMazeRenderer::drawSingleCellItems(const MazeLogic& maze, uint8_t c, uint8
     carrier->display.drawCircle(cx, cy, 5, color565(30, 80, 50));
   }
 
-  // 4. Exit Portal at (6, 6)
+  // 4. Magic Exit Portal at (6, 6)
   if (c == MAZE_COLS - 1 && r == MAZE_ROWS - 1) {
-    carrier->display.drawCircle(cx, cy, 8, color565(160, 130, 20));
-    carrier->display.fillCircle(cx, cy, 5, portalGold);
+    uint8_t pSpin = (uint8_t)((millis() / 200) % 4);
+    uint16_t portalRing = (pSpin & 1) ? color565(255, 220, 60) : color565(120, 245, 255);
+    carrier->display.drawCircle(cx, cy, 8, portalRing);
+    carrier->display.drawCircle(cx, cy, 6, color565(210, 160, 30));
+    carrier->display.fillCircle(cx, cy, 4, portalGold);
     carrier->display.drawPixel(cx, cy, 0xFFFF);
-    carrier->display.drawPixel(cx - 1, cy - 1, 0xFFFF);
+    // Twinkling stars at 4 quadrants
+    int8_t starX[4] = { 0, 3, 0, -3 };
+    int8_t starY[4] = { -3, 0, 3, 0 };
+    carrier->display.drawPixel(cx + starX[pSpin], cy + starY[pSpin], 0xFFFF);
   }
 }
 
@@ -249,30 +263,89 @@ void UiMazeRenderer::drawHud(const MazeLogic& maze, bool force) {
   }
 }
 
+void UiMazeRenderer::animateHazardsAndPortal(const MazeLogic& maze, uint8_t phase) {
+  if (!carrier) return;
+  (void)phase;
+
+  int ballC = ((int)maze.getBallX() - MazeLogic::ORIGIN_X) / MazeLogic::CELL_SIZE;
+  int ballR = ((int)maze.getBallY() - MazeLogic::ORIGIN_Y) / MazeLogic::CELL_SIZE;
+
+  for (uint8_t r = 0; r < MAZE_ROWS; r++) {
+    for (uint8_t c = 0; c < MAZE_COLS; c++) {
+      uint8_t cell = maze.getCell(c, r);
+      bool isPitfall = (cell & MAZE_ITEM_PITFALL);
+      bool isPortal  = (c == MAZE_COLS - 1 && r == MAZE_ROWS - 1);
+
+      if (isPitfall || isPortal) {
+        // Skip redraw if ball is currently inside this cell to prevent flickering
+        if (c == ballC && r == ballR) continue;
+        drawSingleCellItems(maze, c, r);
+      }
+    }
+  }
+}
+
 void UiMazeRenderer::drawMiniLumi(int x, int y, float vx, float vy) {
   if (!carrier) return;
 
   uint16_t lumiMint   = color565(120, 245, 150);
-  uint16_t lumiBorder = color565(45, 175, 95);
+  uint16_t lumiBorder = color565(35, 165, 85);
   uint16_t sproutGold = color565(255, 220, 60);
+  uint16_t blushPink  = color565(255, 120, 160);
 
   // Mint-green mochi body (radius 4)
   carrier->display.fillCircle(x, y, 4, lumiMint);
   carrier->display.drawCircle(x, y, 4, lumiBorder);
 
-  // Golden Sprout on top
+  // Cute tiny spirit ears on sides
+  carrier->display.drawPixel(x - 4, y - 3, lumiBorder);
+  carrier->display.drawPixel(x + 4, y - 3, lumiBorder);
+
+  // Golden Sprout on top: sweeps back against movement velocity
+  int sproutDx = (vx > 0.4f) ? -1 : ((vx < -0.4f) ? 1 : 0);
+  int sproutDy = (vy > 0.4f) ? -1 : 0;
   carrier->display.drawFastVLine(x, y - 6, 2, sproutGold);
-  carrier->display.drawPixel(x - 1, y - 6, sproutGold);
-  carrier->display.drawPixel(x + 1, y - 7, color565(255, 240, 120));
+  carrier->display.drawPixel(x + sproutDx, y - 7 + sproutDy, sproutGold);
+  carrier->display.drawPixel(x + sproutDx * 2, y - 8 + sproutDy, color565(255, 245, 130));
 
-  // Eyes looking in motion direction
-  int eyeDx = (vx > 0.35f) ? 1 : ((vx < -0.35f) ? -1 : 0);
-  int eyeDy = (vy > 0.35f) ? 1 : ((vy < -0.35f) ? -1 : 0);
+  // Determine emotional state: speed > 0.45 or rolling fast = Panicked/Shocked expression!
+  float speedSq = (vx * vx) + (vy * vy);
+  bool isShocked = (speedSq > 0.35f);
 
-  carrier->display.drawPixel(x - 2 + eyeDx, y - 1 + eyeDy, 0x0000);
-  carrier->display.drawPixel(x + 2 + eyeDx, y - 1 + eyeDy, 0x0000);
-  carrier->display.drawPixel(x - 2 + eyeDx, y - 2 + eyeDy, 0xFFFF); // gleam
-  carrier->display.drawPixel(x + 2 + eyeDx, y - 2 + eyeDy, 0xFFFF);
+  if (isShocked) {
+    // SHOCKED / PANICKED: Wide white eyes with tiny dilated pupils & open mouth ":O"
+    carrier->display.drawPixel(x - 2, y - 2, 0xFFFF);
+    carrier->display.drawPixel(x - 2, y - 1, 0xFFFF);
+    carrier->display.drawPixel(x + 2, y - 2, 0xFFFF);
+    carrier->display.drawPixel(x + 2, y - 1, 0xFFFF);
+
+    int eyeDx = (vx > 0.2f) ? 1 : ((vx < -0.2f) ? -1 : 0);
+    int eyeDy = (vy > 0.2f) ? 1 : ((vy < -0.2f) ? -1 : 0);
+    carrier->display.drawPixel(x - 2 + eyeDx, y - 1 + eyeDy, 0x0000);
+    carrier->display.drawPixel(x + 2 + eyeDx, y - 1 + eyeDy, 0x0000);
+
+    // Open gasping mouth in the center
+    carrier->display.drawPixel(x, y + 1, 0x0000);
+    carrier->display.drawPixel(x, y + 2, color565(255, 70, 90));
+
+    // Rosy panic blush
+    carrier->display.drawPixel(x - 3, y + 1, blushPink);
+    carrier->display.drawPixel(x + 3, y + 1, blushPink);
+  } else {
+    // CALM / FOCUSED: Eyes glance in rolling direction with shiny gleam
+    int eyeDx = (vx > 0.2f) ? 1 : ((vx < -0.2f) ? -1 : 0);
+    int eyeDy = (vy > 0.2f) ? 1 : ((vy < -0.2f) ? -1 : 0);
+
+    carrier->display.drawPixel(x - 2 + eyeDx, y - 1 + eyeDy, 0x0000);
+    carrier->display.drawPixel(x + 2 + eyeDx, y - 1 + eyeDy, 0x0000);
+    carrier->display.drawPixel(x - 2 + eyeDx, y - 2 + eyeDy, 0xFFFF); // gleam
+    carrier->display.drawPixel(x + 2 + eyeDx, y - 2 + eyeDy, 0xFFFF);
+
+    // Cute tiny smile
+    carrier->display.drawPixel(x, y + 1, 0x0000);
+    carrier->display.drawPixel(x - 3, y, blushPink);
+    carrier->display.drawPixel(x + 3, y, blushPink);
+  }
 }
 
 void UiMazeRenderer::eraseMiniLumi(int x, int y, const MazeLogic& maze) {
@@ -280,8 +353,8 @@ void UiMazeRenderer::eraseMiniLumi(int x, int y, const MazeLogic& maze) {
   if (!carrier) return;
 
   uint16_t nativeBg = color565(8, 12, 26);
-  // Clear 11x14 box covering ball and sprout with base floor color
-  carrier->display.fillRect(x - 5, y - 8, 11, 14, nativeBg);
+  // Clear 13x16 box covering ball, ears, and sprout with base floor color
+  carrier->display.fillRect(x - 6, y - 9, 13, 16, nativeBg);
 }
 
 void UiMazeRenderer::drawVictoryScreen(const MazeLogic& maze) {
@@ -435,7 +508,16 @@ void UiMazeRenderer::updateDisplay(const MazeLogic& maze, bool forceRedraw) {
     drawHud(maze, false);
   }
 
-  // 3. Ball Delta-Rendering
+  // 3. Periodic pulsating animation of black hole vortex and exit portal
+  if (currentState == MAZE_STATE_PLAYING || currentState == MAZE_STATE_READY) {
+    uint8_t animPhase = (uint8_t)((millis() / 220) % 4);
+    if (animPhase != lastAnimPhase) {
+      lastAnimPhase = animPhase;
+      animateHazardsAndPortal(maze, animPhase);
+    }
+  }
+
+  // 4. Ball Delta-Rendering
   int16_t newX = (int16_t)maze.getBallX();
   int16_t newY = (int16_t)maze.getBallY();
 

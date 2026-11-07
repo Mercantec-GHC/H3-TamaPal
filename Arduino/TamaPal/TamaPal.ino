@@ -679,13 +679,27 @@ void loop() {
     } else {
       // Smooth 50 Hz button paddle control in READY, BALL_LOST, and PLAYING states:
       // TOUCH1 (01, top-left) = Op (Up, -Y), TOUCH0 (00, bottom-left) = Ned (Down, +Y)
+      // Debounce timer ignores brief air-hover spikes (< 35 ms)
+      static unsigned long paddleTouch1StartMs = 0;
+      static unsigned long paddleTouch0StartMs = 0;
+      if (touch1) {
+        if (paddleTouch1StartMs == 0) paddleTouch1StartMs = now;
+      } else {
+        paddleTouch1StartMs = 0;
+      }
+      if (touch0) {
+        if (paddleTouch0StartMs == 0) paddleTouch0StartMs = now;
+      } else {
+        paddleTouch0StartMs = 0;
+      }
+
       static unsigned long lastPaddleBtnMs = 0;
       if (now - lastPaddleBtnMs >= 20) {
         lastPaddleBtnMs = now;
-        if (touch1) {
+        if (touch1 && (now - paddleTouch1StartMs >= PONG_BUTTON_DEBOUNCE_MS)) {
           pongLogic.movePaddle(-3.8f); // Up (Op - button 01)
         }
-        if (touch0) {
+        if (touch0 && (now - paddleTouch0StartMs >= PONG_BUTTON_DEBOUNCE_MS)) {
           pongLogic.movePaddle(3.8f);  // Down (Ned - button 00)
         }
       }
@@ -1317,13 +1331,17 @@ void loop() {
     // 6a. Step physics (Paddle is controlled purely via TOUCH0/TOUCH1 buttons, no IMU interference)
     pongLogic.update(now);
 
-    // 6c. Handle sound & LEDs
+    // 6c. Handle sound, LEDs, and visual cues (cheering mascot & wall sparks)
     SoundType pongSnd = pongLogic.popSoundEffect();
     if (pongSnd != SOUND_NONE) {
       soundLed.playSound(pongSnd);
     }
     if (pongLogic.popPaddleHit()) {
       soundLed.flashColor(0, 255, 220, 100); // 100 ms cyan flash on paddle hit
+      uiPong.triggerCheer();                  // Lumi cheerleader mascot celebrates!
+    }
+    if (pongLogic.popWallHit()) {
+      uiPong.triggerWallSparks(pongLogic.getBallX(), pongLogic.getBallY(), pongLogic.getBallVx(), pongLogic.getBallVy());
     }
 
     // 6d. Update display (zero-flicker delta-rendering)
