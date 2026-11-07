@@ -1,16 +1,31 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using BackendTamapal.Models;
+using BackendTamapal.Services;
+
 
 namespace BackendTamapal.Hubs
 {
     public class GameHub : Hub
     {
+
+        private readonly GameService _gameService;
+
+        public GameHub(GameService gameService)
+        {
+            _gameService = gameService;
+        }
+
         public async Task StartGame()
         {
-            var gameState = new GameState();
-            gameState.Status = "playing";
-            await Clients.All.SendAsync("GameState", gameState);
+
+            _gameService.Start();
+            await Clients.All.SendAsync("GameState", _gameService.State);
 
         }
+
+
+
     }
+
+
 }
