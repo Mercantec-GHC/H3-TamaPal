@@ -62,7 +62,7 @@ void UiPongRenderer::drawInitialScreen(const PongLogic& pong) {
   // 3. Bottom controls hint (calibrated at Y=196 inside circular bottom arc)
   carrier->display.setTextSize(1);
   carrier->display.setTextColor(hintColor, nativeBg);
-  const char* hint = "T0:Op T1:Ned T2:OK T3:Ud";
+  const char* hint = "T1:Op T0:Ned T2:OK T3:Ud";
   int hintW = strlen(hint) * 6;
   carrier->display.setCursor((SCREEN_WIDTH - hintW) / 2, 196);
   carrier->display.print(hint);

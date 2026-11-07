@@ -373,31 +373,34 @@ void MazeLogic::update(unsigned long currentTimeMs) {
   ballVy = (ballVy + currentTiltY * accelScale * speedFactor) * friction;
 
   // 2b. Black Hole (MAZE_ITEM_PITFALL) gravitational pull:
-  // Gently pulls the ball toward nearby Black Holes across open doorways/passages,
-  // requiring the player to tilt more strongly (> 40%) away from the hole to escape!
+  // Exerts a clearly felt gravitational attraction within a 38 px radius (~2 cells),
+  // pulling a stationary or lightly tilted ball into the hole unless the player tilts strongly (> 45-60%)!
   for (uint8_t pr = 0; pr < MAZE_ROWS; pr++) {
     for (uint8_t pc = 0; pc < MAZE_COLS; pc++) {
       if (grid[pr][pc] & MAZE_ITEM_PITFALL) {
-        bool connected = ((int)pc == curCol && (int)pr == curRow);
-        if (!connected) {
-          uint8_t pCell = grid[pr][pc];
-          if ((int)pc == curCol && (int)pr == curRow + 1 && !(pCell & MAZE_WALL_NORTH)) connected = true;
-          if ((int)pc == curCol && (int)pr + 1 == curRow && !(pCell & MAZE_WALL_SOUTH)) connected = true;
-          if ((int)pc == curCol + 1 && (int)pr == curRow && !(pCell & MAZE_WALL_WEST))  connected = true;
-          if ((int)pc + 1 == curCol && (int)pr == curRow && !(pCell & MAZE_WALL_EAST))  connected = true;
-        }
-        if (connected) {
-          float pitX = ORIGIN_X + pc * CELL_SIZE + CELL_SIZE * 0.5f;
-          float pitY = ORIGIN_Y + pr * CELL_SIZE + CELL_SIZE * 0.5f;
-          float gdx = pitX - ballX;
-          float gdy = pitY - ballY;
-          float distSq = gdx * gdx + gdy * gdy;
-          if (distSq > 1.0f && distSq < 900.0f) { // Within 30 px gravitational horizon
-            float dist = sqrtf(distSq);
-            float pull = 0.11f * (1.0f - (dist / 32.0f)) * speedFactor;
-            ballVx += (gdx / dist) * pull;
-            ballVy += (gdy / dist) * pull;
+        float pitX = ORIGIN_X + pc * CELL_SIZE + CELL_SIZE * 0.5f;
+        float pitY = ORIGIN_Y + pr * CELL_SIZE + CELL_SIZE * 0.5f;
+        float gdx = pitX - ballX;
+        float gdy = pitY - ballY;
+        float distSq = gdx * gdx + gdy * gdy;
+        if (distSq > 1.0f && distSq < 1444.0f) { // Within 38 px gravitational horizon
+          bool connected = ((int)pc == curCol && (int)pr == curRow);
+          if (!connected) {
+            uint8_t pCell = grid[pr][pc];
+            if ((int)pc == curCol && (int)pr == curRow + 1 && !(pCell & MAZE_WALL_NORTH)) connected = true;
+            if ((int)pc == curCol && (int)pr + 1 == curRow && !(pCell & MAZE_WALL_SOUTH)) connected = true;
+            if ((int)pc == curCol + 1 && (int)pr == curRow && !(pCell & MAZE_WALL_WEST))  connected = true;
+            if ((int)pc + 1 == curCol && (int)pr == curRow && !(pCell & MAZE_WALL_EAST))  connected = true;
           }
+          float dist = sqrtf(distSq);
+          float normDist = dist / 38.0f;
+          // Close range (~10px): 0.21f accel (~70% tilt needed); Medium range (~22px): 0.14f accel (~45% tilt needed)
+          float basePull = (0.12f + 0.09f * (1.0f - normDist)) * (1.0f - normDist * 0.55f);
+          if (connected) {
+            basePull *= 1.35f; // Extra suction when inside cell or facing open doorway
+          }
+          ballVx += (gdx / dist) * basePull * speedFactor;
+          ballVy += (gdy / dist) * basePull * speedFactor;
         }
       }
     }

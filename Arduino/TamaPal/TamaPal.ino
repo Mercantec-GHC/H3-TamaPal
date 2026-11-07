@@ -277,11 +277,6 @@ void setup() {
   // Initialize MicroSD card persistence and restore Lumi if file exists
   storagePet.begin();
   if (storagePet.loadPet(petLogic)) {
-    if (!petLogic.isAlive() && petLogic.getAgeMinutes() < 10) {
-      // Auto-recover if Lumi died prematurely under legacy fast-minute decay
-      petLogic.rebirth();
-      storagePet.savePet(petLogic);
-    }
     Serial.println(F("[STORAGE] Lumi fortsætter fra gemt tilstand på MicroSD-kort!"));
   }
 
@@ -691,15 +686,15 @@ void loop() {
       }
     } else {
       // Smooth 50 Hz button paddle control in READY, BALL_LOST, and PLAYING states:
-      // TOUCH0 = Op (Up, -Y), TOUCH1 = Ned (Down, +Y)
+      // TOUCH1 (01, top-left) = Op (Up, -Y), TOUCH0 (00, bottom-left) = Ned (Down, +Y)
       static unsigned long lastPaddleBtnMs = 0;
       if (now - lastPaddleBtnMs >= 20) {
         lastPaddleBtnMs = now;
-        if (touch0) {
-          pongLogic.movePaddle(-3.8f); // Up (Op)
-        }
         if (touch1) {
-          pongLogic.movePaddle(3.8f);  // Down (Ned)
+          pongLogic.movePaddle(-3.8f); // Up (Op - button 01)
+        }
+        if (touch0) {
+          pongLogic.movePaddle(3.8f);  // Down (Ned - button 00)
         }
       }
 
@@ -884,16 +879,8 @@ void loop() {
   // 3. LOGIC LAYER: Advance animations and countdown timers
   bool wasAlive = petLogic.isAlive();
   menuLogic.update(now);
-  if (!showcaseDirector.isActive()) {
-    if (petLogic.isHatching()) {
-      petLogic.update(now); // Hatching animation completes in 2.8 real seconds
-    } else if (currentScreen == SCREEN_HOME || currentScreen == SCREEN_STATS || currentScreen == SCREEN_ACTION) {
-      // Real-time Tamagotchi biological clock: 1 virtual age unit = 1 real day (1,440x scale).
-      // Maximum lifespan = 100 days (STAGE_OLD at 100 dage), average neglected lifespan = ~10 days.
-      // Paused automatically while playing minigames or in menus so Lumi never dies in the background!
-      unsigned long bioClockMs = 10000UL + (now / 1440UL);
-      petLogic.update(bioClockMs);
-    }
+  if (!showcaseDirector.isActive() || currentScreen != SCREEN_HATCHING) {
+    petLogic.update(now);
   }
   soundLed.update(now);
 
@@ -1228,11 +1215,11 @@ void loop() {
     }
 
     // 6b. Read touch buttons for gameplay
-    // TOUCH0 = Up (Pong)
-    // TOUCH1 = Down (Pong)
+    // TOUCH1 (01, top-left) = Up (Pong)
+    // TOUCH0 (00, bottom-left) = Down (Pong)
     // TOUCH2 = Action / Serve (Pong & Labyrinth)
-    bool btnUp     = carrier.Buttons.getTouch(TOUCH0);
-    bool btnDown   = carrier.Buttons.getTouch(TOUCH1);
+    bool btnUp     = carrier.Buttons.getTouch(TOUCH1);
+    bool btnDown   = carrier.Buttons.getTouch(TOUCH0);
     bool btnAction = carrier.Buttons.getTouch(TOUCH2);
 
     // Detect immediate edge change (pressed or released) to eliminate 50ms tap latency
