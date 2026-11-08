@@ -3,14 +3,25 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>TamaPal – Pong</title>
+    <!-- Pixel font, same arcade look as on the Oplà -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <canvas id="game" width="600" height="600"></canvas>
-    <br>
-    <button id="start">Start</button>
-    <p id="status"></p>
+    <main>
+        <h1>TamaPal <span>Pong</span></h1>
+        <canvas id="game" width="600" height="600"></canvas>
+        <div class="controls">
+            <button id="start">Start</button>
+            <p class="help">↑ / ↓ flytter ketsjeren</p>
+        </div>
+        <p id="status"></p>
+    </main>
 
     <!-- SignalR client (global variable signalR), must load before main.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/10.0.11/signalr.min.js"></script>
