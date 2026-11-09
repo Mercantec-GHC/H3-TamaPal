@@ -20,6 +20,15 @@ namespace BackendTamapal.Services
 
         }
 
+        public void HandleInput(OplaInput input)
+        {
+            if (input.Button)
+                Start();
+
+            double y = (input.Tilt + 1) / 2;
+            State.Paddle.Y = Math.Clamp(y, 0.1, 0.9);
+        }
+
     }
 
   
