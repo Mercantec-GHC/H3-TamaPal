@@ -17,6 +17,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
+# Skolens server har brugt sine inotify-instanser op, så .NET må ikke overvåge filer med inotify
+ENV DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
 
 COPY --from=build /app/publish .
 COPY ["Frontend/", "./wwwroot/"]
