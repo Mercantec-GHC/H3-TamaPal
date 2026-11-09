@@ -1,6 +1,7 @@
 using BackendTamapal.Hubs;
 using BackendTamapal.Models;
 using BackendTamapal.Services;
+using Microsoft.Extensions.FileProviders;
 
 namespace BackendTamapal
 {
@@ -41,6 +42,13 @@ namespace BackendTamapal
             }
 
             app.UseHttpsRedirection();
+
+            // Vis Andriis frontend: lokalt fra ../../Frontend, i Docker fra wwwroot
+            string frontendFolder = builder.Configuration["FrontendPath"] ?? "wwwroot";
+            var frontendFiles = new PhysicalFileProvider(Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, frontendFolder)));
+            app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = frontendFiles });
+            app.UseStaticFiles(new StaticFileOptions { FileProvider = frontendFiles });
+
             app.UseCors("Frontend");
             app.UseAuthorization();
 
