@@ -15,9 +15,11 @@ namespace BackendTamapal.Services
         private const double StartSpeed = 0.5;
         private const double SpeedUp = 1.05;
         private const double MaxSpeed = 1.2;
+        private const double PaddleSpeed = 1.0;
 
         private double _vx;
         private double _vy;
+        private int _paddleDirection;
         public GameState State { get; set; } = new GameState();
 
         public ConcurrentQueue<OplaMessage> Outbox { get; } = new();
@@ -44,8 +46,7 @@ namespace BackendTamapal.Services
             if (input.Button)
                 Start();
 
-            double y = (input.Tilt + 1) / 2;
-            State.Paddle.Y = Math.Clamp(y, 0.1, 0.9);
+            _paddleDirection = (input.Down ? 1 : 0) - (input.Up ? 1 : 0);
         }
 
         private void SendToOpla(string topicEnd, object payload)
@@ -73,6 +74,9 @@ namespace BackendTamapal.Services
         {
             if (State.Status != "playing")
                 return;
+
+            double newY = State.Paddle.Y + _paddleDirection * PaddleSpeed * dt;
+            State.Paddle.Y = Math.Clamp(newY, PaddleHeight / 2, 1 - PaddleHeight / 2);
 
             Ball ball = State.Ball;
             double previousX = ball.X;
