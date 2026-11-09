@@ -34,6 +34,10 @@ namespace BackendTamapal.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("PlayedAt")
                         .HasColumnType("timestamp with time zone");
 

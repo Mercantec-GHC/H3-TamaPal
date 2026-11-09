@@ -17,12 +17,14 @@ namespace BackendTamapal.Controllers
             _dbFactory = dbFactory;
         }
 
-        // GET /api/scores – de 10 højeste scorer (highscore)
+        // GET /api/scores – de 10 højeste scorer i solo (highscore)
+        // Duo tæller ikke med, fordi en duo-score er point (højst 5) og ikke antal slag
         [HttpGet]
         public async Task<List<GameResult>> GetHighscores()
         {
             using var db = _dbFactory.CreateDbContext();
             return await db.GameResults
+                .Where(r => r.Mode == "solo")
                 .OrderByDescending(r => r.Score)
                 .Take(10)
                 .ToListAsync();
