@@ -23,6 +23,9 @@ namespace BackendTamapal.Services
         public GameState State { get; set; } = new GameState();
 
         public ConcurrentQueue<OplaMessage> Outbox { get; } = new();
+
+        // Færdige spil venter her, til ScoreSaver gemmer dem i databasen
+        public ConcurrentQueue<GameResult> FinishedGames { get; } = new();
         public string PlayerDevice { get; private set; } = "opla-1";
 
 
@@ -128,6 +131,8 @@ namespace BackendTamapal.Services
                 {
                     State.Status = "gameover";
                     SendToOpla("event", new { type = "gameover" });
+
+                    FinishedGames.Enqueue(new GameResult { Score = State.Score, DeviceId = PlayerDevice });
 
                     int reward = Math.Min(State.Score * 3, 30);
                     if (reward > 0)
