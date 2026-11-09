@@ -57,7 +57,7 @@ Spillet kan altså startes både fra Oplà (`button`) og fra browseren.
 - **Hvad sker der, hvis Wi-Fi/broker falder ud?** Oplà prøver at forbinde igen (timeout 1,5 s, så skærmen ikke fryser). Spillet kører videre i backenden med den sidste retning, den fik.
 - **Hvad hvis backenden ikke kører?** Browseren viser "Ingen forbindelse til serveren" og prøver igen hvert 3. sekund (`network.js`).
 - **Hvad hvis der kommer forkert JSON?** `MqttWorker` ignorerer beskeden og skriver en linje i loggen – spillet crasher ikke.
-- **Kan der være flere spillere?** Topic'et har `opla-1`/`opla-2`, og backenden lytter på `+`. Men spillogikken har kun én ketsjer i dag – multiplayer er Nice to Have.
+- **Kan der være flere spillere?** Ja (#31). Topic'et har `opla-1`/`opla-2`, og backenden lytter på `+`. `GameService` husker retning og "sidst set" for hver Oplà. Har begge sendt input inden for 3 sek, når der trykkes Start, bliver det duo: `opla-1` styrer venstre ketsjer, `opla-2` højre, og først til 5 point vinder. Ellers er det solo som før.
 
 ## Game over → databasen (#30)
 
@@ -71,4 +71,5 @@ Tabellen oprettes af EF Core-migrationen i `Backend/BackendTamapal/Migrations/` 
 
 ## Mangler (status 9/11)
 
-- Highscore er testet lokalt mod Neon 9/11. Mangler: miljøvariablen `ConnectionStrings__TamaPalDb` i Dokploy og test på serveren.
+- Highscore virker på serveren (9/11).
+- 2 spillere: backenden er klar, frontenden mangler at tegne `paddle2`, `score2` og vinderen (#31).

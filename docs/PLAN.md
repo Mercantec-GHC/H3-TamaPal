@@ -21,7 +21,7 @@ Status: 9/11 (mandag). Ret filen, når noget ændrer sig.
 | Del | Hvem | Status |
 |---|---|---|
 | Arduino | Oleh | ✅ **Færdig** i `dev`. Controller-tilstand sender `up`/`down`/`button`/`tilt` via MQTT (~20/s) og reagerer på `hit`/`miss`/`gameover`. Derudover Tamagotchi-livscyklus, to offline minispil (Pong, Labyrint) og autonom showcase (se `MESSAGES.md`). Kompilerer (flash 88 %, RAM 28 %), 533/533 enhedstests grønne (målt 9/11). |
-| Backend | Oliver | ✅ **Spillet virker** i `dev` (9/11): `/gamehub` med `StartGame()`, CORS, `GameService.Tick()` med bold, vægge, ketsjer, point, liv og game over, `GameLoop` ~30/s og `MqttWorker`, der lytter på `+/input` (ketsjer styres med `up`/`down`, `button` starter) og sender `hit`/`miss`/`gameover` + `pet/reward` tilbage til Oplà. Testet hele vejen Oplà → backend → browser på Olivers PC. **Database** (Neon + EF Core): `ScoreSaver` gemmer hvert spil ved game over, `GET /api/scores` viser top 10 – testet lokalt mod Neon 9/11. **Mangler:** `ConnectionStrings__TamaPalDb` i Dokploy. |
+| Backend | Oliver | ✅ **Spillet virker** i `dev` (9/11): `/gamehub` med `StartGame()`, CORS, `GameService.Tick()` med bold, vægge, ketsjer, point, liv og game over, `GameLoop` ~30/s og `MqttWorker`, der lytter på `+/input` (ketsjer styres med `up`/`down`, `button` starter) og sender `hit`/`miss`/`gameover` + `pet/reward` tilbage til Oplà. Testet hele vejen Oplà → backend → browser på Olivers PC. **Database** (Neon + EF Core): `ScoreSaver` gemmer hvert spil ved game over, `GET /api/scores` viser top 10 – virker på serveren 9/11. **2 spillere (#31):** backend klar 9/11 (`mode`, `paddle2`, `score2`, `winner`, først til 5) – venter på frontend. |
 | Frontend | Andrii | ✅ **Færdig** i `dev`. SignalR-klient (#10) testet mod `/gamehub` 7/11 og 9/11 (forbinder, `StartGame()`, genforbinder). Neon arkade-look med effekter ved slag/miss. `fakeGame.js` som backup. Tegner live `GameState` fra backenden (9/11). |
 
 ## Mangler til fremlæggelsen (11/11)
@@ -33,7 +33,9 @@ Hele vejen Oplà → MQTT → backend → SignalR → browser virker (9/11). Eve
 - [x] MQTT-lytter `MqttWorker` på `StormLamaerne/Tamapal/+/input`: `up`/`down` = retning, ketsjeren flyttes i `Tick`, `button` starter spillet (#27)
 - [x] Send `{"type":"hit"|"miss"|"gameover"}` til `.../opla-1/event` + `happy_boost` til `.../pet/reward` ved game over (#29)
 - [x] Database (Neon + EF Core): tabellen `GameResults` med highscore efter game over + `GET /api/scores` (#30) – "løst krav" fra Mathias. Testet lokalt 9/11
-- [ ] Miljøvariablen `ConnectionStrings__TamaPalDb` i Dokploy + test på https://tamapal.mercantec.tech/api/scores
+- [x] Miljøvariablen `ConnectionStrings__TamaPalDb` i Dokploy + test på https://tamapal.mercantec.tech/api/scores (9/11)
+- [x] 2 spillere i backenden (#31): `opla-1` venstre mod `opla-2` højre, først til 5 – Nice to Have. Solo er uændret
+- [ ] Frontend (Andrii): tegn `paddle2` og `score : score2`, når `mode` er `"duo"`, og vis vinderen (#31)
 
 **Alle:**
 - [x] Integrationstest Oplà → backend → browser – virker på Olivers PC 9/11 (#19)
