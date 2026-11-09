@@ -1,4 +1,6 @@
-﻿using BackendTamapal.Models;
+﻿using System.Collections.Concurrent;
+using System.Text.Json;
+using BackendTamapal.Models;
 
 namespace BackendTamapal.Services
 {
@@ -18,6 +20,9 @@ namespace BackendTamapal.Services
         private double _vy;
         public GameState State { get; set; } = new GameState();
 
+        public ConcurrentQueue<OplaMessage> Outbox { get; } = new();
+        public string PlayerDevice { get; private set; } = "opla-1";
+
 
 
         public void Start()
@@ -32,13 +37,26 @@ namespace BackendTamapal.Services
             ServeBall();
         }
 
-        public void HandleInput(OplaInput input)
+        public void HandleInput(OplaInput input, string deviceId = "opla-1")
         {
+            PlayerDevice = deviceId;
+
             if (input.Button)
                 Start();
 
             double y = (input.Tilt + 1) / 2;
             State.Paddle.Y = Math.Clamp(y, 0.1, 0.9);
+        }
+
+        private void SendToOpla(string topicEnd, object payload)
+        {
+            var message = new OplaMessage
+            {
+                DeviceId = PlayerDevice,
+                TopicEnd = topicEnd,
+                Json = JsonSerializer.Serialize(payload)
+            };
+            Outbox.Enqueue(message);
         }
 
         private void ServeBall()
@@ -95,6 +113,7 @@ namespace BackendTamapal.Services
                 _vy = _vy * factor;
 
                 State.Score++;
+                SendToOpla("event", new { type = "hit" });
             }
 
             if (ball.X + BallRadius < 0)
@@ -102,9 +121,19 @@ namespace BackendTamapal.Services
                 State.Lives--;
 
                 if (State.Lives <= 0)
+                {
                     State.Status = "gameover";
+                    SendToOpla("event", new { type = "gameover" });
+
+                    int reward = Math.Min(State.Score * 3, 30);
+                    if (reward > 0)
+                        SendToOpla("pet/reward", new { type = "happy_boost", amount = reward });
+                }
                 else
+                {
+                    SendToOpla("event", new { type = "miss" });
                     ServeBall();
+                }
             }
         }
     }
