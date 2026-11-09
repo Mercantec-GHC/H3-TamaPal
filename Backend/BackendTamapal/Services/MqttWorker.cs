@@ -1,5 +1,6 @@
 ﻿using MQTTnet;
 using MQTTnet.Formatter;
+using MQTTnet.Protocol;
 using System.Text.Json;
 using BackendTamapal.Models;
 
@@ -30,11 +31,14 @@ namespace BackendTamapal.Services
             {
                 try
                 {
+                    string topic = e.ApplicationMessage.Topic;
+                    string deviceId = topic.Split('/')[2];
+
                     string payload = e.ApplicationMessage.ConvertPayloadToString();
                     OplaInput? input = JsonSerializer.Deserialize<OplaInput>(payload, _jsonOptions);
 
                     if (input != null)
-                        _gameService.HandleInput(input);
+                        _gameService.HandleInput(input, deviceId);
                 }
                 catch (JsonException)
                 {
@@ -58,7 +62,29 @@ namespace BackendTamapal.Services
                 return;
             }
 
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                while (_gameService.Outbox.TryDequeue(out OplaMessage? message))
+                {
+                    try
+                    {
+                        var mqttMessage = new MqttApplicationMessageBuilder()
+                            .WithTopic($"StormLamaerne/Tamapal/{message.DeviceId}/{message.TopicEnd}")
+                            .WithPayload(message.Json)
+                            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
+                            .Build();
+
+                        await client.PublishAsync(mqttMessage, stoppingToken);
+                        Console.WriteLine($"Sendt til {message.DeviceId}/{message.TopicEnd}: {message.Json}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Kunne ikke sende til Oplà: {ex.Message}");
+                    }
+                }
+
+                await Task.Delay(20, stoppingToken);
+            }
 
 
         }

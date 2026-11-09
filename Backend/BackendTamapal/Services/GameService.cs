@@ -1,4 +1,6 @@
-﻿using BackendTamapal.Models;
+﻿using System.Collections.Concurrent;
+using System.Text.Json;
+using BackendTamapal.Models;
 
 namespace BackendTamapal.Services
 {
@@ -13,10 +15,15 @@ namespace BackendTamapal.Services
         private const double StartSpeed = 0.5;
         private const double SpeedUp = 1.05;
         private const double MaxSpeed = 1.2;
+        private const double PaddleSpeed = 1.0;
 
         private double _vx;
         private double _vy;
+        private int _paddleDirection;
         public GameState State { get; set; } = new GameState();
+
+        public ConcurrentQueue<OplaMessage> Outbox { get; } = new();
+        public string PlayerDevice { get; private set; } = "opla-1";
 
 
 
@@ -32,13 +39,25 @@ namespace BackendTamapal.Services
             ServeBall();
         }
 
-        public void HandleInput(OplaInput input)
+        public void HandleInput(OplaInput input, string deviceId = "opla-1")
         {
+            PlayerDevice = deviceId;
+
             if (input.Button)
                 Start();
 
-            double y = (input.Tilt + 1) / 2;
-            State.Paddle.Y = Math.Clamp(y, 0.1, 0.9);
+            _paddleDirection = (input.Down ? 1 : 0) - (input.Up ? 1 : 0);
+        }
+
+        private void SendToOpla(string topicEnd, object payload)
+        {
+            var message = new OplaMessage
+            {
+                DeviceId = PlayerDevice,
+                TopicEnd = topicEnd,
+                Json = JsonSerializer.Serialize(payload)
+            };
+            Outbox.Enqueue(message);
         }
 
         private void ServeBall()
@@ -55,6 +74,9 @@ namespace BackendTamapal.Services
         {
             if (State.Status != "playing")
                 return;
+
+            double newY = State.Paddle.Y + _paddleDirection * PaddleSpeed * dt;
+            State.Paddle.Y = Math.Clamp(newY, PaddleHeight / 2, 1 - PaddleHeight / 2);
 
             Ball ball = State.Ball;
             double previousX = ball.X;
@@ -95,6 +117,7 @@ namespace BackendTamapal.Services
                 _vy = _vy * factor;
 
                 State.Score++;
+                SendToOpla("event", new { type = "hit" });
             }
 
             if (ball.X + BallRadius < 0)
@@ -102,9 +125,19 @@ namespace BackendTamapal.Services
                 State.Lives--;
 
                 if (State.Lives <= 0)
+                {
                     State.Status = "gameover";
+                    SendToOpla("event", new { type = "gameover" });
+
+                    int reward = Math.Min(State.Score * 3, 30);
+                    if (reward > 0)
+                        SendToOpla("pet/reward", new { type = "happy_boost", amount = reward });
+                }
                 else
+                {
+                    SendToOpla("event", new { type = "miss" });
                     ServeBall();
+                }
             }
         }
     }

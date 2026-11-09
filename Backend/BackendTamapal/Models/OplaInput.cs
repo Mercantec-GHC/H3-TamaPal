@@ -2,7 +2,8 @@
 {
     public class OplaInput
     {
-        public double Tilt { get; set; }
+        public bool Up { get; set; }
+        public bool Down { get; set; }
         public bool Button { get; set; }
     }
 }
