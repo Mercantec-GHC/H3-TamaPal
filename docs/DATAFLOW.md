@@ -14,6 +14,9 @@ flowchart LR
     G -- "Outbox" --> M
     M -- "MQTT event<br/>hit / miss / gameover" --> B
     B -- "MQTT event" --> O
+    G -- "FinishedGames<br/>ved game over" --> S[ScoreSaver]
+    S -- "EF Core" --> D[(Neon<br/>PostgreSQL)]
+    F -- "GET /api/scores" --> C[ScoresController] --> D
 ```
 
 ## Ét tryk, trin for trin
@@ -56,6 +59,16 @@ Spillet kan altså startes både fra Oplà (`button`) og fra browseren.
 - **Hvad hvis der kommer forkert JSON?** `MqttWorker` ignorerer beskeden og skriver en linje i loggen – spillet crasher ikke.
 - **Kan der være flere spillere?** Topic'et har `opla-1`/`opla-2`, og backenden lytter på `+`. Men spillogikken har kun én ketsjer i dag – multiplayer er Nice to Have.
 
+## Game over → databasen (#30)
+
+| # | Hvor | Hvad sker der | Kode |
+|---|---|---|---|
+| 1 | Backend | `Tick` ser, at liv er 0: sætter `status = "gameover"` og lægger et `GameResult` (score, Oplà, tid i UTC) i køen `FinishedGames` | `Services/GameService.cs` |
+| 2 | Backend | `ScoreSaver` tømmer køen hvert halve sekund og gemmer med EF Core i tabellen `GameResults` i Neon. Spillet venter aldrig på databasen – er den nede, skrives en linje i loggen | `Services/ScoreSaver.cs`, `Data/TamaPalDbContext.cs` |
+| 3 | Browser | Henter highscore med `GET /api/scores` (top 10) eller `GET /api/scores/latest` (seneste 10). Browseren kender aldrig databasens kodeord | `Controllers/ScoresController.cs` |
+
+Tabellen oprettes af EF Core-migrationen i `Backend/BackendTamapal/Migrations/` – ikke i hånden i Neon.
+
 ## Mangler (status 9/11)
 
-- Highscore i databasen efter game over (#30).
+- Highscore er testet lokalt mod Neon 9/11. Mangler: miljøvariablen `ConnectionStrings__TamaPalDb` i Dokploy og test på serveren.
