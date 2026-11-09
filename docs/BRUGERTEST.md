@@ -17,14 +17,14 @@ Sig kun: *"Det her er et spil. Prøv at spille det – tænk gerne højt."* Inge
 | Tid | Hvad testeren gør | Hvad vi kigger efter |
 |---|---|---|
 | 0–2 min | Finder selv ud af at starte | Finder hen knappen (Oplà T2 eller "Start" i browseren)? Hvor længe tager det? |
-| 2–7 min | Spiller 2–3 spil | Forstår hen, at vip styrer ketsjeren? Føles den for følsom / for langsom? Ser hen score og liv? |
+| 2–7 min | Spiller 2–3 spil | Finder hen op/ned-knapperne? Er ketsjeren for hurtig / for langsom? Ser hen score og liv? Lægger hen mærke til lyden ved hit/miss? |
 | 7–10 min | Game over → "Spil igen" | Forstår hen, at spillet er slut, og hvordan man starter igen? |
 | 10–15 min | Spørgsmål (nedenfor) | – |
 
 ## Spørgsmål bagefter
 
 1. Hvad var det sværeste / mest forvirrende?
-2. Hvordan styrede du ketsjeren? Føltes det rigtigt?
+2. Hvordan styrede du ketsjeren? Føltes det rigtigt? Hørte du lydene på Oplà?
 3. Hvis du måtte ændre én ting, hvad skulle det være?
 4. Ville du spille igen? Hvorfor / hvorfor ikke?
 
@@ -40,7 +40,7 @@ Sig kun: *"Det her er et spil. Prøv at spille det – tænk gerne højt."* Inge
 
 Vælg **én** ting, der er lille, sikker og nem at vise før/efter. Eksempler afhængigt af hvad vi ser:
 
-- Vip for følsomt/trægt → juster `MAX_TILT_DEG` (Oplà, Oleh) – MESSAGES.md siger allerede, at 30° kan justeres efter testen
+- Ketsjeren for hurtig/langsom → `PaddleSpeed` i `GameService.cs` (backend, Oliver)
 - Testeren finder ikke start → tydeligere tekst på startskærmen, f.eks. "Tryk T2 eller Start" (browser, Andrii)
 - Bolden for hurtig/langsom → `StartSpeed` / `SpeedUp` (backend, Oliver)
 
