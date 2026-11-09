@@ -16,6 +16,7 @@ namespace BackendTamapal
             builder.Services.AddSignalR();
             builder.Services.AddSingleton<GameService>();
             builder.Services.AddHostedService<GameLoop>();
+            builder.Services.AddHostedService<MqttWorker>();
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("Frontend", policy =>
