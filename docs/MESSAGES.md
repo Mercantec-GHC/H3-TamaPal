@@ -55,7 +55,7 @@ Datoer, DoD og status for hele projektet: se `docs/PLAN.md`.
 4. **Spillet færdigt:** point, liv, game over, `hit`/`miss` på Oplàen.
 5. **Brugertest** med en uden for gruppen + mindst én forbedring.
 
-## Vores 5 beskeder (MQTT & SignalR)
+## Vores 6 beskeder (MQTT, SignalR & REST)
 
 > **Ændret 4/11:** Brokeren kræver, at alle topics starter med gruppens navn.
 > Topics er nu `StormLamaerne/Tamapal/...` – store og små bogstaver præcis sådan.
@@ -196,6 +196,24 @@ public class PetStateDto
 * Tegn 5 vandrette bjælker (0–100%): Sult, Varme, Energi, Glæde, Disciplin.
 * Vis kæledyrets navn (`dto.Name`), livsstadie (`baby`/`teen`/`adult`/`old`) og hue/tørklæde hvis `outfit == "winter"`.
 * Hvis `alive === false`, vis gravstenen på kirkegården med teksten fx *"Her hviler THOR (GEN 2, 100 år) - Døde af alderdom. 'Levede et lykkeligt liv!'"*.
+
+### 6. Browser → backend (REST), highscore – tilføjet 9/11 (#30)
+
+Backenden gemmer hvert færdigt spil i Neon (tabellen `GameResults`), når `status` bliver `gameover`.
+Browseren henter listerne med en almindelig `fetch` – den taler aldrig selv med databasen.
+
+| Endpoint | Svar |
+|---|---|
+| `GET /api/scores` | De 10 højeste scorer |
+| `GET /api/scores/latest` | De 10 seneste spil |
+
+```json
+[
+  { "id": 1, "score": 7, "deviceId": "opla-1", "playedAt": "2026-11-09T21:15:04Z" }
+]
+```
+
+`playedAt` er UTC. Frivilligt for frontenden: vis listen fx på game over-skærmen.
 
 ## Hvem laver hvad
 

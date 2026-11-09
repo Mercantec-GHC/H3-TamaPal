@@ -1,6 +1,8 @@
+using BackendTamapal.Data;
 using BackendTamapal.Hubs;
 using BackendTamapal.Models;
 using BackendTamapal.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
 namespace BackendTamapal
@@ -18,6 +20,12 @@ namespace BackendTamapal
             builder.Services.AddSingleton<GameService>();
             builder.Services.AddHostedService<GameLoop>();
             builder.Services.AddHostedService<MqttWorker>();
+
+            // Database: connection string kommer fra User Secrets (lokalt) eller ConnectionStrings__TamaPalDb (Dokploy)
+            string? connectionString = builder.Configuration.GetConnectionString("TamaPalDb");
+            builder.Services.AddDbContextFactory<TamaPalDbContext>(options => options.UseNpgsql(connectionString));
+            builder.Services.AddHostedService<ScoreSaver>();
+
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("Frontend", policy =>
