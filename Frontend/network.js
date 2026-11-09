@@ -1,6 +1,7 @@
 // SignalR connection to Oliver's GameHub (message 3 and 4 in docs/MESSAGES.md).
 // Has the same functions as fakeGame.js, so main.js only needs to change one import.
-const HUB_URL = 'http://localhost:5243/gamehub';
+// Live Server (port 5500) → local backend; otherwise the server the page came from (tamapal.mercantec.tech)
+const HUB_URL = location.port === '5500' ? 'http://localhost:5243/gamehub' : '/gamehub';
 const RETRY_MS = 3000; // try again every 3 seconds if the server is not running
 
 // Shown until the first GameState arrives
