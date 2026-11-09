@@ -2,7 +2,7 @@
 
 A modern Tamagotchi that lives on an **Arduino Oplà (MKR IoT Carrier)** and reacts
 to the real world: cold, darkness and movement. The Oplà is also a **game controller**:
-tilt it to play Pong in the **browser**, with the game logic running on a .NET backend.
+use its up/down buttons to play Pong in the **browser**, with the game logic running on a .NET backend.
 
 H3 middle project (Mercantec, autumn 2026). Full game design:
 [docs/TamaPal-game-design-doc.docx](docs/TamaPal-game-design-doc.docx).
@@ -11,13 +11,14 @@ H3 middle project (Mercantec, autumn 2026). Full game design:
 
 ## What works (9/11)
 
-- **Pong, the whole way:** tilt the Oplà → the paddle moves in the browser. The backend moves the
+- **Pong, the whole way:** hold the Oplà's up/down button → the paddle moves in the browser. The backend moves the
   ball, counts points and lives and ends the game. The Oplà button (T2) or the browser button starts it.
+  On `hit`/`miss`/`gameover` the backend sends an event back, and the Oplà plays a sound.
 - **On the Oplà alone (offline):** the pet Lumi with 5 needs, life stages, wardrobe, cemetery,
   two mini games (Pong, Labyrinth) and a hands-free showcase for video.
-- **Not done yet:** `hit`/`miss`/`gameover` feedback to the Oplà (#29), highscore in the database (#30).
+- **Not done yet:** highscore in the database (#30).
 
-Status, checklist and dates: [docs/PLAN.md](docs/PLAN.md).
+Status, checklist and dates: [docs/PLAN.md](docs/PLAN.md). Data flow step by step: [docs/DATAFLOW.md](docs/DATAFLOW.md).
 
 ---
 
@@ -31,7 +32,7 @@ Status, checklist and dates: [docs/PLAN.md](docs/PLAN.md).
 └─────────────┘                      └──────────────────────┘                            └─────────────┘
 ```
 
-- **Arduino** – controller mode sends `tilt`/`button` over MQTT; plus the whole pet on the Oplà.
+- **Arduino** – controller mode sends `up`/`down`/`button` (and `tilt`) over MQTT and plays sounds on events; plus the whole pet on the Oplà.
 - **Backend** – `MqttWorker` listens to `StormLamaerne/Tamapal/+/input`, `GameService` holds the rules,
   `GameLoop` sends `GameState` to the browser ~30 times a second through `GameHub` (`/gamehub`).
 - **Frontend** – only draws the `GameState` it receives and sends `StartGame()`. No game logic.

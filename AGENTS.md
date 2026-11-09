@@ -9,7 +9,7 @@ TamaPal – H3 middle project at Mercantec (deadline: presentation 11/11-2026).
 A game where an **Arduino Oplà** (MKR WiFi 1010 + MKR IoT Carrier) is the controller,
 a **.NET backend** runs the game logic, and a **browser frontend** draws the game on a canvas.
 
-Current MVP proposal: Pong against the wall with one Oplà (tilt or buttons = paddle, button = start).
+Current MVP proposal: Pong against the wall with one Oplà (up/down buttons = paddle, button = start).
 Status, dates and open questions: `docs/PLAN.md`.
 
 | Person (GitHub) | Area | Folder |

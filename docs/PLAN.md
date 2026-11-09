@@ -21,22 +21,22 @@ Status: 9/11 (mandag). Ret filen, når noget ændrer sig.
 | Del | Hvem | Status |
 |---|---|---|
 | Arduino | Oleh | ✅ **Færdig** i `dev`. Controller-tilstand sender `up`/`down`/`button`/`tilt` via MQTT (~20/s) og reagerer på `hit`/`miss`/`gameover`. Derudover Tamagotchi-livscyklus, to offline minispil (Pong, Labyrint) og autonom showcase (se `MESSAGES.md`). Kompilerer (flash 88 %, RAM 28 %), 533/533 enhedstests grønne (målt 9/11). |
-| Backend | Oliver | ✅ **Spillet virker** i `dev` (9/11): `/gamehub` med `StartGame()`, CORS, `GameService.Tick()` med bold, vægge, ketsjer, point, liv og game over, `GameLoop` ~30/s og `MqttWorker`, der lytter på `+/input` (ketsjer følger `tilt`, `button` starter). Testet hele vejen Oplà → backend → browser på Olivers PC. **Mangler:** events til Oplà og database. |
-| Frontend | Andrii | ✅ **Færdig** i `dev`. SignalR-klient (#10) testet mod `/gamehub` 7/11 og 9/11 (forbinder, `StartGame()`, genforbinder). Neon arkade-look med effekter ved slag/miss. `fakeGame.js` som backup. Venter kun på, at backenden flytter bolden. |
+| Backend | Oliver | ✅ **Spillet virker** i `dev` (9/11): `/gamehub` med `StartGame()`, CORS, `GameService.Tick()` med bold, vægge, ketsjer, point, liv og game over, `GameLoop` ~30/s og `MqttWorker`, der lytter på `+/input` (ketsjer styres med `up`/`down`, `button` starter) og sender `hit`/`miss`/`gameover` + `pet/reward` tilbage til Oplà. Testet hele vejen Oplà → backend → browser på Olivers PC. **Mangler:** database. |
+| Frontend | Andrii | ✅ **Færdig** i `dev`. SignalR-klient (#10) testet mod `/gamehub` 7/11 og 9/11 (forbinder, `StartGame()`, genforbinder). Neon arkade-look med effekter ved slag/miss. `fakeGame.js` som backup. Tegner live `GameState` fra backenden (9/11). |
 
 ## Mangler til fremlæggelsen (11/11)
 
-Hele vejen Oplà → MQTT → backend → SignalR → browser virker (9/11). Tilbage er feedback til Oplà, database og test.
+Hele vejen Oplà → MQTT → backend → SignalR → browser virker (9/11). Events tilbage til Oplà er i `dev` (9/11). Tilbage er database og test.
 
 **Backend (Oliver) – i denne rækkefølge:**
 - [x] `GameService.Tick(dt)`: bold, vægge, ketsjer, point, liv, `gameover`, kaldt i `GameLoop` (#26, #28)
-- [x] MQTT-lytter `MqttWorker` på `StormLamaerne/Tamapal/+/input`: ketsjer = `(tilt + 1) / 2`, `button` starter spillet (#27)
-- [ ] Send `{"type":"hit"|"miss"|"gameover"}` til `.../opla-1/event` (#29)
+- [x] MQTT-lytter `MqttWorker` på `StormLamaerne/Tamapal/+/input`: `up`/`down` = retning, ketsjeren flyttes i `Tick`, `button` starter spillet (#27)
+- [x] Send `{"type":"hit"|"miss"|"gameover"}` til `.../opla-1/event` + `happy_boost` til `.../pet/reward` ved game over (#29)
 - [ ] Database (Neon + EF Core): mindst én tabel med highscore efter game over (#30) – "løst krav" fra Mathias
 
 **Alle:**
 - [x] Integrationstest Oplà → backend → browser – virker på Olivers PC 9/11 (#19)
-- [ ] Brugertest med én uden for gruppen + én forbedring (#18)
+- [ ] Brugertest med én uden for gruppen + én forbedring (#18) – plan: `BRUGERTEST.md`
 - [ ] Gennemgå Del 3 i `MESSAGES.md` sammen – kun godkendt af Oleh indtil nu
 - [ ] Release `dev` → `main` (#17)
 
@@ -50,11 +50,11 @@ Hele vejen Oplà → MQTT → backend → SignalR → browser virker (9/11). Til
 | 2 | Gameplay loop | Ram bolden → +1 point og hurtigere bold; forbi → -1 liv | alle | ✅ designet |
 | 3 | Start, spil, slut | `status`: `waiting` → `playing` → `gameover`, "Spil igen" | Oliver + Andrii | ✅ hele forløbet virker via backenden (9/11) |
 | 4 | Mindst 2 handlinger på Oplà | Op/ned (knapper eller tilt) + server/start + sensorer (nærhedsklap, rystevask, temperatur, lys) | Oleh | ✅ 100% implementeret & testet |
-| 5 | Protokol Arduino → backend | MQTT, topics i `MESSAGES.md` (universal input, events, pet/state, robust JSON, 1.5s timeout, TLS/MQTTS støtte) | Oleh + Oliver | ✅ Oplà → broker → backend virker (9/11). Events tilbage til Oplà mangler (#29) |
+| 5 | Protokol Arduino → backend | MQTT, topics i `MESSAGES.md` (universal input, events, pet/state, robust JSON, 1.5s timeout, TLS/MQTTS støtte) | Oleh + Oliver | ✅ Oplà → broker → backend virker (9/11). Events tilbage til Oplà i `dev` (#29) |
 | 6 | Backend med spillogik | Game loop: bold, point, liv, regler | Oliver | ✅ `GameService.Tick()` (9/11) |
 | 7 | Frontend med feedback | Canvas, score, liv, start- og game over-skærm | Andrii | ✅ tegner live `GameState` fra backenden |
-| 8 | Integration + forklare dataflow | Test af samlet flow: Oplà → MQTT → Backend → SignalR → Browser | alle | ✅ flow virker; forklaring til fremlæggelsen mangler |
-| 9 | Brugertest + 1 forbedring | En uden for gruppen tester, vi retter én ting | alle | ⚠️ kan testes via Oplàs autonome showcase eller fakeGame.js |
+| 8 | Integration + forklare dataflow | Test af samlet flow: Oplà → MQTT → Backend → SignalR → Browser | alle | ✅ flow virker; forklaring i `DATAFLOW.md` |
+| 9 | Brugertest + 1 forbedring | En uden for gruppen tester, vi retter én ting | alle | ⚠️ plan i `BRUGERTEST.md`; tester og tidspunkt mangler |
 | 10 | Kode på GitHub, alle bidrager, demo | Alle pusher til `dev`, release `dev` → `main` | alle | ⚠️ |
 
 **Database:** Mathias kalder det et "løst krav" (3/11) – der skal være en database koblet på.
@@ -94,6 +94,6 @@ I DoD står den under Nice to Have. Forslag: highscore (navn + score) samt forf�
 
 ## Åbne spørgsmål til mødet
 
-1. Styring: knapper eller tilt? Olehs kode sender begge i samme payload (`up`, `down`, `tiltX`, `tiltY`, `tilt`).
-2. Hvem laver events til Oplà (#29) og highscore i databasen (#30) inden 11/11?
+1. Styring: backenden bruger nu knapper (`up`/`down`), ikke `tilt` (9/11). `MESSAGES.md` (linje 82 og Del 2 punkt om `tilt`) skal tilpasses – godkendes i gruppen.
+2. Highscore i databasen (#30) – når Oliver den inden 11/11? (#29 er færdig.) `pet/reward` eller score i `gameover`? (Del 2, punkt 7)
 3. Hvem tester spillet til brugertesten?
