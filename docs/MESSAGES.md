@@ -99,6 +99,9 @@ QoS: 1
 * `"gameover"`: 0 liv tilbage, spil slut. Oplà afspiller 3-tonet faldende melodi (440 $\to$ 330 $\to$ 220 Hz).
 * `"assign_p1"` / `"assign_p2"`: Backenden tildeler eller bekræfter spillerens rolle.
 
+**I 2-spiller (duo, se besked 3):** `hit` sendes til den, der ramte, `miss` til den, der missede (modstanderen fik et point),
+og `gameover` til begge. Kun vinderen får `pet/reward` `{"type":"happy_boost","amount":25}`.
+
 ### 3. Backend → browser (SignalR), 30 gange i sekundet
 
 Hub: `/gamehub`, event `GameState`
@@ -114,6 +117,35 @@ Hub: `/gamehub`, event `GameState`
 ```
 
 Alle koordinater er mellem 0 og 1. `status` kan være `waiting`, `playing` eller `gameover`.
+
+**Nye felter til 2 spillere (tilføjet 9/11, #31) – skal godkendes af gruppen:**
+
+```json
+{
+  "status": "playing",
+  "mode": "duo",
+  "ball":    { "x": 0.5, "y": 0.3 },
+  "paddle":  { "y": 0.4 },
+  "paddle2": { "y": 0.6 },
+  "score": 3,
+  "score2": 2,
+  "lives": 3,
+  "winner": 0
+}
+```
+
+| Felt | Solo (`mode: "solo"`) | Duo (`mode: "duo"`) |
+|---|---|---|
+| `paddle` | Spillerens ketsjer (venstre, x = 0,03) | Spiller 1 = `opla-1` (venstre, x = 0,03) |
+| `paddle2` | Bruges ikke (står på 0,5) | Spiller 2 = `opla-2` (højre, x = 0,97) – erstatter højre væg |
+| `score` | Antal slag | Spiller 1's point |
+| `score2` | Bruges ikke (0) | Spiller 2's point |
+| `lives` | Liv tilbage | Bruges ikke (3) |
+| `winner` | Bruges ikke (0) | 0 under spillet, 1 eller 2 ved `gameover` |
+
+**Regler for duo:** Spillet bliver duo, hvis både `opla-1` og `opla-2` har sendt input inden for de sidste 3 sekunder,
+når der trykkes Start (Oplà-knap eller `StartGame()`). Ellers er det solo præcis som før.
+Ryger bolden forbi en spiller, får modstanderen 1 point, og næste bold sendes mod den, der missede. Først til 5 point vinder.
 
 ### 4. Browser → backend (SignalR)
 
@@ -204,16 +236,17 @@ Browseren henter listerne med en almindelig `fetch` – den taler aldrig selv me
 
 | Endpoint | Svar |
 |---|---|
-| `GET /api/scores` | De 10 højeste scorer |
-| `GET /api/scores/latest` | De 10 seneste spil |
+| `GET /api/scores` | De 10 højeste scorer i solo |
+| `GET /api/scores/latest` | De 10 seneste spil (solo og duo) |
 
 ```json
 [
-  { "id": 1, "score": 7, "deviceId": "opla-1", "playedAt": "2026-11-09T21:15:04Z" }
+  { "id": 1, "score": 7, "deviceId": "opla-1", "mode": "solo", "playedAt": "2026-11-09T21:15:04Z" }
 ]
 ```
 
-`playedAt` er UTC. Frivilligt for frontenden: vis listen fx på game over-skærmen.
+`playedAt` er UTC. `mode` er `solo` (score = antal slag) eller `duo` (score = point, én række pr. spiller).
+Frivilligt for frontenden: vis listen fx på game over-skærmen.
 
 ## Hvem laver hvad
 
