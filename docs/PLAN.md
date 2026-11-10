@@ -35,7 +35,8 @@ Hele vejen Oplà → MQTT → backend → SignalR → browser virker (9/11). Eve
 - [x] Database (Neon + EF Core): tabellen `GameResults` med highscore efter game over + `GET /api/scores` (#30) – "løst krav" fra Mathias. Testet lokalt 9/11
 - [x] Miljøvariablen `ConnectionStrings__TamaPalDb` i Dokploy + test på https://tamapal.mercantec.tech/api/scores (9/11)
 - [x] 2 spillere i backenden (#31): `opla-1` venstre mod `opla-2` højre, først til 5 – Nice to Have. Solo er uændret
-- [ ] Frontend (Andrii): tegn `paddle2` og `score : score2`, når `mode` er `"duo"`, og vis vinderen (#31)
+- [x] Frontend (Andrii): tegn `paddle2` og `score : score2`, når `mode` er `"duo"`, og vis vinderen (#31) – testet med `fakeGame.js` og `?duo` 10/11
+- [ ] Test duo med to Oplàer mod backenden (#31)
 
 **Alle:**
 - [x] Integrationstest Oplà → backend → browser – virker på Olivers PC 9/11 (#19)

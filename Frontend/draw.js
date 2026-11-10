@@ -1,4 +1,4 @@
-import { BALL_RADIUS, PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_X } from './field.js';
+import { BALL_RADIUS, PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_X, PADDLE2_X } from './field.js';
 
 // Colors in the same style as Oleh's Pong on the Oplà screen (Arduino/TamaPal/ui_pong.cpp)
 const COLORS = {
@@ -8,6 +8,7 @@ const COLORS = {
   rail: '#00f0ff',      // neon cyan walls
   danger: '#e12d41',    // red line on the left: the ball must not pass here
   paddle: '#50f5ff',
+  paddle2: '#ff8214',   // player 2 (duo) in orange, so the two players are easy to tell apart
   ball: '#55ff8c',      // lime green like Lumi
   ballDark: '#147d3c',
   gold: '#ffe12d',
@@ -32,8 +33,9 @@ let shakeUntil = 0; // screen shake after a miss
 export function draw(ctx, state) {
   const size = ctx.canvas.width;
   const now = performance.now();
+  const duo = state.mode === 'duo'; // "duo" = 2 players (docs/MESSAGES.md besked 3), everything else = solo
 
-  noticeEvents(state, size, now);
+  noticeEvents(state, size, now, duo);
 
   ctx.save();
   // Screen shake: move everything a few random pixels for a short moment
@@ -41,9 +43,10 @@ export function draw(ctx, state) {
     ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
   }
 
-  drawField(ctx, size, now);
+  drawField(ctx, size, now, duo);
   drawTrail(ctx, size);
-  drawPaddle(ctx, state, size, now);
+  drawPaddle(ctx, PADDLE_X, state.paddle.y, COLORS.paddle, size, now);
+  if (duo) drawPaddle(ctx, PADDLE2_X, state.paddle2.y, COLORS.paddle2, size, now);
   drawBall(ctx, state, size);
   drawSparks(ctx);
   ctx.restore();
@@ -54,27 +57,47 @@ export function draw(ctx, state) {
     ctx.fillRect(0, 0, size, size);
   }
 
-  drawHud(ctx, state, size);
-  drawOverlay(ctx, state, size, now);
+  if (duo) drawDuoHud(ctx, state, size);
+  else drawHud(ctx, state, size);
+  drawOverlay(ctx, state, size, now, duo);
 }
 
-// Compare with the last frame: score went up = hit, lives went down = miss
-function noticeEvents(state, size, now) {
+// Compare with the last frame.
+// Solo: score went up = hit, lives went down = miss.
+// Duo: score or score2 went up = someone missed (a point); a hit = the ball turned around near a paddle.
+function noticeEvents(state, size, now, duo) {
   if (previous && state.status === 'playing') {
-    if (state.score > previous.score) {
-      addSparks(state.ball.x * size, state.ball.y * size);
-    }
-    if (state.lives < previous.lives) {
-      flashUntil = now + 300;
-      shakeUntil = now + 250;
+    if (duo) {
+      const point = state.score > previous.score || state.score2 > previous.score2;
+      if (point) {
+        flashUntil = now + 300;
+        shakeUntil = now + 250;
+      }
+      const turnedRight = state.ball.x > previous.ballX && previous.movedLeft && state.ball.x < 0.2;
+      const turnedLeft = state.ball.x < previous.ballX && !previous.movedLeft && state.ball.x > 0.8;
+      if (!point && (turnedRight || turnedLeft)) {
+        addSparks(state.ball.x * size, state.ball.y * size);
+      }
+    } else {
+      if (state.score > previous.score) {
+        addSparks(state.ball.x * size, state.ball.y * size);
+      }
+      if (state.lives < previous.lives) {
+        flashUntil = now + 300;
+        shakeUntil = now + 250;
+      }
     }
   }
   if (state.status !== 'playing') trail.length = 0; // no tail on start/game over screens
 
-  previous = { score: state.score, lives: state.lives };
+  // movedLeft only changes when the ball really moved (the server sends ~30/s, we draw ~60/s)
+  const movedLeft = previous && state.ball.x !== previous.ballX
+    ? state.ball.x < previous.ballX
+    : previous?.movedLeft ?? false;
+  previous = { score: state.score, score2: state.score2, lives: state.lives, ballX: state.ball.x, movedLeft };
 }
 
-function drawField(ctx, size, now) {
+function drawField(ctx, size, now, duo) {
   // Background: radial gradient from navy in the center to black at the edges
   const bg = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size * 0.75);
   bg.addColorStop(0, COLORS.bgCenter);
@@ -102,19 +125,21 @@ function drawField(ctx, size, now) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Neon walls top, right and bottom (the ball bounces off these)
+  // Neon walls top and bottom (the ball bounces off these), and right – but only in solo:
+  // in duo player 2 stands on the right instead
   ctx.shadowColor = COLORS.rail;
   ctx.shadowBlur = 15;
   ctx.fillStyle = COLORS.rail;
   ctx.fillRect(0, 0, size, RAIL);
   ctx.fillRect(0, size - RAIL, size, RAIL);
-  ctx.fillRect(size - RAIL, 0, RAIL, size);
+  if (!duo) ctx.fillRect(size - RAIL, 0, RAIL, size);
 
-  // Red "danger" line on the left, pulses softly
+  // Red "danger" line on the left (and right in duo), pulses softly
   ctx.shadowColor = COLORS.danger;
   ctx.globalAlpha = 0.5 + 0.3 * Math.sin(now / 300);
   ctx.fillStyle = COLORS.danger;
   ctx.fillRect(0, RAIL, 3, size - RAIL * 2);
+  if (duo) ctx.fillRect(size - 3, RAIL, 3, size - RAIL * 2);
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 0;
 }
@@ -130,18 +155,18 @@ function drawTrail(ctx, size) {
   });
 }
 
-function drawPaddle(ctx, state, size, now) {
-  // Paddle (paddle.y = center of the paddle), rounded corners and neon glow
-  const x = (PADDLE_X - PADDLE_WIDTH / 2) * size;
-  const y = (state.paddle.y - PADDLE_HEIGHT / 2) * size;
+function drawPaddle(ctx, centerX, centerY, color, size, now) {
+  // Paddle (centerX/centerY = center of the paddle, 0–1), rounded corners and neon glow
+  const x = (centerX - PADDLE_WIDTH / 2) * size;
+  const y = (centerY - PADDLE_HEIGHT / 2) * size;
   const w = PADDLE_WIDTH * size;
   const h = PADDLE_HEIGHT * size;
 
-  ctx.shadowColor = COLORS.paddle;
+  ctx.shadowColor = color;
   ctx.shadowBlur = 20 + 5 * Math.sin(now / 200); // glow "breathes"
   const grad = ctx.createLinearGradient(x, 0, x + w, 0);
   grad.addColorStop(0, '#ffffff');
-  grad.addColorStop(1, COLORS.paddle);
+  grad.addColorStop(1, color);
   ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, w / 2);
@@ -223,7 +248,31 @@ function drawHud(ctx, state, size) {
   ctx.textBaseline = 'alphabetic';
 }
 
-function drawOverlay(ctx, state, size, now) {
+// Duo: "P1 3 : 2 P2" at the top in the middle, each player in their paddle's color. No hearts.
+function drawDuoHud(ctx, state, size) {
+  ctx.font = `16px ${FONT}`;
+  ctx.textBaseline = 'top';
+  ctx.shadowBlur = 10;
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = COLORS.paddle;
+  ctx.shadowColor = COLORS.paddle;
+  ctx.fillText(`P1 ${state.score}`, size / 2 - 20, 24);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText(':', size / 2, 24);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = COLORS.paddle2;
+  ctx.shadowColor = COLORS.paddle2;
+  ctx.fillText(`${state.score2} P2`, size / 2 + 20, 24);
+
+  ctx.shadowBlur = 0;
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawOverlay(ctx, state, size, now, duo) {
   if (state.status === 'playing') return;
 
   // Dark glass over the field
@@ -241,7 +290,17 @@ function drawOverlay(ctx, state, size, now) {
     ctx.globalAlpha = 1;
   }
 
-  if (state.status === 'gameover') {
+  if (state.status === 'gameover' && duo) {
+    // The winner in their own color, then the final score
+    const color = state.winner === 2 ? COLORS.paddle2 : COLORS.paddle;
+    title(ctx, `SPILLER ${state.winner} VINDER`, size / 2, size / 2 - 50, color, 26);
+    ctx.font = `18px ${FONT}`;
+    ctx.fillStyle = COLORS.gold;
+    ctx.fillText(`${state.score} : ${state.score2}`, size / 2, size / 2 + 5);
+    ctx.font = `12px ${FONT}`;
+    ctx.fillStyle = COLORS.hint;
+    ctx.fillText('TRYK PÅ "SPIL IGEN"', size / 2, size / 2 + 45);
+  } else if (state.status === 'gameover') {
     title(ctx, 'GAME OVER', size / 2, size / 2 - 50, COLORS.danger, 36);
     ctx.font = `18px ${FONT}`;
     ctx.fillStyle = COLORS.gold;

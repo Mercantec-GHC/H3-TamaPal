@@ -4,3 +4,4 @@ export const BALL_RADIUS = 0.02;
 export const PADDLE_WIDTH = 0.02;
 export const PADDLE_HEIGHT = 0.2;
 export const PADDLE_X = 0.03; // center of the paddle
+export const PADDLE2_X = 0.97; // center of player 2's paddle (only in duo, docs/MESSAGES.md besked 3)

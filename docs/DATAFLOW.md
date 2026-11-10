@@ -72,4 +72,4 @@ Tabellen oprettes af EF Core-migrationen i `Backend/BackendTamapal/Migrations/` 
 ## Mangler (status 9/11)
 
 - Highscore virker på serveren (9/11).
-- 2 spillere: backenden er klar, frontenden mangler at tegne `paddle2`, `score2` og vinderen (#31).
+- 2 spillere (#31): backend og frontend er klar (10/11), mangler test med to Oplàer.
