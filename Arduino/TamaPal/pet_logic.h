@@ -1,0 +1,151 @@
+// WHAT: Pure business logic for Lumi's 5 Tamagotchi vitals (Sult, Varme, Energi, Glæde, Disciplin)
+// WHY:  Separated from hardware and graphics for deterministic testing on Mac / PC
+// USED BY: TamaPal.ino, ui_stats.cpp, tests/test_main.cpp
+
+#ifndef PET_LOGIC_H
+#define PET_LOGIC_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "settings.h"
+
+class PetLogic {
+public:
+  PetLogic();
+
+  // Reset or initialize vitals to healthy defaults
+  void reset();
+
+  // Player interaction actions
+  bool feed();     // Increases Hunger (sult/mæthed) and slightly Happiness
+  bool play();     // Increases Happiness, consumes Energy and Hunger
+  bool scold();    // Increases Discipline, slightly reduces Happiness
+  bool applyReward(const char* rewardType, int amount); // Backend reward (e.g. "happy_boost")
+  void applyGameReward(uint16_t score);                 // Minigame completion reward (happiness up, slight energy burn)
+  void toggleSleep();
+  void setSleeping(bool sleep);
+  void setManualSleep(bool sleep);
+  bool isManualSleeping() const;
+
+  // Environmental sensor updates (ambient room temperature & light from MKR Carrier)
+  void setAmbientTemperature(float celsius);
+  void setAmbientLight(int lux, unsigned long nowMs = 0);
+
+  // Periodic decay and simulation step (called periodically with millis())
+  void update(unsigned long currentTimeMs);
+
+  // Getters for the 5 vital stats (0 to 100%)
+  int getHunger() const;      // Sult / Mæthed (100 = mæt, 0 = udsultet)
+  int getWarmth() const;      // Varme (100 = behagelig, 0 = for kold/varm)
+  int getEnergy() const;      // Energi / Søvn (100 = udhvilet, 0 = udmattet)
+  int getHappiness() const;   // Glæde (100 = super glad, 0 = trist)
+  int getDiscipline() const;  // Disciplin (100 = velopdragen, 0 = ulydig)
+
+  // Overall status queries
+  int getOverallHealth() const;       // Weighted average (0..100)
+  bool isSleeping() const;
+  bool isAlive() const;               // True if alive, false if spirit/dead
+  DeathCause getDeathCause() const;   // Cause of death enum
+  uint16_t getGeneration() const;     // Generation counter (Gen 1, Gen 2...)
+  void setGeneration(uint16_t gen);
+  const char* getDeathCauseName() const; // E.g. "Døde af sult", "Døde af alderdom"
+  static const char* getDeathCauseName(DeathCause cause);
+  const char* getDeathCauseCode() const; // E.g. "hunger", "old_age", "none"
+  static const char* getDeathCauseCode(DeathCause cause);
+  const char* getDeathEpitaph() const;   // Humor / memorial epitaph in Danish
+  void triggerDeath(DeathCause cause);   // Trigger death with cause
+  void rebirth();                        // Rebirth as Baby of next generation
+  void startHatching(unsigned long nowMs); // Begin 2.8s egg hatching sequence
+  bool isHatching() const;               // True while hatching animation is running
+  uint8_t getHatchingPhase(unsigned long nowMs) const; // 0 = wobble, 1 = crack, 2 = breakout
+  bool pet(unsigned long nowMs);         // Stroke / pet Lumi (+12% happiness, blissful purr)
+  bool isBeingPetted(unsigned long nowMs) const; // True during 1.8s petting reaction window
+  const char* getStage() const;       // Lifecycle stage name: "baby", "teen", "adult", "old"
+  PetStage getStageEnum() const;      // Current stage enum
+  void setStage(PetStage stage);      // Set lifecycle stage
+  const char* getOutfit() const;      // Wardrobe outfit name: "default", "winter"
+  PetOutfit getOutfitEnum() const;    // Current wardrobe outfit enum
+  void setOutfit(PetOutfit outfit);   // Set wardrobe outfit
+  void toggleOutfit();                // Toggle between default and winter outfit
+  void restoreSleepEnergy(float amount); // Direct floating-point energy recharge during sleep
+  bool isOverheating() const;         // True if wearing winter clothes while warm (> 75% or > 23.5C)
+  bool needsAttention() const;        // True if any vital is below PET_CRITICAL_THRESHOLD
+  const char* getMoodStatusDanish() const;
+
+  // Pet Custom Name (up to 4 letters, default "LUMI")
+  const char* getName() const;
+  void setName(const char* name);
+
+  // JSON serialization for MQTT syncing (docs/MESSAGES.md Del 1b Proposal 3A)
+  void formatStateJson(char* buffer, unsigned int bufferSize, const char* petName = "Lumi", const char* petStage = nullptr) const;
+
+  // Direct vital setter for test verification
+  void setVitals(float hunger, float warmth, float energy, float happiness, float discipline);
+
+  // Care mechanics: Sickness, Poop & Berry bank
+  uint16_t getBerries() const;
+  void addBerries(uint16_t count);
+  bool spendBerries(uint16_t count);
+  void setBerries(uint16_t count);
+
+  bool isSick() const;
+  void setSick(bool isSick);
+  bool cureSickness(uint16_t berryCost = 3);
+  uint8_t getSickTicks() const;
+
+  bool getHasPoop() const;
+  void setHasPoop(bool poop, unsigned long nowMs = 0);
+  void cleanPoop();
+  unsigned long getPoopTimeMs() const;
+
+  // Minigame records and character age (persisted to MicroSD)
+  uint16_t getHighScorePong() const;
+  void setHighScorePong(uint16_t score);
+  uint16_t getHighScoreMaze() const;
+  void setHighScoreMaze(uint16_t score);
+  uint32_t getAgeMinutes() const;
+  void setAgeMinutes(uint32_t mins);
+
+private:
+  float hungerVal;
+  float warmthVal;
+  float energyVal;
+  float happinessVal;
+  float disciplineVal;
+
+  uint32_t ageMinutes;
+  uint16_t highScorePong;
+  uint16_t highScoreMaze;
+  uint8_t ageTickCount;
+
+  PetStage currentStage;
+  PetOutfit currentOutfit;
+  bool isAsleep;
+  bool manualSleep;
+  bool manualSleepUntilFull;
+  bool alive;
+  DeathCause deathCause;
+  uint16_t generation;
+  char petName[8];
+  uint16_t berryCount;
+  bool sick;
+  uint8_t sickTicks;
+  bool hasPoop;
+  unsigned long poopTimeMs;
+  bool hatchingActive;
+  unsigned long hatchingStartTimeMs;
+  unsigned long pettingActiveUntilMs;
+  unsigned long lastPetTimeMs;
+  uint8_t criticalTicks;
+  DeathCause activeCrisisCause;
+  bool decayInitialized;
+  unsigned long lastDecayTimeMs;
+  unsigned long darkStartTimeMs;
+  unsigned long lightStartTimeMs;
+  float ambientTemp;
+  int ambientLux;
+
+  static float clamp0100(float val);
+};
+
+#endif // PET_LOGIC_H

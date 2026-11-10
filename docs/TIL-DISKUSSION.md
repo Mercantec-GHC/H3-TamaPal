@@ -1,5 +1,8 @@
 # Til diskussion – fra Andrii (til fredag)
 
+> **Arkiv (4/11).** De gældende forslag og aftaler står i `MESSAGES.md`, datoer og status i `PLAN.md`.
+> Branch-reglerne herunder gælder ikke længere – se `MOEDE-2026-11-02.md`. Olivers game loop nedenfor er stadig relevant.
+
 1. **Dataflow:** Arduino → backend via MQTT (praktisk og bedre end HTTP til mange små beskeder) → frontend i browseren via SignalR.
 2. **JSON-format:** hvilke data har vi brug for at arbejde videre? (bold, ketsjere, point, TamaPals statistik)
 3. **Frontend:** Blazor eller JS/canvas?

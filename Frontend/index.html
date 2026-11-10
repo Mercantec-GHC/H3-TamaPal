@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="da">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TamaPal – Pong</title>
+    <!-- Pixel font, same arcade look as on the Oplà -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <main>
+        <h1>TamaPal <span>Pong</span></h1>
+        <canvas id="game" width="600" height="600"></canvas>
+        <div class="controls">
+            <button id="start">Start</button>
+            <p class="help">↑ / ↓ flytter ketsjeren</p>
+        </div>
+        <p id="status"></p>
+
+        <!-- Filled by scores.js from /api/scores (message 6 in docs/MESSAGES.md) -->
+        <section class="scores">
+            <div>
+                <h2>Highscore <small>solo</small></h2>
+                <ol id="top-scores"></ol>
+            </div>
+            <div>
+                <h2>Seneste spil</h2>
+                <ol id="latest-scores"></ol>
+            </div>
+        </section>
+    </main>
+
+    <!-- SignalR client (global variable signalR), must load before main.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/10.0.11/signalr.min.js"></script>
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>

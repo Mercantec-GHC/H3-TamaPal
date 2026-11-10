@@ -491,3 +491,16 @@ config.h
 # Node / frontend
 node_modules/
 dist/
+
+# Personal Arduino plan document
+ARDUINO_PLAN_OLEH.md
+OLEH_SUMMARY.md
+
+# Unit test binaries (Mac/Linux)
+Arduino/tests/test_runner
+
+# Clangd / LSP compilation database
+compile_commands.json
+.clangd
+
+
