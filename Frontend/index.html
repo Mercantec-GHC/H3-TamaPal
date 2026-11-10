@@ -21,6 +21,18 @@
             <p class="help">↑ / ↓ flytter ketsjeren</p>
         </div>
         <p id="status"></p>
+
+        <!-- Filled by scores.js from /api/scores (message 6 in docs/MESSAGES.md) -->
+        <section class="scores">
+            <div>
+                <h2>Highscore <small>solo</small></h2>
+                <ol id="top-scores"></ol>
+            </div>
+            <div>
+                <h2>Seneste spil</h2>
+                <ol id="latest-scores"></ol>
+            </div>
+        </section>
     </main>
 
     <!-- SignalR client (global variable signalR), must load before main.js -->

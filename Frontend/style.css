@@ -81,3 +81,56 @@ button:disabled {
   font-size: 12px;
   color: #e12d41;
 }
+
+/* Highscore lists under the game (scores.js) */
+.scores {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+  width: min(600px, 100%);
+}
+
+.scores > div {
+  flex: 1 1 260px;
+  padding: 16px;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 12px;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.15);
+}
+
+.scores h2 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #ffe12d;
+  text-shadow: 0 0 8px #ffe12d;
+}
+
+.scores small {
+  font-size: 8px;
+  color: #78b9e6;
+  text-shadow: none;
+}
+
+.scores ol {
+  margin: 0;
+  padding-left: 24px;
+  font-size: 10px;
+  line-height: 2;
+}
+
+.scores li span {
+  display: inline-block;
+  min-width: 3em;
+  margin-right: 8px;
+}
+
+.scores li span:nth-child(3) {
+  color: #78b9e6; /* solo / duo */
+}
+
+.scores .empty {
+  list-style: none;
+  margin-left: -24px;
+  color: #78b9e6;
+}

@@ -1,4 +1,5 @@
 import { draw } from './draw.js';
+import { refreshScores } from './scores.js';
 // Where the game runs. Both files have the same functions, so only this line changes:
 // './fakeGame.js' = fake game in the browser, './network.js' = Oliver's /gamehub (SignalR)
 import { getState, startGame, updateGame, setPaddleDirection, isConnected } from './network.js';
@@ -27,6 +28,9 @@ window.addEventListener('keyup', (event) => onKey(event, false));
 
 // Game loop: the browser calls frame() before every screen refresh (~60 times a second)
 let lastTime = performance.now();
+let lastStatus = null; // to notice the moment a game ends
+
+refreshScores(); // highscore lists under the game, when the page opens
 
 function frame(now) {
   // Seconds since the last frame; max 0.05 so the ball does not jump after a hidden tab
@@ -36,6 +40,10 @@ function frame(now) {
   updateGame(dt);
   const state = getState();
   draw(ctx, state);
+
+  // A game just ended → the backend has saved it, so load the lists again
+  if (state.status === 'gameover' && lastStatus === 'playing') setTimeout(refreshScores, 1500); // ScoreSaver saves every 0.5 s
+  lastStatus = state.status;
 
   startButton.textContent = state.status === 'gameover' ? 'Spil igen' : 'Start';
   startButton.disabled = state.status === 'playing' || !isConnected();
